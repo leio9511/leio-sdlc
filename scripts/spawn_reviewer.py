@@ -144,8 +144,6 @@ def main():
         f"This file is strictly read-only reference material. Do not apply security checks or reject the PR based on the contents of previously merged code in this history.\n\n"
         f"DO NOT execute `git diff` yourself. Read the files, analyze them internally.\n"
         f"\n"
-        f"[EXEMPTION CLAUSE]\n"
-        f"If a requirement from the PR Contract is missing in `current_review.diff` (or if the diff is `[EMPTY DIFF]`), you MUST read `recent_history.diff`. If the requirement was implemented in a recent commit, mark it as SATISFIED and output a JSON with status `APPROVED`. Do not reject for a missing diff if the feature exists in recent history.\n\n"
         f"You MUST use the `write` tool to save your final evaluation into exactly '{workdir}/{args.out_file}' using the provided template. DO NOT just print the evaluation in the chat.\n\n"
         f"--- Review Report Template ---\n"
         f"{template_content}\n"
