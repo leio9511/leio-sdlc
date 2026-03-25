@@ -139,10 +139,10 @@ def main():
 
         f"I have already generated the code diff for you. "
         f"Use the `read` tool to read the file: {diff_file} \n"
-        f"Please perform your standard review process exclusively on the contents of this file.\n\n"
+        f"All security checks, redlines, and logic validations MUST be strictly applied ONLY to this file.\n\n"
         f"--- READ-ONLY REFERENCE HISTORY (PREVIOUSLY MERGED) ---\n"
         f"Additionally, you can read the recent commit history via `recent_history.diff` if needed.\n"
-        f"This file is strictly read-only context to help you understand what was already merged. It is not the target of your review.\n\n"
+        f"This file is strictly read-only reference material. Do not apply security checks or reject the PR based on the contents of previously merged code in this history.\n\n"
         f"DO NOT execute `git diff` yourself. Read the files, analyze them internally.\n"
         f"\n"
         f"[EXEMPTION CLAUSE]\n"

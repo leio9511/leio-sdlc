@@ -43,8 +43,8 @@ class TestReviewerContextIsolation(unittest.TestCase):
         # Verify the headers exist and are separated
         self.assertIn("--- TARGET FOR REVIEW (CURRENT CODE CHANGES) ---", prompt_content)
         self.assertIn("--- READ-ONLY REFERENCE HISTORY (PREVIOUSLY MERGED) ---", prompt_content)
-        self.assertIn("strictly read-only context to help you understand what was already merged", prompt_content)
-        self.assertIn("Please perform your standard review process exclusively on the contents of this file", prompt_content)
+        self.assertIn("strictly read-only reference material", prompt_content)
+        self.assertIn("All security checks, redlines, and logic validations MUST be strictly applied ONLY to this file", prompt_content)
 
 if __name__ == '__main__':
     unittest.main()
