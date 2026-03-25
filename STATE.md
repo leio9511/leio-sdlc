@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1025] PRD-1025: Reviewer LGTM Bypass**: Refactored orchestrator to parse strict JSON status and physically isolated history diffs in reviewer prompt.
 - [x] **[ISSUE-1018] PRD-1018: Enforce Channel Parameter**: Orchestrator now strictly requires --channel and fails-fast on missing notification target. (v0.5.5)
 - [x] **[ISSUE-1015] PRD-1015: Hard-Copy Deployment Strategy**: Replaced symlink Blue/Green deploy with atomic directory swapping for AgentSkills. (v0.5.4)
 - [x] **[ISSUE-1019] PRD-1019: Clean Workspace Escalation**: Git reset --hard and clean -fd on State 5 Tier 1 recovery. (v0.5.3)

@@ -53,6 +53,26 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
     if effective_channel:
         subprocess.run(["openclaw", "message", "send", "--channel", effective_channel.split(":")[0], "-t", effective_channel.split(":")[1] if ":" in effective_channel else effective_channel, "-m", msg], check=False)
 
+import json
+
+def parse_review_verdict(content):
+    """
+    Parses structured JSON review status: {"status": "APPROVED", "comments": "..."}
+    Matches the prompt given to the Reviewer.
+    """
+    try:
+        # Search for code blocks or literal json
+        json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'(\{.*?\})', content, re.DOTALL)
+        
+        if json_match:
+            data = json.loads(json_match.group(1).strip())
+            return data.get("status")
+    except (json.JSONDecodeError, AttributeError, ValueError):
+        pass
+    return None
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--workdir", required=True)
@@ -221,7 +241,10 @@ def main():
                 if os.path.exists(review_report_path):
                     with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
                 else: review_content = ""
-                if "[LGTM]" in review_content:
+                
+                # New Structured JSON Parsing logic
+                verdict = parse_review_verdict(review_content)
+                if verdict == "APPROVED":
                     subprocess.run(["git", "reset", "--hard", "HEAD"])
                     subprocess.run(["git", "clean", "-fd"])
                     safe_git_checkout("master")
@@ -235,7 +258,7 @@ def main():
                     else:
                         state_5_trigger = True
                         break
-                elif "[ACTION_REQUIRED]" in review_content:
+                elif verdict == "ACTION_REQUIRED" or "[ACTION_REQUIRED]" in review_content:
                     rejection_count += 1
                     if rejection_count < 5:
                         subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir])

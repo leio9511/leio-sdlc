@@ -80,7 +80,7 @@ def main():
         f.write(content)
 
     import subprocess
-    subprocess.run(["git", "add", file_path], check=True)
+    subprocess.run(["git", "add", "-f", file_path], check=True)
 
     print(f"[PR_CREATED] {file_path}")
 

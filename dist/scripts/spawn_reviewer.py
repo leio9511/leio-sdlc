@@ -123,17 +123,38 @@ def main():
         f"You are explicitly forbidden from manually editing the markdown file's status field.\n\n"
         f"--- REVIEWER PLAYBOOK ---\n{playbook_content}\n------------------------\n\n"
         f"You are the Reviewer. Please strictly follow your playbook.\n\n"
-        f"You must output EXACTLY one status tag in the Verdict section: either `[LGTM]` or `[ACTION_REQUIRED]`. Do not output both.\n\n"
+        f"You MUST output a structured JSON verdict at the end of your response inside a code block:\n"
+        f"```json\n"
+        f"{{\"status\": \"APPROVED\", \"comments\": \"...\"}}\n"
+        f"```\n"
+        f"OR\n"
+        f"```json\n"
+        f"{{\"status\": \"ACTION_REQUIRED\", \"comments\": \"...\"}}\n"
+        f"```\n"
+        f"Use status: \"APPROVED\" if the changes look good. Use status: \"ACTION_REQUIRED\" if any issues were found.\n\n"
         f"--- PR Contract ---\n"
         f"{pr_content}\n"
         f"-------------------\n\n"
+        f"--- TARGET FOR REVIEW (CURRENT CODE CHANGES) ---\n"
+
         f"I have already generated the code diff for you. "
         f"Use the `read` tool to read the file: {diff_file} \n"
+        f"All security checks, redlines, and logic validations MUST be strictly applied ONLY to this file.\n\n"
+        f"--- READ-ONLY REFERENCE HISTORY (PREVIOUSLY MERGED) ---\n"
         f"Additionally, you can read the recent commit history via `recent_history.diff` if needed.\n"
-        f"DO NOT execute `git diff` yourself. Read the file, analyze it internally.\n"
+        f"This file is strictly read-only reference material. Do not apply security checks or reject the PR based on the contents of previously merged code in this history.\n\n"
+        f"DO NOT execute `git diff` yourself. Read the files, analyze them internally.\n"
+        f"\n"
+        f"### Context Isolation\n"
+        f"You MUST cleanly isolate `recent_history.diff` from `current_review.diff`.\n"
+        f"- `recent_history.diff`: Strictly READ-ONLY reference material to check if requirements were previously satisfied.\n"
+        f"- `current_review.diff`: This is the ONLY code that should be subjected to security checks, redlines, and logic validations.\n"
+        f"DO NOT reject the current PR based on code found in `recent_history.diff`.\n"
         f"\n"
         f"[EXEMPTION CLAUSE]\n"
-        f"If a requirement from the PR Contract is missing in `current_review.diff` (or if the diff is `[EMPTY DIFF]`), you MUST read `recent_history.diff`. If the requirement was implemented in a recent commit, mark it as SATISFIED and output `[LGTM]`. Do not reject for a missing diff if the feature exists in recent history.\n\n"
+        f"If a requirement from the PR Contract is missing in `current_review.diff` (or if the diff is `[EMPTY DIFF]`), you MUST read `recent_history.diff`. If the requirement was implemented in a recent commit, mark it as SATISFIED and output a JSON with status `APPROVED`. Do not reject for a missing diff if the feature exists in recent history.\n\n"
+
+        f"\n"
         f"You MUST use the `write` tool to save your final evaluation into exactly '{workdir}/{args.out_file}' using the provided template. DO NOT just print the evaluation in the chat.\n\n"
         f"--- Review Report Template ---\n"
         f"{template_content}\n"
@@ -147,7 +168,7 @@ def main():
             tf.write(task_string)
         # Mock LLM writing the report
         with open(os.path.join(workdir, args.out_file), "w") as rf:
-            rf.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
+            rf.write('```json\n{"status": "APPROVED", "comments": "Mock LGTM"}\n```')
         print('{"status": "mock_success", "role": "reviewer"}')
         sys.exit(0)
 
