@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+import os
+import sys
+import glob
+import subprocess
+import re
+import argparse
+import uuid
+import time
+import fcntl
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from git_utils import safe_git_checkout, GitCheckoutError
+from notification_formatter import format_notification
+from handoff_prompter import HandoffPrompter
+
+MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
+
+def set_pr_status(pr_file, new_status):
+    with open(pr_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    updated = re.sub(r'^status:\s*\S+', f'status: {new_status}', content, count=1, flags=re.MULTILINE)
+    with open(pr_file, 'w', encoding='utf-8') as f:
+        f.write(updated)
+    subprocess.run(["git", "add", pr_file], check=False)
+    subprocess.run(["git", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
+
+def get_pr_slice_depth(pr_file):
+    with open(pr_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    match = re.search(r'slice_depth:\s*(\d+)', content)
+    if match:
+        return int(match.group(1))
+    return 0
+
+def teardown_coder_session(workdir):
+    session_file = os.path.join(workdir, ".coder_session")
+    if os.path.exists(session_file):
+        with open(session_file, "r") as f:
+            session_key = f.read().strip()
+        if session_key:
+            print(f"Tearing down coder session {session_key}")
+        try:
+            os.remove(session_file)
+        except OSError:
+            pass
+
+def notify_channel(effective_channel, msg, event_type=None, context=None):
+    if event_type:
+        msg = format_notification(event_type, context or {})
+    else:
+        msg = f"🤖 [SDLC Engine] {msg}"
+    if effective_channel:
+        subprocess.run(["openclaw", "message", "send", "--channel", effective_channel.split(":")[0], "-t", effective_channel.split(":")[1] if ":" in effective_channel else effective_channel, "-m", msg], check=False)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--workdir", required=True)
+    parser.add_argument("--prd-file", required=True)
+    parser.add_argument("--max-prs-to-process", type=int, default=50)
+    parser.add_argument("--coder-session-strategy", default="on-escalation", choices=["always", "per-pr", "on-escalation"])
+    parser.add_argument("--force-replan", action="store_true")
+    parser.add_argument("--channel", help="Notification channel")
+    parser.add_argument("--global-dir", help="Global workspace path")
+    parser.add_argument("--test-sleep", action="store_true")
+    args = parser.parse_args()
+
+    workdir = os.path.abspath(args.workdir)
+    global_dir = os.path.abspath(args.global_dir) if args.global_dir else workdir
+    os.chdir(workdir)
+
+    if args.test_sleep:
+        lock_path = os.path.join(workdir, ".sdlc_repo.lock")
+        with open(lock_path, "w") as f: f.write("locked")
+        time.sleep(2)
+        sys.exit(0)
+
+    if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
+        if not os.path.exists(".git"):
+            print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
+            sys.exit(1)
+        branch_output = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
+        if branch_output not in ["master", "main"]:
+            print(f"[FATAL] Orchestrator must be started from the master or main branch. Current: {branch_output}")
+            sys.exit(1)
+
+    try:
+        lock_path = os.path.join(workdir, ".sdlc_repo.lock")
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("[FATAL] Another SDLC pipeline is currently running. Concurrent execution is blocked.")
+        sys.exit(1)
+
+    status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+    if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
+    if status_output.strip():
+        print("[FATAL] Dirty Git Workspace detected!")
+        print(HandoffPrompter.get_prompt("dirty_workspace"))
+        sys.exit(1)
+
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    effective_channel = args.channel or os.environ.get("OPENCLAW_SESSION_KEY") or os.environ.get("OPENCLAW_CHANNEL_ID")
+    if not effective_channel:
+        print("[FATAL] Missing channel parameter.")
+        print("[FATAL_STARTUP]")
+        sys.exit(1)
+
+    prd_filename = os.path.basename(args.prd_file)
+    base_name, _ = os.path.splitext(prd_filename)
+    job_dir_rel = os.path.join("docs", "PRs", base_name)
+    job_dir = os.path.abspath(os.path.join(workdir, job_dir_rel))
+
+    if os.path.exists(job_dir) and not args.force_replan:
+        md_files = glob.glob(os.path.join(job_dir, "*.md"))
+        if len(md_files) > 0:
+            print("State 0: Existing PRs detected. Resuming queue...")
+            notify_channel(effective_channel, "Ignition: Resuming existing queue...", "sdlc_resume", {"prd_id": prd_filename})
+    else:
+        if args.force_replan and os.path.exists(job_dir):
+            import shutil
+            shutil.rmtree(job_dir)
+        print("State 0: Auto-slicing PRD...")
+        notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
+        notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
+        try:
+            subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], check=True)
+        except subprocess.CalledProcessError: pass
+        if not os.path.exists(job_dir):
+            print("[FATAL] Planner failed to generate any PRs.")
+            sys.exit(1)
+        md_files = glob.glob(os.path.join(job_dir, "*.md"))
+        if len(md_files) == 0:
+            print("[FATAL] Planner failed to generate any PRs.")
+            sys.exit(1)
+        notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
+
+    loops = 0
+    while True:
+        if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
+            print(f"Max runs reached. Exiting orchestrator.")
+            break
+        loops += 1
+        md_files = glob.glob(os.path.join(job_dir, "*.md"))
+        md_files.sort()
+        current_pr = None
+        for md_file in md_files:
+            with open(md_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if re.search(r'^status:\s*in_progress', content, re.MULTILINE):
+                    current_pr = md_file
+                    break
+        if not current_pr:
+            result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "get_next_pr.py"), "--workdir", workdir, "--job-dir", job_dir], capture_output=True, text=True)
+            output = result.stdout.strip()
+            if "[QUEUE_EMPTY]" in output or not output:
+                print("No open PRs found. Exiting.")
+                notify_channel(effective_channel, "Success: All PRs completed!", "all_done", {"prd_id": prd_filename})
+                sys.exit(0)
+            current_pr = output.split('\n')[-1].strip()
+            if not os.path.exists(current_pr): sys.exit(1)
+            set_pr_status(current_pr, "in_progress")
+
+        if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir)
+        base_filename = os.path.splitext(os.path.basename(current_pr))[0]
+        parent_dir_name = os.path.basename(os.path.dirname(os.path.abspath(current_pr)))
+        branch_name = f"{parent_dir_name}/{base_filename}".replace(":", "_").replace(" ", "_").replace("?", "_")
+        reset_count = 0
+        pr_done = False
+        while True:
+            if pr_done: break
+            status_result = subprocess.run(["git", "diff", "--cached", "--quiet"])
+            if status_result.returncode != 0:
+                subprocess.run(["git", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
+            print(f"State 2: Checking out branch {branch_name}")
+            try:
+                branch_check = subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
+                if branch_check.returncode == 0: safe_git_checkout(branch_name)
+                else: safe_git_checkout(branch_name, create=True)
+            except GitCheckoutError as e: sys.exit(1)
+            rejection_count = 0
+            state_5_trigger = False
+            while True:
+                if args.coder_session_strategy == "always": teardown_coder_session(workdir)
+                print(f"State 3: Spawning Coder for {current_pr}")
+                try:
+                    coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], timeout=MAX_RUNTIME)
+                    if coder_result.returncode != 0:
+                        state_5_trigger = True
+                        break
+                except subprocess.TimeoutExpired:
+                    state_5_trigger = True
+                    break
+                status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+                if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
+                if status_output.strip():
+                    coder_state_file = os.path.join(workdir, ".coder_state.json")
+                    dirty_acknowledged = False
+                    if os.path.exists(coder_state_file):
+                        try:
+                            import json
+                            with open(coder_state_file, "r") as f:
+                                state_data = json.load(f)
+                                if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
+                        except Exception: pass
+                    if not dirty_acknowledged:
+                        try:
+                            coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], timeout=MAX_RUNTIME)
+                            if coder_result.returncode != 0:
+                                state_5_trigger = True
+                                break
+                        except subprocess.TimeoutExpired:
+                            state_5_trigger = True
+                            break
+                        continue
+                review_artifact = "Review_Report.md"
+                review_report_path = os.path.join(workdir, review_artifact)
+                if os.path.exists(review_report_path): os.remove(review_report_path)
+                print(f"State 4: Spawning Reviewer for {current_pr}")
+                subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact])
+                if os.path.exists(review_report_path):
+                    with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
+                else: review_content = ""
+                if "[LGTM]" in review_content:
+                    subprocess.run(["git", "reset", "--hard", "HEAD"])
+                    subprocess.run(["git", "clean", "-fd"])
+                    safe_git_checkout("master")
+                    merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                    if merge_result.returncode == 0:
+                        subprocess.run(["git", "branch", "-D", branch_name], check=True)
+                        set_pr_status(current_pr, "closed")
+                        teardown_coder_session(workdir)
+                        pr_done = True
+                        break
+                    else:
+                        state_5_trigger = True
+                        break
+                elif "[ACTION_REQUIRED]" in review_content:
+                    rejection_count += 1
+                    if rejection_count < 5:
+                        subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir])
+                        continue
+                    else:
+                        arbitrator_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], capture_output=True, text=True)
+                        if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
+                            subprocess.run(["git", "reset", "--hard", "HEAD"])
+                            subprocess.run(["git", "clean", "-fd"])
+                            safe_git_checkout("master")
+                            merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                            if merge_result.returncode == 0:
+                                subprocess.run(["git", "branch", "-D", branch_name], check=True)
+                                set_pr_status(current_pr, "closed")
+                                teardown_coder_session(workdir)
+                                pr_done = True
+                                break
+                            else:
+                                state_5_trigger = True
+                                break
+                        else:
+                            state_5_trigger = True
+                            break
+                else:
+                    state_5_trigger = True
+                    break
+            if state_5_trigger:
+                if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
+                if reset_count == 0:
+                    print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
+                    subprocess.run(["git", "reset", "--hard"], check=False)
+                    subprocess.run(["git", "clean", "-fd"], check=False)
+                    safe_git_checkout("master")
+                    subprocess.run(["git", "branch", "-D", branch_name], check=False)
+                    reset_count += 1
+                    continue
+                else:
+                    slice_depth = get_pr_slice_depth(current_pr)
+                    if slice_depth < 2:
+                        pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
+                        subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir])
+                        pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
+                        new_files = pr_files_after - pr_files_before
+                        if len(new_files) >= 2:
+                            set_pr_status(current_pr, "superseded")
+                            pr_done = True
+                            break
+                        else:
+                            set_pr_status(current_pr, "blocked_fatal")
+                            sys.exit(1)
+                    else:
+                        set_pr_status(current_pr, "blocked_fatal")
+                        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -e
+
+# Emulate setup_sandbox
+setup_sandbox() {
+    TEST_DIR="/tmp/$1"
+    mkdir -p "$TEST_DIR"
+    cp -r /root/.openclaw/workspace/projects/leio-sdlc/* "$TEST_DIR/"
+    cd "$TEST_DIR"
+    export PYTHONPATH="$TEST_DIR"
+    export WORKSPACE_DIR="$TEST_DIR"
+    mkdir -p docs/PRDs docs/PRs/PRD
+}
+
+cleanup_sandbox() {
+    rm -rf "/tmp/$1"
+}
+
+echo "================================================="
+echo "Testing: Planner Micro-Slicing Logic"
+echo "================================================="
+
+setup_sandbox "test_planner_slice"
+export SDLC_TEST_MODE=true
+
+# Create a mock PRD
+echo "# Mock PRD" > PRD.md
+
+# Test Scenario 1: Regression (Happy Path)
+echo "Running Test Scenario 1 (Regression)..."
+python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir .
+if [[ ! -f "docs/PRs/PRD/PR_A.md" || ! -f "docs/PRs/PRD/PR_B.md" ]]; then
+    echo "❌ Scenario 1 Failed: Expected mock PRs not created."
+    exit 1
+fi
+echo "✅ Scenario 1 Passed."
+
+# Test Scenario 2: File Missing
+echo "Running Test Scenario 2 (File Missing)..."
+if python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr fake.md > error_log.txt 2>&1; then
+    echo "❌ Scenario 2 Failed: Expected script to exit with error."
+    exit 1
+fi
+if ! grep -q "\[Pre-flight Failed\]" error_log.txt; then
+    echo "❌ Scenario 2 Failed: Missing '[Pre-flight Failed]' error message."
+    exit 1
+fi
+echo "✅ Scenario 2 Passed."
+
+# Test Scenario 3: Successful Slice
+echo "Running Test Scenario 3 (Successful Slice)..."
+echo "# Failed PR content" > Failed_PR.md
+python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr Failed_PR.md
+if [[ ! -f "docs/PRs/PRD/PR_Slice_1.md" || ! -f "docs/PRs/PRD/PR_Slice_2.md" ]]; then
+    echo "❌ Scenario 3 Failed: Expected mock slice PRs not created."
+    exit 1
+fi
+echo "✅ Scenario 3 Passed."
+
+cleanup_sandbox "test_planner_slice"
+echo "✅ test_planner_slice_failed_pr.sh passed."
+exit 0

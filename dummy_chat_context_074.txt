@@ -1,0 +1,4 @@
+User (Boss): "等一下，这里有问题。加 catch 这么简单的操作，为什么 worker 会搞不定而触发切分？这会不会是给的任务有问题而导致死锁？或者让 worker 开始工作的时候环境不对？"
+Assistant (System): "这是一个极其荒诞且致命的多米诺骨牌效应！源头Bug (ISSUE-074) 是：在 scripts/orchestrator.py 内部，它跑完审查员（State 4）之后，期望从磁盘读取一句 [LGTM] 或者 [ACTION_REQUIRED]。但它写死了一个远古时期的名字：review_report.txt。而 spawn_reviewer.py 被强制指令必须把结果写进 Review_Report.md。这导致 Orchestrator 永远读不到结果，永远判定为 Invalid Reviewer output，永远打回重做，最后导致微切片和 Git Checkout 崩溃。"
+User (Boss): "难道不应该是 orchestrator 要什么文件，就把文件名传给 reviewer 然后之后再读么？问题出在 orchestrator 的逻辑上"
+Assistant (System): "一语惊醒梦中人！这是架构级的依赖注入（Dependency Injection）。Orchestrator 必须是单一事实来源（Single Source of Truth）。spawn_reviewer.py 不应该自己决定把报告写在哪。它必须新增一个参数 --out-file <path>。Orchestrator 在 State 4 召唤审查员时发号施令，并去这个自己指定的路径读成绩单。同时，在发号施令前，Orchestrator 先亲手把这个路径清空（Stale File Cleanup）。"

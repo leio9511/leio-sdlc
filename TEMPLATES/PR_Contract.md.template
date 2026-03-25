@@ -1,0 +1,13 @@
+status: open
+
+# PR-[ID]: [Title]
+
+## 1. Objective
+[Clearly state the functional goal of this specific PR]
+
+## 2. Scope (Functional & Implementation Freedom)
+[Describe the logical components to be built. DO NOT list exact file paths.]
+*The Coder MUST search the workspace, understand the existing code structure, and autonomously decide which files to create or modify to implement this logic.*
+
+## 3. TDD & Acceptance Criteria
+[Define the functional conditions and assertions required to pass this PR. The Coder MUST ensure all tests run GREEN before submitting.]
