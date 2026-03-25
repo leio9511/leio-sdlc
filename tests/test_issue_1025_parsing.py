@@ -8,36 +8,7 @@ from unittest.mock import patch, MagicMock
 
 # Add scripts to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
-
-# We will need to mock components that orchestrator.py imports or uses
-# For now, let's just test the parsing logic we intend to implement.
-
-def parse_review_verdict(content):
-    """
-    Proposed implementation of the parsing logic.
-    We look for a JSON block in the content.
-    """
-    # Simple regex to find JSON-like structure or just try to find the first '{' and last '}'
-    try:
-        # Try to find a JSON block between ```json and ```
-        import re
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
-        if json_match:
-            data = json.loads(json_match.group(1))
-            return data.get("status")
-        
-        # Fallback: try to find any JSON-like object
-        json_match = re.search(r'(\{.*?\})', content, re.DOTALL)
-        if json_match:
-            data = json.loads(json_match.group(1))
-            return data.get("status")
-    except (json.JSONDecodeError, AttributeError):
-        pass
-    
-    # Fallback to old behavior if no valid JSON found? 
-    # The PR contract says: "Do not use string matching for approval status."
-    # So we should probably return None or raise error if JSON is missing/invalid.
-    return None
+from orchestrator import parse_review_verdict
 
 class TestReviewParsing(unittest.TestCase):
     def test_json_approval(self):

@@ -46,7 +46,7 @@ git commit -m "Feature commit B: fix buggy test" > /dev/null
 # To prevent actually calling out to openclaw in tests, let's set the environment variable.
 export SDLC_TEST_MODE=true
 
-python3 "$SPAWN_SCRIPT" --pr-file "$DUMMY_PR" --diff-target master --workdir "$WORKSPACE"
+python3 "$SPAWN_SCRIPT" --pr-file "$DUMMY_PR" --diff-target master --workdir "$WORKSPACE" --global-dir "$WORKSPACE"
 
 # Assertions:
 # 1. Read the generated recent_history.diff.
