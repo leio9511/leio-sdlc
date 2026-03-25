@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR Contract: PR_02B_Orchestrator_JSON_Review_Parsing
 
