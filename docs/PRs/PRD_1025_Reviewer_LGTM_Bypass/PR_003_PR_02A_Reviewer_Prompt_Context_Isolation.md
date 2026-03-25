@@ -1,4 +1,4 @@
-status: in_progress
+status: open
 
 # PR Contract: PR_02A_Reviewer_Prompt_Context_Isolation
 
