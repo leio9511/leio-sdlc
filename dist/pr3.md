@@ -1,15 +1,16 @@
 status: open
 
-# PR-003: React UI Login and Registration
+# PR-003: Migrate to Native Backgrounding
 
 ## 1. Objective
-Implement the frontend user interface for authentication.
+Prevent agent deadlocks by replacing legacy shell backgrounding (`nohup` and `&`) with native OpenClaw `exec(background: true)` parameters across all relevant skill templates.
 
-## 2. Scope & Implementation Details
-- Create `src/components/Login.js` and `src/components/Register.js`.
-- Implement form state management and API calls to backend endpoints.
+## 2. Scope (Functional & Implementation Freedom)
+- Refactor skill definitions and templates to remove legacy backgrounding commands.
+- Apply the OpenClaw native `exec` backgrounding pattern to ensure completion events are properly routed back to the Agent Loop.
+*The Coder MUST search the workspace, understand the existing code structure, and autonomously decide which files to create or modify to implement this logic.*
 
 ## 3. TDD & Acceptance Criteria
-- Write component tests in `src/components/__tests__/Auth.test.js`.
-- Assert rendering of forms.
-- Mock API calls and assert successful login updates the UI state.
+- Verify via static analysis or testing that `nohup` and `&` are completely removed from the targeted skill templates.
+- Ensure the modified templates correctly specify the `background: true` parameter for long-running execution commands.
+- All tests must pass (GREEN).
