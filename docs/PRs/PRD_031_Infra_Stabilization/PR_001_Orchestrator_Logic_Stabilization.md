@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-001: Orchestrator Logic Stabilization (Channel Parsing & PRD Guardrail)
 
