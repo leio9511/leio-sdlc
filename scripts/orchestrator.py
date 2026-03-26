@@ -87,6 +87,8 @@ def main():
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     workdir = os.path.abspath(args.workdir)
+    from git_utils import check_git_boundary
+    check_git_boundary(workdir)
     global_dir = os.path.dirname(RUNTIME_DIR) if not args.global_dir else os.path.abspath(args.global_dir)
     os.chdir(workdir)
 
