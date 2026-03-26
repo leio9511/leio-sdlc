@@ -1,22 +1,6 @@
 # .sdlc_guardrail
 # SDLC Framework Protective Boundaries
 
-# Framework Scripts (PROTECTED)
-preflight.sh
-run.sh
-deploy.sh
-scripts/orchestrator.py
-scripts/spawn_coder.py
-scripts/spawn_planner.py
-scripts/spawn_reviewer.py
-scripts/spawn_manager.py
-scripts/create_pr_contract.py
-scripts/git_utils.py
-
-# Templates (PROTECTED)
-TEMPLATES/
-playbooks/
-
 # Runtime State (PROTECTED)
 .coder_session
 .coder_state.json

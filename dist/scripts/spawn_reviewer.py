@@ -53,8 +53,9 @@ def main():
     parser.add_argument("--job-dir", required=False, default=".", help="Working directory for the Reviewer to generate artifacts")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--out-file", default="Review_Report.md", help="Path to write the review report")
-    parser.add_argument("--global-dir", required=True, help="Global directory for templates/playbooks")
+    parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
 
     workdir = os.path.abspath(args.workdir)

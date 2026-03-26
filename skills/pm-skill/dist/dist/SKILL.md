@@ -20,10 +20,8 @@ You MUST adhere to the exact structure, headers, and format defined in that temp
 If the user's request involves modifying any protected SDLC Framework scripts (e.g., `orchestrator.py`, `spawn_planner.py`, `merge_code.py`), you MUST add a new section to the PRD called `## Framework Modifications`. 
 In this section, explicitly list the exact absolute or relative paths of all framework scripts that the Coder is allowed to modify. This is required to pass the Reviewer's anti-tamper guardrail.
 
-## Scope Locking (CRITICAL POLYREPO DISCIPLINE)
-All project repositories are located inside the `/root/.openclaw/workspace/projects/` directory.
-When the user mentions a project name (e.g., "leio-sdlc" or "AMS"), you MUST resolve the target absolute directory to `/root/.openclaw/workspace/projects/<PROJECT_NAME>`.
-NEVER save files to the global root workspace directly. Explicitly identify this target absolute directory to prevent downstream agents from wandering into the wrong repository. 
+## Scope Locking
+You must explicitly identify the target project's absolute directory to prevent downstream agents from wandering into the wrong repository. 
 
 ## Autonomous Test Strategy (Core Value)
 You MUST autonomously define the optimal testing strategy based on the project type.
@@ -32,4 +30,4 @@ You MUST autonomously define the optimal testing strategy based on the project t
 - Web/Services: Define Probe/API or UI tests.
 
 ## Artifact Delivery
-You must use the `write` tool to physically save the PRD into the target project's `docs/PRDs/` directory (e.g., `/root/.openclaw/workspace/projects/leio-sdlc/docs/PRDs/PRD_XXX_Feature.md`).
+You must use the `write` tool to physically save the PRD into the target project's `docs/PRDs/` directory.

@@ -85,8 +85,9 @@ def main():
     parser.add_argument("--test-sleep", action="store_true")
     args = parser.parse_args()
 
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     workdir = os.path.abspath(args.workdir)
-    global_dir = os.path.abspath(args.global_dir) if args.global_dir else workdir
+    global_dir = os.path.dirname(RUNTIME_DIR) if not args.global_dir else os.path.abspath(args.global_dir)
     os.chdir(workdir)
 
     if args.test_sleep:
@@ -119,7 +120,6 @@ def main():
         print(HandoffPrompter.get_prompt("dirty_workspace"))
         sys.exit(1)
 
-    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     effective_channel = args.channel or os.environ.get("OPENCLAW_SESSION_KEY") or os.environ.get("OPENCLAW_CHANNEL_ID")
     if not effective_channel:
         print("[FATAL] Missing channel parameter.")
