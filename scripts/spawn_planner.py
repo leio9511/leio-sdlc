@@ -12,7 +12,8 @@ def main():
     parser.add_argument("--out-dir", required=False, default=None, help="Output directory for PRs")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--slice-failed-pr", required=False, default=None, help="Path to a failed PR file to slice")
-    parser.add_argument("--global-dir", required=True, help="Global directory for templates")
+    parser.add_argument("--global-dir", required=False, help="Global directory for templates")
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
 
     workdir = os.path.abspath(args.workdir)
@@ -40,7 +41,7 @@ def main():
 
     # Dynamic Toolchain Addressing
     SDLC_DIR = os.path.dirname(os.path.abspath(__file__))
-    global_dir = os.path.abspath(args.global_dir)
+    global_dir = os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(RUNTIME_DIR)
 
     # Scaffolding: Ensure new project has standard guardrail and ignore files
     scaffold_files = {

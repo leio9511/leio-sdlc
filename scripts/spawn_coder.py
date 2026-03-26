@@ -70,7 +70,8 @@ def main():
     parser.add_argument("--feedback-file", required=False, help="Path to the Review Report / Feedback file")
     parser.add_argument("--system-alert", required=False, help="System alert string (e.g. git status)")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
-    parser.add_argument("--global-dir", required=True, help="Global directory for playbooks")
+    parser.add_argument("--global-dir", required=False, help="Global directory for playbooks")
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
@@ -111,7 +112,7 @@ def main():
             
         # Inject Coder Playbook (PRD_1005)
         RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
-        global_dir = os.path.abspath(args.global_dir)
+        global_dir = os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(RUNTIME_DIR)
         playbook_path = os.path.join(global_dir, "playbooks", "coder_playbook.md")
         playbook_content = ""
         if os.path.exists(playbook_path):

@@ -86,7 +86,7 @@ def main():
     args = parser.parse_args()
 
     workdir = os.path.abspath(args.workdir)
-    global_dir = os.path.abspath(args.global_dir) if args.global_dir else workdir
+    global_dir = os.path.dirname(RUNTIME_DIR) if not args.global_dir else os.path.abspath(args.global_dir)
     os.chdir(workdir)
 
     if args.test_sleep:
