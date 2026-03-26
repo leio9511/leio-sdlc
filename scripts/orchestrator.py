@@ -51,7 +51,14 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
     else:
         msg = f"🤖 [SDLC Engine] {msg}"
     if effective_channel:
-        subprocess.run(["openclaw", "message", "send", "--channel", effective_channel.split(":")[0], "-t", effective_channel.split(":")[1] if ":" in effective_channel else effective_channel, "-m", msg], check=False)
+        parts = effective_channel.split(":", 1)
+        channel_arg = parts[0] if ":" in effective_channel else None
+        target_arg = parts[1] if ":" in effective_channel else effective_channel
+        cmd = ["openclaw", "message", "send"]
+        if channel_arg:
+            cmd.extend(["--channel", channel_arg])
+        cmd.extend(["-t", target_arg, "-m", msg])
+        subprocess.run(cmd, check=False)
 
 import json
 
@@ -98,6 +105,17 @@ def main():
         time.sleep(2)
         sys.exit(0)
 
+    prd_path_abs = os.path.abspath(args.prd_file)
+    if os.path.exists(prd_path_abs):
+        try:
+            subprocess.run(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
+        except subprocess.CalledProcessError:
+            print(f"[FATAL] PRD file '{args.prd_file}' is untracked by Git. Please commit it before running.")
+            sys.exit(1)
+        status_out = subprocess.run(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
+        if status_out:
+            print(f"[FATAL] PRD file '{args.prd_file}' has uncommitted changes. Please commit it before running.")
+            sys.exit(1)
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
         if not os.path.exists(".git"):
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
