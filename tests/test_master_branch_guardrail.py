@@ -57,7 +57,7 @@ class TestMasterBranchGuardrail(unittest.TestCase):
         if "SDLC_BYPASS_BRANCH_CHECK" in env:
             del env["SDLC_BYPASS_BRANCH_CHECK"]
 
-        test_args = ["orchestrator.py", "--workdir", ".", "--prd-file", "dummy.md"]
+        test_args = ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"]
 
         with patch.dict(os.environ, env):
             with patch.object(sys, 'argv', test_args):

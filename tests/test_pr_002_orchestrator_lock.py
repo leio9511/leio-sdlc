@@ -15,7 +15,7 @@ class TestOrchestratorLock(unittest.TestCase):
         
         # Start first instance
         proc1 = subprocess.Popen(
-            ["python3", orchestrator_path, "--workdir", workdir, "--prd-file", "dummy", "--test-sleep"],
+            ["python3", orchestrator_path, "--enable-exec-from-workspace", "--workdir", workdir, "--prd-file", "dummy", "--test-sleep"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
@@ -27,7 +27,7 @@ class TestOrchestratorLock(unittest.TestCase):
         
         # Start second instance
         proc2 = subprocess.Popen(
-            ["python3", orchestrator_path, "--workdir", workdir, "--prd-file", "dummy"],
+            ["python3", orchestrator_path, "--enable-exec-from-workspace", "--workdir", workdir, "--prd-file", "dummy"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 
 def test_invalid_strategy():
     result = subprocess.run(
-        [sys.executable, "scripts/orchestrator.py", "--workdir", ".", "--prd-file", "dummy.md", "--coder-session-strategy", "invalid-strategy"],
+        [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--coder-session-strategy", "invalid-strategy"],
         capture_output=True, text=True
     )
     assert result.returncode != 0
@@ -17,7 +17,7 @@ def test_invalid_strategy():
 
 def test_missing_workdir():
     result = subprocess.run(
-        [sys.executable, "scripts/orchestrator.py", "--prd-file", "dummy.md"],
+        [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md"],
         capture_output=True, text=True
     )
     assert result.returncode != 0
@@ -56,7 +56,7 @@ def test_always_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, 
     mock_run.coder_calls = 0
     mock_subprocess_run.side_effect = mock_run
     
-    with patch('sys.argv', ['orchestrator.py', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'always', '--max-runs', '1']):
+    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'always', '--max-runs', '1']):
         try:
             orchestrator.main()
         except SystemExit:
@@ -87,7 +87,7 @@ def test_per_pr_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, 
     
     mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
     
-    with patch('sys.argv', ['orchestrator.py', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'per-pr', '--max-runs', '1']):
+    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'per-pr', '--max-runs', '1']):
         try:
             orchestrator.main()
         except SystemExit:
@@ -120,7 +120,7 @@ def test_on_escalation_strategy(mock_open, mock_set_pr_status, mock_exists, mock
         
     mock_subprocess_run.side_effect = mock_run
     
-    with patch('sys.argv', ['orchestrator.py', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'on-escalation', '--max-runs', '1']):
+    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'on-escalation', '--max-runs', '1']):
         try:
             orchestrator.main()
         except SystemExit:

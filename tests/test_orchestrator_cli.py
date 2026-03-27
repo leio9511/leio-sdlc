@@ -11,7 +11,7 @@ if not hasattr(git_utils, 'check_git_boundary'):
     git_utils.check_git_boundary = MagicMock()
 
 class TestOrchestratorCLI(unittest.TestCase):
-    @patch("sys.argv", ["orchestrator.py", "--prd-file", "dummy.md"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md"])
     def test_missing_workdir_exits(self):
         with self.assertRaises(SystemExit) as cm:
             import orchestrator
@@ -24,7 +24,7 @@ class TestOrchestratorCLI(unittest.TestCase):
         orchestrator.notify_channel("slack:channel:C12345", "Test message")
         mock_run.assert_called_with(["openclaw", "message", "send", "--channel", "slack", "-t", "channel:C12345", "-m", "🤖 [SDLC Engine] Test message"], check=False)
 
-    @patch("sys.argv", ["orchestrator.py", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test"])
     @patch("os.path.exists")
     @patch("subprocess.run")
     def test_prd_guardrail_untracked(self, mock_run, mock_exists):
@@ -56,7 +56,7 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test"])
     @patch("os.path.exists")
     @patch("subprocess.run")
     def test_prd_guardrail_modified(self, mock_run, mock_exists):
@@ -92,7 +92,7 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep"])
     @patch("os.path.exists")
     @patch("subprocess.run")
     def test_prd_guardrail_clean(self, mock_run, mock_exists):

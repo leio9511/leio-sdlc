@@ -8,7 +8,7 @@ class TestOrchestratorLock(unittest.TestCase):
     def test_concurrent_execution(self):
         env = os.environ.copy()
         env["SDLC_BYPASS_BRANCH_CHECK"] = "1"
-        cmd = [sys.executable, "scripts/orchestrator.py", "--workdir", ".", "--prd-file", "dummy.md", "--test-sleep"]
+        cmd = [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--test-sleep"]
         proc1 = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
         time.sleep(0.5)
         proc2 = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
@@ -22,7 +22,7 @@ class TestOrchestratorLock(unittest.TestCase):
 
     def test_branch_check(self):
         # Without bypass, should fail
-        cmd = [sys.executable, "scripts/orchestrator.py", "--workdir", ".", "--prd-file", "dummy.md", "--test-sleep"]
+        cmd = [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--test-sleep"]
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         # Since we are on a feature branch, it should exit with 1
         self.assertEqual(proc.returncode, 1)
