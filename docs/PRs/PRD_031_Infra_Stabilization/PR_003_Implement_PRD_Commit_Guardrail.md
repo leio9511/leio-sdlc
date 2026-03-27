@@ -1,4 +1,4 @@
-status: open
+status: superseded
 
 # PR-001: Implement PRD Commit Guardrail
 
