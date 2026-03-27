@@ -51,13 +51,15 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
     else:
         msg = f"🤖 [SDLC Engine] {msg}"
     if effective_channel:
-        parts = effective_channel.split(":", 1)
-        channel_arg = parts[0] if ":" in effective_channel else None
-        target_arg = parts[1] if ":" in effective_channel else effective_channel
         cmd = ["openclaw", "message", "send"]
-        if channel_arg:
-            cmd.extend(["--channel", channel_arg])
-        cmd.extend(["-t", target_arg, "-m", msg])
+        if ":" in effective_channel:
+            parts = effective_channel.split(":")
+            if len(parts) >= 2:
+                cmd.extend(["--channel", parts[0]])
+                cmd.extend(["-t", ":".join(parts[1:])])
+        else:
+            cmd.extend(["-t", effective_channel])
+        cmd.extend(["-m", msg])
         subprocess.run(cmd, check=False)
 
 import json
