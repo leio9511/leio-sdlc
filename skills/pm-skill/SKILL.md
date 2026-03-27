@@ -1,6 +1,6 @@
 ---
 name: pm-skill
-description: 扮演产品经理（PM）角色，负责在项目的 Copilot Ideation 阶段根据讨论生成标准化的 PRD（产品需求文档）。
+description: 强制指令：扮演产品经理（PM）角色。当要求撰写、修改或生成 PRD (产品需求文档) 时，必须且只能运行本 Skill 下的 pm.py。绝对禁止主 Agent 使用内置的 write 或 edit 工具手动生成或修改任何 PRD.md 文件。
 ---
 
 # Product Manager (PM) AgentSkill

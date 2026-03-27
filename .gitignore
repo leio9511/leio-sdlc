@@ -29,3 +29,9 @@ clean_coder_prompt_retry.txt
 docs/PRs/PRD_079_SDLC_Slack_Notifications/Review_Report_2.md
 .sdlc_run.lock
 .sdlc_repo.lock
+
+# Build Artifacts
+dist/
+__pycache__/
+*.pyc
+

@@ -1,8 +1,0 @@
-.git/
-.sdlc/
-docs/
-tests/
-*.log
-*.diff
-.review_count
-memory/
