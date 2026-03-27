@@ -1,0 +1,9 @@
+# Skill Template
+
+This is a generated AgentSkill template.
+
+## Usage
+Run the script using the `exec` tool with `background: true`:
+```
+python3 scripts/run.py
+```
