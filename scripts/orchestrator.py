@@ -9,6 +9,9 @@ import uuid
 import time
 import fcntl
 
+# Global marker for Git Hook authentication (PRD-1012)
+os.environ["SDLC_ORCHESTRATOR_RUNNING"] = "1"
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from git_utils import safe_git_checkout, GitCheckoutError
 from notification_formatter import format_notification

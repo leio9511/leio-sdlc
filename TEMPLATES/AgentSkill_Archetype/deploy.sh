@@ -97,7 +97,13 @@ perform_hard_copy_deployment() {
         openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
     fi
 
-    # 5. Auto-Cleanup
+    # 5. SDLC Guardrail (PRD-1012): Install pre-commit hook in active project
+    if [ -f "scripts/install_hook.sh" ] && [ -d ".git" ]; then
+        echo "🛡️ Installing SDLC commit guardrail..."
+        bash "scripts/install_hook.sh" || echo "⚠️ Hook installation failed."
+    fi
+
+    # 6. Auto-Cleanup
     echo "🧹 Pruning old backups..."
     ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
 

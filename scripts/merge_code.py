@@ -6,6 +6,9 @@ import subprocess
 import json
 import re
 
+# Global marker for Git Hook authentication (PRD-1012)
+os.environ["SDLC_ORCHESTRATOR_RUNNING"] = "1"
+
 def parse_review_verdict(content):
     """
     Parses structured JSON review status: {"status": "APPROVED", "comments": "..."}
