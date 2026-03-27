@@ -49,13 +49,28 @@ echo "✅ Scenario 2 Passed."
 
 # Test Scenario 3: Successful Slice
 echo "Running Test Scenario 3 (Successful Slice)..."
-echo "# Failed PR content" > Failed_PR.md
-python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr Failed_PR.md
+echo "# Failed PR content" > PR_001_Failed_PR.md
+python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr PR_001_Failed_PR.md
 if [[ ! -f "docs/PRs/PRD/PR_Slice_1.md" || ! -f "docs/PRs/PRD/PR_Slice_2.md" ]]; then
     echo "❌ Scenario 3 Failed: Expected mock slice PRs not created."
     exit 1
 fi
+if ! grep -q -- "--insert-after 001" tests/task_string.log; then
+    echo "❌ Scenario 3 Failed: Missing '--insert-after 001' in task string."
+    exit 1
+fi
 echo "✅ Scenario 3 Passed."
+
+# Test Scenario 4: Successful Slice with sub-id
+echo "Running Test Scenario 4 (Successful Slice with sub-id)..."
+echo "# Failed PR content" > PR_002_1_Failed_PR.md
+python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr PR_002_1_Failed_PR.md
+if ! grep -q -- "--insert-after 002_1" tests/task_string.log; then
+    echo "❌ Scenario 4 Failed: Missing '--insert-after 002_1' in task string."
+    cat tests/task_string.log
+    exit 1
+fi
+echo "✅ Scenario 4 Passed."
 
 cleanup_sandbox "test_planner_slice"
 echo "✅ test_planner_slice_failed_pr.sh passed."

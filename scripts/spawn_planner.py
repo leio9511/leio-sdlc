@@ -5,6 +5,7 @@ import json
 import sys
 import subprocess
 import uuid
+import re
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn Planner Agent")
@@ -32,12 +33,20 @@ def main():
         sys.exit(1)
 
     failed_pr_content = None
+    failed_pr_id = None
     if args.slice_failed_pr is not None:
         if not (os.path.isfile(args.slice_failed_pr) and os.path.getsize(args.slice_failed_pr) > 0):
             print(f"[Pre-flight Failed] Planner cannot start. Failed PR file not found or empty at '{args.slice_failed_pr}'.")
             sys.exit(1)
         with open(args.slice_failed_pr, "r") as f:
             failed_pr_content = f.read()
+            
+        failed_pr_filename = os.path.basename(args.slice_failed_pr)
+        match = re.match(r"^PR_(\d+(?:_\d+)*)_", failed_pr_filename)
+        if match:
+            failed_pr_id = match.group(1)
+        else:
+            print(f"[Warning] Could not extract failed PR ID from filename '{failed_pr_filename}'. Falling back to default append mode.")
 
     # Dynamic Toolchain Addressing
     SDLC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -83,6 +92,7 @@ def main():
             playbook_content = f.read()
 
     if args.slice_failed_pr is not None:
+        insert_after_flag = f" --insert-after {failed_pr_id}" if failed_pr_id else ""
         task_string = (
             f"The following PR has failed multiple times because it is too complex for the Coder. "
             f"Your task is to break THIS SPECIFIC PR down into at least 2 smaller, sequential Micro-PRs. "
@@ -93,8 +103,9 @@ def main():
             f"FAILED PR:\\n{failed_pr_content}\\n\\n"
             f"ORIGINAL PRD:\\n{prd_content}\\n\\n"
             f"ATTENTION: Your root workspace is rigidly locked to {workdir}. "
-            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir} --title <title> --content-file <file>` "
+            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir}{insert_after_flag} --title <title> --content-file <file>` "
             f"to generate the PR contracts instead of raw file writing. "
+            f"The `--insert-after` parameter is MANDATORY for sequential ordering of the new sliced PRs.\\n"
             f"For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. "
             f"Do NOT alter the `status: open` YAML frontmatter.\\n"
             f"TEMPLATE:\\n{template_content}\\n"
