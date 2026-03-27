@@ -40,9 +40,9 @@ def main():
         f"Use the `read` tool to read the file: {diff_file} \n"
         f"You MUST read 'Review_Report.md' to understand the Reviewer's objections.\n"
         f"Your ONLY job is to output exactly one of these two tokens as the final word in your response:\n"
-        f"1. [OVERRIDE_APPROVED] - If you believe the code satisfies the contract and the Reviewer is being too pedantic.\n"
+        f"1. [OVERRIDE_LGTM] - If you believe the code satisfies the contract and the Reviewer is being too pedantic.\n"
         f"2. [CONFIRM_REJECT] - If you agree with the Reviewer that the code is materially defective.\n\n"
-        f"Use the `write` tool to save your final decision to '{workdir}/arbitration_report.txt' and include either [OVERRIDE_APPROVED] or [CONFIRM_REJECT] in the file.\n"
+        f"Use the `write` tool to save your final decision to '{workdir}/arbitration_report.txt' and include either [OVERRIDE_LGTM] or [CONFIRM_REJECT] in the file.\n"
     )
     
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
@@ -53,8 +53,8 @@ def main():
     if os.path.exists(report_path):
         with open(report_path, "r") as f:
             content = f.read()
-        if "[OVERRIDE_APPROVED]" in content:
-            print("[OVERRIDE_APPROVED]")
+        if "[OVERRIDE_LGTM]" in content:
+            print("[OVERRIDE_LGTM]")
         elif "[CONFIRM_REJECT]" in content:
             print("[CONFIRM_REJECT]")
         else:

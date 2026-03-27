@@ -113,7 +113,7 @@ with open("Review_Report.md", "w") as f:
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_arbitrator.py
-print("[OVERRIDE_APPROVED]")
+print("[OVERRIDE_LGTM]")
 INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
