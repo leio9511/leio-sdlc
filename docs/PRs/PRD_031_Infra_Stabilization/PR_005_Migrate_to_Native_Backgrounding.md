@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-003: Migrate to Native Backgrounding
 
