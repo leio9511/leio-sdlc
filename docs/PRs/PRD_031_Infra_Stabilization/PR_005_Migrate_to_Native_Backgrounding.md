@@ -1,4 +1,4 @@
-status: in_progress
+status: superseded
 
 # PR-003: Migrate to Native Backgrounding
 
