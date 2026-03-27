@@ -38,5 +38,16 @@ def format_notification(event_type: str, context: dict) -> str:
         return f"🎉 [{prd_match}] SDLC 完成：所有 PR 执行完毕"
     elif event_type == "dead_end":
         return f"🛑 [{pr_match}] PR 需要人工介入"
+    elif event_type == "sdlc_handshake":
+        return f"🤝 [SDLC Engine] Initial Handshake successful. Channel linked."
+    elif event_type == "coder_spawned":
+        return f"Calling Coder for [{pr_match}]..."
+    elif event_type == "reviewer_spawned":
+        return f"Coder submitted changes. Reviewer is now auditing..."
+    elif event_type == "review_rejected":
+        summary = context.get('summary', 'No reason provided')
+        return f"❌ Reviewer rejected changes. Reason: {summary}. Retrying..."
+    elif event_type == "pr_merged":
+        return f"✅ [{pr_match}] successfully merged to master."
     
     return f"🤖 [SDLC Engine] 未知事件: {event_type}"

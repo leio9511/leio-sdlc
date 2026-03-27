@@ -60,6 +60,11 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
         else:
             cmd.extend(["-t", effective_channel])
         cmd.extend(["-m", msg])
+        
+        if os.environ.get("SDLC_TEST_MODE") == "true":
+            print(f"DEBUG [notify_channel]: {' '.join(cmd)}")
+            return
+            
         subprocess.run(cmd, check=False)
 
 import json
@@ -157,6 +162,34 @@ def main():
         print("[FATAL_STARTUP]")
         sys.exit(1)
 
+    # --- IGNITION GUARDRAIL ---
+    cmd_handshake = ["openclaw", "message", "send"]
+    if ":" in effective_channel:
+        parts = effective_channel.split(":")
+        if len(parts) >= 2:
+            cmd_handshake.extend(["--channel", parts[0]])
+            cmd_handshake.extend(["-t", ":".join(parts[1:])])
+    else:
+        cmd_handshake.extend(["-t", effective_channel])
+    
+    msg = format_notification("sdlc_handshake", {})
+    cmd_handshake.extend(["-m", msg])
+    
+    if os.environ.get("SDLC_TEST_MODE") != "true":
+        res = subprocess.run(cmd_handshake, capture_output=True, text=True)
+        if res.returncode != 0:
+            print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
+            if res.stderr: print(res.stderr.strip(), file=sys.stderr)
+            sys.exit(1)
+        else:
+            print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
+    else:
+        print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
+        if "invalid" in effective_channel:
+            print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
+            sys.exit(1)
+    # --------------------------
+
     prd_filename = os.path.basename(args.prd_file)
     base_name, _ = os.path.splitext(prd_filename)
     job_dir_rel = os.path.join("docs", "PRs", base_name)
@@ -234,6 +267,7 @@ def main():
             while True:
                 if args.coder_session_strategy == "always": teardown_coder_session(workdir)
                 print(f"State 3: Spawning Coder for {current_pr}")
+                notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                 try:
                     coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], timeout=MAX_RUNTIME)
                     if coder_result.returncode != 0:
@@ -268,6 +302,7 @@ def main():
                 review_report_path = os.path.join(workdir, review_artifact)
                 if os.path.exists(review_report_path): os.remove(review_report_path)
                 print(f"State 4: Spawning Reviewer for {current_pr}")
+                notify_channel(effective_channel, f"Coder submitted changes for {base_filename}. Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
                 subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact])
                 if os.path.exists(review_report_path):
                     with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
@@ -283,6 +318,7 @@ def main():
                     if merge_result.returncode == 0:
                         subprocess.run(["git", "branch", "-D", branch_name], check=True)
                         set_pr_status(current_pr, "closed")
+                        notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
                         teardown_coder_session(workdir)
                         pr_done = True
                         break
@@ -291,6 +327,7 @@ def main():
                         break
                 elif verdict == "ACTION_REQUIRED" or "[ACTION_REQUIRED]" in review_content:
                     rejection_count += 1
+                    notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                     if rejection_count < 5:
                         subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir])
                         continue
@@ -304,6 +341,7 @@ def main():
                             if merge_result.returncode == 0:
                                 subprocess.run(["git", "branch", "-D", branch_name], check=True)
                                 set_pr_status(current_pr, "closed")
+                                notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
                                 teardown_coder_session(workdir)
                                 pr_done = True
                                 break

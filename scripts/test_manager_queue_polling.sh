@@ -24,7 +24,7 @@ MOCK
 
 cat << 'MOCK' > scripts/spawn_reviewer.py
 #!/usr/bin/env python3
-print("[LGTM] Review passed.")
+print("{\"status\": \"APPROVED\", \"comments\": \"Review passed.\"}")
 MOCK
 
 cat << 'MOCK' > scripts/merge_code.py

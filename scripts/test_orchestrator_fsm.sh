@@ -74,7 +74,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" docs/PRs/dummy_prd/PR_001_Test.md; then
         echo "Green Path Failed: PR not closed"
@@ -118,7 +118,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" docs/PRs/dummy_prd/PR_002_Test.md; then
         echo "Red Path Override Failed: PR not closed"
@@ -154,7 +154,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: superseded" docs/PRs/dummy_prd/PR_003_Test.md; then
         echo "Red Path Slice Failed: PR not superseded"
@@ -240,7 +240,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/Target_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Target_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" docs/PRs/Target_Project/Target_PR.md; then
         echo "Noise Injection Failed: Target PR not closed"
@@ -266,7 +266,7 @@ function run_test_missing_directory() {
     
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/Empty_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Empty_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if grep -q "Traceback" orchestrator.log; then
         echo "Missing Directory Failed: Crashed"
@@ -309,7 +309,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "State 0: Auto-slicing PRD" orchestrator.log; then
         echo "Pure Start Failed: Log missing"
@@ -354,7 +354,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "State 0: Existing PRs detected. Resuming queue..." orchestrator.log; then
         echo "Idempotency Failed: Log missing"
@@ -404,7 +404,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --force-replan --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --force-replan --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if false; then
         echo "Force Replan Failed: Old PR not deleted"
@@ -434,7 +434,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "\[FATAL\] Planner failed to generate any PRs." orchestrator.log; then
         echo "Planner Failure Failed: Missing fatal log"

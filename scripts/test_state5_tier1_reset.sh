@@ -1,4 +1,5 @@
 #!/bin/bash
+export SDLC_TEST_MODE=true
 set -e
 
 # scripts/test_state5_tier1_reset.sh - Test for PR-002
@@ -85,7 +86,7 @@ INNER_EOF
     echo "Starting orchestrator..."
     # We use a temporary log file so we don't pollute the git status of the sandbox if it checks it
     git status
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
     mv ../orchestrator.log orchestrator.log
 
     # Assertions

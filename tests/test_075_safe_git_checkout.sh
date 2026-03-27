@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export SDLC_TEST_MODE=true
 set -e
 
 # Setup test environment
@@ -42,7 +43,7 @@ export PATH="$TEST_DIR/fake_bin:$PATH"
 
 echo "Running orchestrator..."
 set +e
-/usr/bin/python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" \
+/usr/bin/python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" \
     --prd-file docs/PRDs/dummy_prd.md \
     --workdir "$TEST_DIR" \
     --max-runs 1 > orchestrator.log 2>&1

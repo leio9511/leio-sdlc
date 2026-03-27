@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export SDLC_TEST_MODE=true
 set -e
 
 echo "Running Anti-Reward Hacking Tests..."
@@ -14,7 +15,7 @@ export PATH="$(pwd)/dummy_workspace/bin:$PATH"
 mkdir -p dummy_workspace
 cd dummy_workspace
 touch dummy.md
-python3 ../scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file dummy.md --global-dir ../ --max-prs-to-process 1 > test.log 2>&1 || true
+python3 ../scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy.md --global-dir ../ --max-prs-to-process 1 > test.log 2>&1 || true
 
 if grep -q "No such file or directory.*scripts/" test.log; then
     echo "FAILED: Orchestrator is still using relative scripts/ paths!"

@@ -1,4 +1,5 @@
 #!/bin/bash
+export SDLC_TEST_MODE=true
 set -e
 
 WORKSPACE="/tmp/test_069_workspace_$$"
@@ -25,9 +26,9 @@ EOF
 git add docs/PRs/PRD_069_Test/PR_001_Namespace_Fix.md
 
 # Path to original orchestrator
-ORCHESTRATOR="/root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --channel "#test""
+ORCHESTRATOR="/root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --channel "valid:id""
 
-# Create a wrapper Python script to test the logic directly since we can't easily inject into orchestrator.py --channel "#test"'s while loop without it running everything
+# Create a wrapper Python script to test the logic directly since we can't easily inject into orchestrator.py --channel "valid:id"'s while loop without it running everything
 cat << 'EOF' > test_extraction.py
 import os
 current_pr = "docs/PRs/PRD_069_Test/PR_001_Namespace_Fix.md"
