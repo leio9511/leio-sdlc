@@ -53,5 +53,8 @@ def format_notification(event_type: str, context: dict) -> str:
         return f"Synchronizing code to GitHub..."
     elif event_type == "github_sync_complete":
         return f"GitHub sync complete."
+    elif event_type == "github_sync_failed":
+        err = context.get('error', 'unknown error')
+        return f"⚠️ GitHub sync failed: {err}"
     
     return f"🤖 [SDLC Engine] 未知事件: {event_type}"

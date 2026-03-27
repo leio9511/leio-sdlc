@@ -106,13 +106,19 @@ def trigger_github_sync(workdir, effective_channel, pr_id):
     if os.path.exists(sync_script):
         notify_channel(effective_channel, "Synchronizing code to GitHub...", "github_sync_start", {"pr_id": pr_id})
         try:
-            res = subprocess.run([sys.executable, sync_script, "--project-dir", workdir], capture_output=True, text=True)
+            res = subprocess.run([sys.executable, sync_script, "--project-dir", workdir], capture_output=True, text=True, timeout=120)
             if res.returncode == 0:
                 notify_channel(effective_channel, "GitHub sync complete.", "github_sync_complete", {"pr_id": pr_id})
             else:
-                print(f"[Warning] GitHub Sync failed: {res.stderr}", file=sys.stderr)
+                err_msg = res.stderr.strip() if res.stderr else "Non-zero exit code"
+                print(f"[Warning] GitHub Sync failed: {err_msg}", file=sys.stderr)
+                notify_channel(effective_channel, f"GitHub sync failed: {err_msg}", "github_sync_failed", {"pr_id": pr_id, "error": err_msg})
+        except subprocess.TimeoutExpired:
+            print("[Warning] GitHub Sync failed: Timeout", file=sys.stderr)
+            notify_channel(effective_channel, "GitHub sync failed: Timeout", "github_sync_failed", {"pr_id": pr_id, "error": "Timeout"})
         except Exception as e:
             print(f"[Warning] GitHub Sync failed: {str(e)}", file=sys.stderr)
+            notify_channel(effective_channel, f"GitHub sync failed: {str(e)}", "github_sync_failed", {"pr_id": pr_id, "error": str(e)})
 
 def main():
     parser = argparse.ArgumentParser()
