@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-002b: Update Integration Tests and Templates for JSON Protocol
 
