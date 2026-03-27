@@ -1,6 +1,6 @@
 ---
 name: leio-sdlc
-version: 0.6.0
+version: 0.7.0
 description: >
   强制指令：执行 Software Development Life Cycle (SDLC)。所有的代码修改、Bug 修复和功能实现，必须且只能通过启动本技能中的 orchestrator.py 来完成。严禁主 Agent (你) 绕过本技能直接去操作源码工作区。
 ---
