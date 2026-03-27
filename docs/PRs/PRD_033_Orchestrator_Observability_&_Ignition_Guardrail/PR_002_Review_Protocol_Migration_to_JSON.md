@@ -1,4 +1,4 @@
-status: open
+status: superseded
 
 # PR-002: Review Protocol Migration to JSON
 
