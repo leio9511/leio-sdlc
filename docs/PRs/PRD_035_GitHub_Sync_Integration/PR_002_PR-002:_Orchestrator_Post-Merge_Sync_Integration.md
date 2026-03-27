@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-002: Orchestrator Post-Merge Sync Integration
 
