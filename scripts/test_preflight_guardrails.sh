@@ -76,8 +76,8 @@ if ! echo "$output" | grep -q "\[Pre-flight Failed\]"; then
     exit 1
 fi
 
-# Action 2: [ACTION_REQUIRED] without force
-echo "[ACTION_REQUIRED]" > review.md
+# Action 2: {"status": "ACTION_REQUIRED"} without force
+echo '{"status": "ACTION_REQUIRED"}' > review.md
 set +e
 output=$(python3 scripts/merge_code.py --branch fake-branch --review-file review.md 2>&1)
 exit_code=$?
@@ -91,7 +91,7 @@ if ! echo "$output" | grep -q "\[Pre-flight Failed\]"; then
     exit 1
 fi
 
-# Action 3: [ACTION_REQUIRED] with force
+# Action 3: {"status": "ACTION_REQUIRED"} with force
 echo "Testing Merge with force-lgtm..."
 set +e
 python3 scripts/merge_code.py --branch fake-branch --review-file review.md --force-lgtm >/dev/null 2>&1
@@ -102,9 +102,9 @@ if [ $exit_code -ne 0 ]; then
     exit 1
 fi
 
-# Action 4: [LGTM]
+# Action 4: {"status": "APPROVED"}
 echo "Testing Merge with LGTM..."
-echo "[LGTM]" > review2.md
+echo '{"status": "APPROVED"}' > review2.md
 set +e
 python3 scripts/merge_code.py --branch fake-branch --review-file review2.md >/dev/null 2>&1
 exit_code=$?

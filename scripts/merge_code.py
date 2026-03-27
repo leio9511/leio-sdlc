@@ -3,12 +3,31 @@ import os
 import sys
 import argparse
 import subprocess
+import json
+import re
+
+def parse_review_verdict(content):
+    """
+    Parses structured JSON review status: {"status": "APPROVED", "comments": "..."}
+    """
+    try:
+        # Search for code blocks or literal json
+        json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'(\{.*?\})', content, re.DOTALL)
+        
+        if json_match:
+            data = json.loads(json_match.group(1).strip())
+            return data.get("status")
+    except (json.JSONDecodeError, AttributeError, ValueError):
+        pass
+    return None
 
 def main():
     parser = argparse.ArgumentParser(description="Merge a git branch.")
     parser.add_argument("--branch", required=True, help="The branch to merge")
     parser.add_argument("--review-file", required=True, help="Path to the Review Report file")
-    parser.add_argument("--force-lgtm", action="store_true", help="Force merge even without [LGTM] in review")
+    parser.add_argument("--force-lgtm", action="store_true", help="Force merge even without APPROVED status")
     args = parser.parse_args()
 
     if not os.path.isfile(args.review_file):
@@ -18,8 +37,9 @@ def main():
     if not args.force_lgtm:
         with open(args.review_file, "r") as f:
             content = f.read()
-            if "[LGTM]" not in content:
-                print(f"[Pre-flight Failed] Merge rejected. The file '{args.review_file}' does not contain [LGTM]. You must fix the code and re-review, or use --force-lgtm to override a nitpicky Reviewer.")
+            verdict = parse_review_verdict(content)
+            if verdict != "APPROVED":
+                print(f"[Pre-flight Failed] Merge rejected. The file '{args.review_file}' does not contain an 'APPROVED' status in JSON. You must fix the code and re-review, or use --force-lgtm to override.")
                 sys.exit(1)
 
     branch = args.branch
