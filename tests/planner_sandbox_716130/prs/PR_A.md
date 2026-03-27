@@ -1,0 +1,1 @@
+status: open\n\n# PR-001: Feature A\n\n## 1. Objective\nMock Obj\n\n## 2. Scope & Implementation Details\nMock Scope\n\n## 3. TDD & Acceptance Criteria\nMock TDD\n
