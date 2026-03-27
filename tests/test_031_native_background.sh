@@ -16,7 +16,7 @@ for file in "${FILES[@]}"; do
             echo "❌ Error: nohup found in $file"
             exit 1
         fi
-        if grep -qE "&s*$" "$file"; then
+        if grep -q "&[[:space:]]*$" "$file"; then
             echo "❌ Error: & found in $file"
             exit 1
         fi
