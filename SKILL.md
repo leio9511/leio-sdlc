@@ -53,12 +53,12 @@ You MUST copy these commands exactly into your `exec` tool. Do not invent your o
 Use this to generate PR Contracts based on PRDs.
 **PRE-CONDITION GUARD:** The pipeline's ONLY valid entry point is an existing `PRD_*.md` file path. The Manager MUST physically verify the existence of a `PRD_*.md` file in `docs/PRDs/`. You are NOT a Product Manager and MUST NOT generate PRDs from dialogue. The first step is to read the existing PRD, and then spawn the Planner.
 
-To spawn a planner, use the `exec` tool to run: `python3 {baseDir}/scripts/spawn_planner.py --prd-file <path_to_prd>`
+To spawn a planner, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/spawn_planner.py --prd-file <path_to_prd>`
 
 ## Command Template 2: Spawning a Coder (Code)
 Use this to execute coding tasks based on PR Contracts.
 
-To spawn a coder, use the `exec` tool to run: `python3 {baseDir}/scripts/spawn_coder.py --pr-file <path_to_pr> --prd-file <path_to_prd>`
+To spawn a coder, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/spawn_coder.py --pr-file <path_to_pr> --prd-file <path_to_prd>`
 
 ## Command Template 2b: Spawning a Coder for Revision (Correction Loop)
 `python3 {baseDir}/scripts/spawn_coder.py --pr-file <path_to_pr> --prd-file <path_to_prd> --feedback-file <path_to_review_report>`
@@ -67,14 +67,14 @@ If the Reviewer generates a `Review_Report.md` containing `[ACTION_REQUIRED]`, d
 
 ## Command Template 3: Start Review Session (Review)
 Use this to review code changes against the PR Contract.
-To spawn a reviewer, use the `exec` tool to run: `python3 {baseDir}/scripts/spawn_reviewer.py --pr-file <path_to_pr> --diff-target <base_hash>..<latest_hash>`
+To spawn a reviewer, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/spawn_reviewer.py --pr-file <path_to_pr> --diff-target <base_hash>..<latest_hash>`
 
 ## Command Template 4: Merge and Deploy (Merge)
 Use this to merge approved changes into the master branch.
 **PRE-CONDITION GUARD:** The Manager MUST verify that a Reviewer has reviewed the specific commit hash and issued an "Approved" status. Merging without a Reviewer's explicit approval is a critical violation.
-To merge approved code, use the `exec` tool to run: `python3 {baseDir}/scripts/merge_code.py --branch <branch_name> --review-file <path_to_review_report> [--force-lgtm]`
+To merge approved code, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/merge_code.py --branch <branch_name> --review-file <path_to_review_report> [--force-lgtm]`
 Manager has Override Authority. If the Reviewer is stuck in an infinite nitpicky loop giving `[ACTION_REQUIRED]`, you can pass `--force-lgtm` to bypass the `[LGTM]` requirement and merge anyway.
 
 ## Command Template 5: Issue Tracking
 
-To update an issue status, use the `exec` tool to run: `python3 {baseDir}/scripts/update_issue.py --issue-id <ID> --status <new_status>`
+To update an issue status, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/update_issue.py --issue-id <ID> --status <new_status>`
