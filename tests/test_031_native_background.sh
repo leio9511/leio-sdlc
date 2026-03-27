@@ -4,7 +4,7 @@ set -e
 echo "Running static analysis for legacy backgrounding commands..."
 
 FILES=(
-    "../docs/TEMPLATES/AgentSkill_Archetype/SKILL.md.template"
+    "projects/docs/TEMPLATES/AgentSkill_Archetype/SKILL.md.template"
     "SKILL.md"
     "skills/pm-skill/SKILL.md"
     "skills/issue_tracker/SKILL.md"
