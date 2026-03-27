@@ -1,4 +1,4 @@
-status: in_progress
+status: closed
 
 # PR-001: Implement `--enable-exec-from-workspace` flag and update existing tests
 
