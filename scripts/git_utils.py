@@ -28,10 +28,10 @@ def check_git_boundary(workdir):
     import sys
     import subprocess
     if not os.path.exists(os.path.join(workdir, ".git")):
-        print(f"[FATAL] Git Boundary Enforcement: workdir '{workdir}' must contain a .git directory.")
+        print(f"[FATAL] Git boundary violation: workdir '{workdir}' must contain a .git directory.")
         sys.exit(1)
     
     toplevel = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, cwd=workdir).stdout.strip()
     if os.path.abspath(toplevel) != os.path.abspath(workdir):
-        print(f"[FATAL] Git Boundary Enforcement: workdir '{workdir}' is not the root of the git repository.")
+        print(f"[FATAL] Git boundary violation: workdir '{workdir}' is not the root of the git repository.")
         sys.exit(1)

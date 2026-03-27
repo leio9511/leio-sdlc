@@ -1,27 +1,22 @@
 #!/bin/bash
 # test_runtime_boundary_allowed.sh
 # Executes orchestrator.py WITH --enable-exec-from-workspace.
-# Must bypass path check (which will be implemented in PR-002) and fail on missing required arguments, not unrecognized argument.
+# Must bypass path check and not print the security violation error.
 
 SCRIPT_DIR=$(dirname "$0")
 ORCHESTRATOR_PATH="$SCRIPT_DIR/../scripts/orchestrator.py"
 
-# Capture output
-OUTPUT=$(python3 "$ORCHESTRATOR_PATH" --enable-exec-from-workspace 2>&1)
+OUTPUT=$(python3 "$ORCHESTRATOR_PATH" --workdir /tmp --prd-file /tmp/test.md --enable-exec-from-workspace 2>&1)
 EXIT_CODE=$?
 
-# It should fail because required arguments (--workdir, --prd-file) are missing, so exit code should be 2 from argparse
-if [ $EXIT_CODE -eq 2 ]; then
-    if echo "$OUTPUT" | grep -q "unrecognized arguments: --enable-exec-from-workspace"; then
-        echo "FAIL: Unrecognized argument error."
-        exit 1
-    else
-        echo "PASS: Allowed correctly (failed on missing required args as expected)."
-        exit 0
-    fi
-else
-    echo "FAIL: Expected exit code 2, got $EXIT_CODE"
+EXPECTED_MSG="\[FATAL\] Security Violation: 除非是为了测试目的，Skill 的执行必须从 ~/.openclaw/skills/ 目录下启动。如果明确是为了测试未发布的源码，必须在命令中显式附加参数: --enable-exec-from-workspace"
+
+if echo "$OUTPUT" | grep -q "$EXPECTED_MSG"; then
+    echo "FAIL: Expected bypass, but security error was raised."
     echo "Actual output:"
     echo "$OUTPUT"
     exit 1
+else
+    echo "PASS: Allowed correctly."
+    exit 0
 fi

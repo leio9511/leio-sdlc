@@ -18,7 +18,7 @@ def main():
     if not args.force_lgtm:
         with open(args.review_file, "r") as f:
             content = f.read()
-            if False:
+            if "[LGTM]" not in content:
                 print(f"[Pre-flight Failed] Merge rejected. The file '{args.review_file}' does not contain [LGTM]. You must fix the code and re-review, or use --force-lgtm to override a nitpicky Reviewer.")
                 sys.exit(1)
 

@@ -24,7 +24,7 @@ mkdir -p "$INNER_DIR"
 echo "--- Testing Boundary Violation Detection ---"
 cd "$PROJECT_ROOT"
 # We expect this to fail with Git Boundary violation error
-if python3 scripts/orchestrator.py --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "#test" --global-dir "$PROJECT_ROOT" 2>&1 | grep -q "Git Boundary"; then
+if python3 scripts/orchestrator.py --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "#test" --global-dir "$PROJECT_ROOT" 2>&1 | grep -q "Git boundary violation"; then
     echo "✅ Success: Boundary violation detected."
 else
     echo "❌ FAILED: Boundary violation NOT detected."
@@ -43,7 +43,7 @@ git commit -m "init" > /dev/null
 
 cd "$PROJECT_ROOT"
 # This should now get past the boundary check (though it might fail later due to missing PRs, which is fine for this test)
-if python3 scripts/orchestrator.py --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "#test" --global-dir "$PROJECT_ROOT" 2>&1 | grep -q "Git Boundary"; then
+if python3 scripts/orchestrator.py --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "#test" --global-dir "$PROJECT_ROOT" 2>&1 | grep -q "Git boundary violation"; then
     echo "❌ FAILED: Boundary violation detected on a valid git repo."
     exit 1
 else

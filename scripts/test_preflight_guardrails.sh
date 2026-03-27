@@ -64,7 +64,7 @@ set -e
 echo "Testing Merge Pre-flight..."
 # Action 1: fake review file
 set +e
-output=$(python3 scripts/merge_code.py --workdir . --branch fake-branch --review-file missing.md 2>&1)
+output=$(python3 scripts/merge_code.py --branch fake-branch --review-file missing.md 2>&1)
 exit_code=$?
 set -e
 if [ $exit_code -ne 1 ]; then
@@ -79,7 +79,7 @@ fi
 # Action 2: [ACTION_REQUIRED] without force
 echo "[ACTION_REQUIRED]" > review.md
 set +e
-output=$(python3 scripts/merge_code.py --workdir . --branch fake-branch --review-file review.md 2>&1)
+output=$(python3 scripts/merge_code.py --branch fake-branch --review-file review.md 2>&1)
 exit_code=$?
 set -e
 if [ $exit_code -ne 1 ]; then
@@ -94,7 +94,7 @@ fi
 # Action 3: [ACTION_REQUIRED] with force
 echo "Testing Merge with force-lgtm..."
 set +e
-python3 scripts/merge_code.py --workdir . --branch fake-branch --review-file review.md --force-lgtm >/dev/null 2>&1
+python3 scripts/merge_code.py --branch fake-branch --review-file review.md --force-lgtm >/dev/null 2>&1
 exit_code=$?
 set -e
 if [ $exit_code -ne 0 ]; then
@@ -106,7 +106,7 @@ fi
 echo "Testing Merge with LGTM..."
 echo "[LGTM]" > review2.md
 set +e
-python3 scripts/merge_code.py --workdir . --branch fake-branch --review-file review2.md >/dev/null 2>&1
+python3 scripts/merge_code.py --branch fake-branch --review-file review2.md >/dev/null 2>&1
 exit_code=$?
 set -e
 if [ $exit_code -ne 0 ]; then
