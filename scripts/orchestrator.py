@@ -101,6 +101,19 @@ def parse_review_verdict(content):
         pass
     return None
 
+def trigger_github_sync(workdir, effective_channel, pr_id):
+    sync_script = os.path.expanduser("~/.openclaw/skills/leio-github-sync/scripts/sync.py")
+    if os.path.exists(sync_script):
+        notify_channel(effective_channel, "Synchronizing code to GitHub...", "github_sync_start", {"pr_id": pr_id})
+        try:
+            res = subprocess.run([sys.executable, sync_script, "--project-dir", workdir], capture_output=True, text=True)
+            if res.returncode == 0:
+                notify_channel(effective_channel, "GitHub sync complete.", "github_sync_complete", {"pr_id": pr_id})
+            else:
+                print(f"[Warning] GitHub Sync failed: {res.stderr}", file=sys.stderr)
+        except Exception as e:
+            print(f"[Warning] GitHub Sync failed: {str(e)}", file=sys.stderr)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--workdir", required=True)
@@ -319,6 +332,7 @@ def main():
                         subprocess.run(["git", "branch", "-D", branch_name], check=True)
                         set_pr_status(current_pr, "closed")
                         notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
+                        trigger_github_sync(workdir, effective_channel, base_filename)
                         teardown_coder_session(workdir)
                         pr_done = True
                         break
@@ -342,6 +356,7 @@ def main():
                                 subprocess.run(["git", "branch", "-D", branch_name], check=True)
                                 set_pr_status(current_pr, "closed")
                                 notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
+                                trigger_github_sync(workdir, effective_channel, base_filename)
                                 teardown_coder_session(workdir)
                                 pr_done = True
                                 break

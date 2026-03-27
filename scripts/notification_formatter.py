@@ -49,5 +49,9 @@ def format_notification(event_type: str, context: dict) -> str:
         return f"❌ Reviewer rejected changes. Reason: {summary}. Retrying..."
     elif event_type == "pr_merged":
         return f"✅ [{pr_match}] successfully merged to master."
+    elif event_type == "github_sync_start":
+        return f"Synchronizing code to GitHub..."
+    elif event_type == "github_sync_complete":
+        return f"GitHub sync complete."
     
     return f"🤖 [SDLC Engine] 未知事件: {event_type}"

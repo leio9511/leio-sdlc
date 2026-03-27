@@ -102,6 +102,13 @@ perform_hard_copy_deployment() {
     ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
 
     echo "✅ DEPLOYMENT SUCCESS: $SLUG is now live via hard-copy swap."
+
+    # 6. GitHub Auto-Sync (PRD-035)
+    local SYNC_SCRIPT="$HOME_DIR/.openclaw/skills/leio-github-sync/scripts/sync.py"
+    if [ -f "$SYNC_SCRIPT" ] && [ -z "$HOME_MOCK" ]; then
+        echo "🌐 Synchronizing code to GitHub..."
+        python3 "$SYNC_SCRIPT" --project-dir "$PWD" || echo "⚠️ GitHub sync failed but deployment succeeded."
+    fi
 }
 
 perform_hard_copy_deployment "$@"
