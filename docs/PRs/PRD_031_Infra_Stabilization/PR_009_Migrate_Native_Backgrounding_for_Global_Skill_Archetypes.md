@@ -1,4 +1,4 @@
-status: in_progress
+status: closed
 
 # PR-003-2: Migrate Native Backgrounding for Global Skill Archetypes
 
