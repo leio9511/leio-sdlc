@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-002a: Refactor Merge Script to Parse JSON Review Protocol
 
