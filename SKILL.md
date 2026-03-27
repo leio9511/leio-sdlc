@@ -71,8 +71,8 @@ To spawn a reviewer, use the `exec` tool with `background: true` to run: `python
 ## Command Template 4: Merge and Deploy (Merge)
 Use this to merge approved changes into the master branch.
 **PRE-CONDITION GUARD:** The Manager MUST verify that a Reviewer has reviewed the specific commit hash and issued an "Approved" status. Merging without a Reviewer's explicit approval is a critical violation.
-To merge approved code, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/merge_code.py --branch <branch_name> --review-file <path_to_review_report> [--force-lgtm]`
-Manager has Override Authority. If the Reviewer is stuck in an infinite nitpicky loop giving `[ACTION_REQUIRED]`, you can pass `--force-lgtm` to bypass the `[LGTM]` requirement and merge anyway.
+To merge approved code, use the `exec` tool with `background: true` to run: `python3 {baseDir}/scripts/merge_code.py --branch <branch_name> --review-file <path_to_review_report> [--force-approved]`
+Manager has Override Authority. If the Reviewer is stuck in an infinite nitpicky loop giving `[ACTION_REQUIRED]`, you can pass `--force-approved` to bypass the requirement and merge anyway.
 
 ## Command Template 5: Issue Tracking
 

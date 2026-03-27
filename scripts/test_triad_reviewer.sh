@@ -9,7 +9,7 @@ echo "Setting up Triad Consistency Test for Reviewer..."
 mkdir -p tests
 cat << 'EOF' > tests/dummy_triad_pr.md
 # Dummy PR
-This is a test PR. Please output [LGTM].
+This is a test PR. Please output an APPROVED status in JSON.
 EOF
 
 cat << 'EOF' > tests/dummy_triad.diff
@@ -26,12 +26,13 @@ unset SDLC_TEST_MODE
 
 # 2.2.3 Execute Test and Capture Logs
 echo "Executing Reviewer spawn script..."
-python3 scripts/spawn_reviewer.py --pr-file tests/dummy_triad_pr.md --diff-target HEAD --override-diff-file tests/dummy_triad.diff  --workdir "$(pwd)" > tests/triad_reviewer.log 2>&1
+# Pass mandatory --global-dir
+python3 scripts/spawn_reviewer.py --pr-file tests/dummy_triad_pr.md --diff-target HEAD --override-diff-file tests/dummy_triad.diff  --workdir "$(pwd)" --global-dir "$(pwd)" > tests/triad_reviewer.log 2>&1
 
 # 2.2.4 Assertions
 echo "Running assertions..."
-if ! grep -q '\[LGTM\]' tests/triad_reviewer.log; then
-    echo "ERROR: Missing [LGTM] in log."
+if ! grep -q 'APPROVED' tests/triad_reviewer.log; then
+    echo "ERROR: Missing APPROVED status in log."
     cat tests/triad_reviewer.log
     # Cleanup
     rm -f tests/dummy_triad_pr.md tests/dummy_triad.diff tests/triad_reviewer.log

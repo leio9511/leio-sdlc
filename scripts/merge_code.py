@@ -27,19 +27,19 @@ def main():
     parser = argparse.ArgumentParser(description="Merge a git branch.")
     parser.add_argument("--branch", required=True, help="The branch to merge")
     parser.add_argument("--review-file", required=True, help="Path to the Review Report file")
-    parser.add_argument("--force-lgtm", action="store_true", help="Force merge even without APPROVED status")
+    parser.add_argument("--force-approved", action="store_true", help="Force merge even without APPROVED status")
     args = parser.parse_args()
 
     if not os.path.isfile(args.review_file):
         print(f"[Pre-flight Failed] Merge rejected. Review artifact '{args.review_file}' not found. You MUST run spawn_reviewer.py first.")
         sys.exit(1)
 
-    if not args.force_lgtm:
+    if not args.force_approved:
         with open(args.review_file, "r") as f:
             content = f.read()
             verdict = parse_review_verdict(content)
             if verdict != "APPROVED":
-                print(f"[Pre-flight Failed] Merge rejected. The file '{args.review_file}' does not contain an 'APPROVED' status in JSON. You must fix the code and re-review, or use --force-lgtm to override.")
+                print(f"[Pre-flight Failed] Merge rejected. The file '{args.review_file}' does not contain an 'APPROVED' status in JSON. You must fix the code and re-review, or use --force-approved to override.")
                 sys.exit(1)
 
     branch = args.branch

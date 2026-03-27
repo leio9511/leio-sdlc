@@ -1,7 +1,12 @@
 # Review Report
 
 ## Verdict
-(Write exactly [LGTM] or [ACTION_REQUIRED] here)
+```json
+{
+    "status": "APPROVED",
+    "comments": "..."
+}
+```
 
 ## Summary
 (Provide a brief summary of the changes)

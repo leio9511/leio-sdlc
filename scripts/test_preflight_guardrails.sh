@@ -92,25 +92,25 @@ if ! echo "$output" | grep -q "\[Pre-flight Failed\]"; then
 fi
 
 # Action 3: {"status": "ACTION_REQUIRED"} with force
-echo "Testing Merge with force-lgtm..."
+echo "Testing Merge with force-approved..."
 set +e
-python3 scripts/merge_code.py --branch fake-branch --review-file review.md --force-lgtm >/dev/null 2>&1
+python3 scripts/merge_code.py --branch fake-branch --review-file review.md --force-approved >/dev/null 2>&1
 exit_code=$?
 set -e
 if [ $exit_code -ne 0 ]; then
-    echo "Fail: Merge should have succeeded with force-lgtm"
+    echo "Fail: Merge should have succeeded with force-approved"
     exit 1
 fi
 
 # Action 4: {"status": "APPROVED"}
-echo "Testing Merge with LGTM..."
+echo "Testing Merge with APPROVED..."
 echo '{"status": "APPROVED"}' > review2.md
 set +e
 python3 scripts/merge_code.py --branch fake-branch --review-file review2.md >/dev/null 2>&1
 exit_code=$?
 set -e
 if [ $exit_code -ne 0 ]; then
-    echo "Fail: Merge should have succeeded with LGTM"
+    echo "Fail: Merge should have succeeded with APPROVED"
     exit 1
 fi
 
