@@ -62,6 +62,20 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
 
 import json
 
+
+def validate_prd_is_committed(prd_file, workdir):
+    prd_path_abs = os.path.abspath(prd_file)
+    if os.path.exists(prd_path_abs):
+        try:
+            subprocess.run(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
+        except subprocess.CalledProcessError:
+            print(f"[FATAL] PRD file '{prd_file}' is untracked by Git. Please commit it before running.")
+            sys.exit(1)
+        status_out = subprocess.run(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
+        if status_out:
+            print(f"[FATAL] PRD file '{prd_file}' has uncommitted changes. Please commit it before running.")
+            sys.exit(1)
+
 def parse_review_verdict(content):
     """
     Parses structured JSON review status: {"status": "APPROVED", "comments": "..."}
@@ -105,17 +119,7 @@ def main():
         time.sleep(2)
         sys.exit(0)
 
-    prd_path_abs = os.path.abspath(args.prd_file)
-    if os.path.exists(prd_path_abs):
-        try:
-            subprocess.run(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
-        except subprocess.CalledProcessError:
-            print(f"[FATAL] PRD file '{args.prd_file}' is untracked by Git. Please commit it before running.")
-            sys.exit(1)
-        status_out = subprocess.run(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
-        if status_out:
-            print(f"[FATAL] PRD file '{args.prd_file}' has uncommitted changes. Please commit it before running.")
-            sys.exit(1)
+    validate_prd_is_committed(args.prd_file, workdir)
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
         if not os.path.exists(".git"):
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")

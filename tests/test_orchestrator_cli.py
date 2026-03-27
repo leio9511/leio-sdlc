@@ -92,5 +92,53 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 1)
 
+    @patch("sys.argv", ["orchestrator.py", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep"])
+    @patch("os.path.exists")
+    @patch("subprocess.run")
+    def test_prd_guardrail_clean(self, mock_run, mock_exists):
+        import orchestrator
+        import subprocess
+
+        def mock_exists_side_effect(path):
+            if path == os.path.abspath("clean.md"):
+                return True
+            return True
+
+        mock_exists.side_effect = mock_exists_side_effect
+
+        def mock_run_side_effect(*args, **kwargs):
+            if args[0] == ["git", "rev-parse", "--show-toplevel"]:
+                class Ret:
+                    stdout = os.path.abspath(".")
+                    returncode = 0
+                return Ret()
+            if args[0] == ["git", "ls-files", "--error-unmatch", os.path.abspath("clean.md")]:
+                class Ret:
+                    stdout = ""
+                    returncode = 0
+                return Ret()
+            if args[0] == ["git", "status", "--porcelain", os.path.abspath("clean.md")]:
+                class Ret:
+                    stdout = ""
+                    returncode = 0
+                return Ret()
+            if args[0] == ["git", "branch", "--show-current"]:
+                class Ret:
+                    stdout = "master"
+                    returncode = 0
+                return Ret()
+            # Handle other calls as needed or return a dummy
+            class DummyRet:
+                stdout = ""
+                returncode = 0
+            return DummyRet()
+
+        mock_run.side_effect = mock_run_side_effect
+
+        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+            with self.assertRaises(SystemExit) as cm:
+                orchestrator.main()
+            self.assertEqual(cm.exception.code, 0)
+
 if __name__ == "__main__":
     unittest.main()
