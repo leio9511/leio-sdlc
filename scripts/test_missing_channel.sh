@@ -15,11 +15,19 @@ unset OPENCLAW_CHANNEL_ID
 mkdir -p docs/PRDs
 echo "dummy prd content" > docs/PRDs/dummy.md
 
+# Initialize Git to pass boundary check
+git init > /dev/null
+git add docs/PRDs/dummy.md
+echo "test_output.log" > .gitignore
+echo ".sdlc_repo.lock" >> .gitignore
+git add .gitignore
+git commit -m "init" > /dev/null
+
 # Run orchestrator WITHOUT the --channel parameter
 export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
 export SDLC_BYPASS_BRANCH_CHECK=1
 set +e
-python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --coder-session-strategy always > test_output.log 2>&1
+python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --coder-session-strategy always > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 

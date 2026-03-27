@@ -6,7 +6,7 @@ echo "Sandbox: $SANDBOX_DIR"
 cd "$SANDBOX_DIR"
 # No git init here
 
-if python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --workdir "$(pwd)" --prd-file prd.md --channel "#test" --global-dir "$(pwd)" 2>&1 | grep -q "Git Boundary Enforcement"; then
+if python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --channel "#test" --global-dir "$(pwd)" 2>&1 | grep -q "Git Boundary Enforcement"; then
     echo "✅ test_git_boundary.sh PASSED"
 else
     echo "❌ test_git_boundary.sh FAILED: Did not enforce git boundary."

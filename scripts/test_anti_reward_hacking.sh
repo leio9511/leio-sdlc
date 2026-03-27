@@ -7,7 +7,7 @@ echo "Running Anti-Reward Hacking Tests..."
 mkdir -p dummy_workspace
 cd dummy_workspace
 touch dummy.md
-python3 ../scripts/orchestrator.py --channel "#test" --workdir "$(pwd)" --prd-file dummy.md --global-dir ../ --max-prs-to-process 1 > test.log 2>&1 || true
+python3 ../scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" --workdir "$(pwd)" --prd-file dummy.md --global-dir ../ --max-prs-to-process 1 > test.log 2>&1 || true
 
 if grep -q "No such file or directory.*scripts/" test.log; then
     echo "FAILED: Orchestrator is still using relative scripts/ paths!"

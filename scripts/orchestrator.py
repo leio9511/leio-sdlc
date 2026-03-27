@@ -106,6 +106,7 @@ def main():
     parser.add_argument("--channel", help="Notification channel")
     parser.add_argument("--global-dir", help="Global workspace path")
     parser.add_argument("--test-sleep", action="store_true")
+    parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))

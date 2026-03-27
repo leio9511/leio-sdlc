@@ -42,7 +42,7 @@ export PATH="$TEST_DIR/fake_bin:$PATH"
 
 echo "Running orchestrator..."
 set +e
-/usr/bin/python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --channel "#test" \
+/usr/bin/python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --enable-exec-from-workspace --channel "#test" \
     --prd-file docs/PRDs/dummy_prd.md \
     --workdir "$TEST_DIR" \
     --max-runs 1 > orchestrator.log 2>&1

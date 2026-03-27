@@ -12,7 +12,7 @@ git commit --allow-empty -m "init"
 
 # Run orchestrator in a sub-process so we can kill it after checking the lock
 # We use --test-sleep to make it wait
-python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --workdir "$(pwd)" --prd-file prd.md --test-sleep --channel "#test" --global-dir "$(pwd)" &
+python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --test-sleep --channel "#test" --global-dir "$(pwd)" &
 PID=$!
 sleep 1
 
