@@ -6,6 +6,15 @@ set -e
 
 PROJECT_ROOT=$(pwd)
 TEMP_DIR=$(mktemp -d)
+mkdir -p "$TEMP_DIR/bin"
+cat << 'INNER_EOF' > "$TEMP_DIR/bin/openclaw"
+#!/bin/bash
+exit 0
+INNER_EOF
+chmod +x "$TEMP_DIR/bin/openclaw"
+export PATH="$TEMP_DIR/bin:$PATH"
+# mock_openclaw added
+
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 echo "Sandbox: $TEMP_DIR"

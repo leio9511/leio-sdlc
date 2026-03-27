@@ -2,6 +2,13 @@
 set -e
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SANDBOX_DIR=$(mktemp -d)
+mkdir -p "$SANDBOX_DIR/bin"
+cat << 'INNER_EOF' > "$SANDBOX_DIR/bin/openclaw"
+#!/bin/bash
+exit 0
+INNER_EOF
+chmod +x "$SANDBOX_DIR/bin/openclaw"
+export PATH="$SANDBOX_DIR/bin:$PATH"
 echo "Sandbox: $SANDBOX_DIR"
 
 cd "$SANDBOX_DIR"

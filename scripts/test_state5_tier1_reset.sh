@@ -8,6 +8,13 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 function setup_sandbox() {
     sandbox_dir=$(mktemp -d)
     cd "$sandbox_dir"
+    mkdir -p "bin"
+    cat << 'INNER_EOF' > "bin/openclaw"
+#!/bin/bash
+exit 0
+INNER_EOF
+    chmod +x "bin/openclaw"
+    export PATH="$(pwd)/bin:$PATH"
     git init > /dev/null 2>&1
     git config user.name "E2E Test"
     git config user.email "e2e@example.com"

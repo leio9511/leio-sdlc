@@ -4,6 +4,13 @@ set -e
 echo "Running Anti-Reward Hacking Tests..."
 
 # Scenario 1
+mkdir -p dummy_workspace/bin
+cat << 'INNER_EOF' > dummy_workspace/bin/openclaw
+#!/bin/bash
+exit 0
+INNER_EOF
+chmod +x dummy_workspace/bin/openclaw
+export PATH="$(pwd)/dummy_workspace/bin:$PATH"
 mkdir -p dummy_workspace
 cd dummy_workspace
 touch dummy.md
