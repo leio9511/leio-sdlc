@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-003-1: Migrate Native Backgrounding for Core LEIO SDLC Skills
 
