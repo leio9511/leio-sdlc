@@ -91,29 +91,29 @@ perform_hard_copy_deployment() {
     mv -T "$TMP_DIR" "$PROD_DIR"
     rm -rf "$OLD_DIR"
 
-    # 4. Gateway Reload
-    if [ -z "$HOME_MOCK" ]; then
-        echo "🔄 Restarting OpenClaw gateway..."
-        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
-    fi
-
-    # 5. Auto-Cleanup
+    # 4. Auto-Cleanup
     echo "🧹 Pruning old backups..."
     ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
 
     echo "✅ DEPLOYMENT SUCCESS: $SLUG is now live via hard-copy swap."
 
-    # 6. GitHub Auto-Sync (PRD-035)
+    # 5. GitHub Auto-Sync (PRD-035)
     local SYNC_SCRIPT="$HOME_DIR/.openclaw/skills/leio-github-sync/scripts/sync.py"
     if [ -f "$SYNC_SCRIPT" ] && [ -z "$HOME_MOCK" ]; then
         echo "🌐 Synchronizing code to GitHub..."
         python3 "$SYNC_SCRIPT" --project-dir "$PWD" || echo "⚠️ GitHub sync failed but deployment succeeded."
     fi
     
-    # 7. Install Git Hooks
+    # 6. Install Git Hooks
     if [ -d ".sdlc_hooks" ]; then
         echo "🎣 Installing Git hooks..."
         git config core.hooksPath .sdlc_hooks
+    fi
+
+    # 7. Gateway Reload
+    if [ -z "$HOME_MOCK" ]; then
+        echo "🔄 Restarting OpenClaw gateway..."
+        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
     fi
 }
 
