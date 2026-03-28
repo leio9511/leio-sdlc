@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-002: Integrate Pre-Commit Hook into SDLC Framework
 
