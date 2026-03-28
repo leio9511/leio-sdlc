@@ -1,4 +1,4 @@
-status: in_progress
+status: closed
 
 # PR-003: Update Governance Constitution for Quarantine Protocol
 
