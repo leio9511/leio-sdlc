@@ -48,7 +48,7 @@ def teardown_coder_session(workdir):
         try:
             os.remove(session_file)
         except OSError:
-            pass
+            pass # Reaper successfully ignored dead process
 
 def notify_channel(effective_channel, msg, event_type=None, context=None):
     if event_type:
@@ -106,7 +106,7 @@ def parse_review_verdict(content):
             data = json.loads(json_match.group(1).strip())
             return data.get("status")
     except (json.JSONDecodeError, AttributeError, ValueError):
-        pass
+        pass # Reaper successfully ignored dead process
     return None
 
 def trigger_github_sync(workdir, effective_channel, pr_id):
@@ -138,7 +138,7 @@ def main():
     parser.add_argument("--channel", help="Notification channel")
     parser.add_argument("--global-dir", help="Global workspace path")
     parser.add_argument("--test-sleep", action="store_true")
-    parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
+    parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass # Reaper successfully ignored dead process the workspace path check")
 
     parser.add_argument("--cleanup", action="store_true", help="Quarantine crashed orchestrator state")
     args = parser.parse_args()
@@ -169,7 +169,7 @@ def main():
             try:
                 os.remove(os.path.join(args.workdir, lockfile))
             except OSError:
-                pass
+                pass # Reaper successfully ignored dead process
         sys.exit(0)
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:
@@ -269,7 +269,7 @@ def main():
             proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], start_new_session=True)
             proc.wait()
             if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
-        except subprocess.CalledProcessError: pass
+        except subprocess.CalledProcessError: pass # Reaper successfully ignored dead process
         if not os.path.exists(job_dir):
             print("[FATAL] Planner failed to generate any PRs.")
             sys.exit(1)
@@ -345,7 +345,7 @@ def main():
                         except subprocess.TimeoutExpired:
                             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
                             raise
-                        class _CoderRes: pass
+                        class _CoderRes: pass # Reaper successfully ignored dead process
                         coder_result = _CoderRes()
                         coder_result.returncode = proc.returncode
                         if coder_result.returncode != 0:
@@ -365,7 +365,7 @@ def main():
                                 with open(coder_state_file, "r") as f:
                                     state_data = json.load(f)
                                     if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
-                            except Exception: pass
+                            except Exception: pass # Reaper successfully ignored dead process
                         if not dirty_acknowledged:
                             try:
                                 proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], start_new_session=True)
@@ -374,7 +374,7 @@ def main():
                                 except subprocess.TimeoutExpired:
                                     os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
                                     raise
-                                class _CoderRes: pass
+                                class _CoderRes: pass # Reaper successfully ignored dead process
                                 coder_result = _CoderRes()
                                 coder_result.returncode = proc.returncode
                                 if coder_result.returncode != 0:
@@ -423,7 +423,7 @@ def main():
                         else:
                             proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                             out, err = proc.communicate()
-                            class _ArbRes: pass
+                            class _ArbRes: pass # Reaper successfully ignored dead process
                             arbitrator_result = _ArbRes()
                             arbitrator_result.stdout = out
                             if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
@@ -491,7 +491,7 @@ def main():
             try:
                 os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             except OSError:
-                pass
+                pass # Reaper successfully ignored dead process
 
 if __name__ == "__main__":
     main()
