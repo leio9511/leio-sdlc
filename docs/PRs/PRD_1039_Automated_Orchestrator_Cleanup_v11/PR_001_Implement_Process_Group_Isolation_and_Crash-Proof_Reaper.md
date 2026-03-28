@@ -1,4 +1,4 @@
-status: in_progress
+status: superseded
 
 # PR-001: Implement Process Group Isolation and Crash-Proof Reaper
 
