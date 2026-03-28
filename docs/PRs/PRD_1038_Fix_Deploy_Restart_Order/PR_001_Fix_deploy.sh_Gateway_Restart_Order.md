@@ -1,4 +1,4 @@
-status: in_progress
+status: closed
 
 # PR-001: Fix deploy.sh Gateway Restart Order
 
