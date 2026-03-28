@@ -23,9 +23,17 @@ This forces the human operator (or the main Agent) to manually intervene and exe
    - This provides the Manager/human with a deterministic, "safe" tool to reset a corrupted environment without typing raw Git commands.
 
 4. **Handoff Prompter & Self-Explanation Adjustments**:
-   - The `git_checkout_error` prompt in `scripts/handoff_prompter.py` currently instructs the Agent: `You must run git branch -D and git clean -fd`. This must be updated to: `The orchestrator automatically executed a safe rollback to master. Please review the logs.`
-   - Add a new prompt for mid-flight crashes/interrupts (e.g., `fatal_crash`): `[FATAL_CRASH] The Orchestrator encountered a fatal error mid-flight. A safe teardown sequence was automatically executed (reset to master). You do NOT need to manually clean the workspace. Please review the Orchestrator logs.`
-   - **Crucial Boundary**: The pre-flight `dirty_workspace` check MUST NOT trigger the automated cleanup. If the workspace is dirty *before* the Orchestrator starts, it must exit immediately and preserve the human's/Agent's uncommitted work as it does today.
+   - **Audit Results**: Current exit points in `orchestrator.py` are mostly using raw `sys.exit(1)` without descriptive `HandoffPrompter` tags, causing the Manager to "miss" the handoff or get stuck.
+   - **Success Reaction Fix**: Before exiting with code 0 when the queue is empty, the Orchestrator MUST print `HandoffPrompter.get_prompt("happy_path")`. This ensures the Manager recognizes the "Success" signal and performs closing duties (PRD/Issue/State).
+   - **Exit Point Linking**: Every `sys.exit(1)` in the code must be mapped to a specific `HandoffPrompter` key.
+   - **Specific Prompt Updates**:
+     - `git_checkout_error`: Change to `[FATAL_GIT] Git checkout failed. Orchestrator automatically rolled back to master. Workspace is clean.`
+     - `blocked_fatal`: Link to `HandoffPrompter.get_prompt("dead_end")`.
+     - `fatal_crash` (New): `[FATAL_CRASH] An unexpected error occurred. Orchestrator performed an emergency teardown (reset to master). Please check logs.`
+   - **Crucial Boundary**: The pre-flight checks (State 0: `dirty_workspace`, `Lock Check`, `Master Branch Check`) MUST NOT trigger the automated cleanup. We only clean up what we "created" after the pipeline successfully ignites.
+
+5. **Fall-through Reliability (The "Dumb" Fallback)**:
+   - If the `finally` block itself encounters an error (e.g., Git command fails), it must use a `try...except` block to print a final, absolute survival message: `[FATAL_SYSTEM_CRITICAL] Automated cleanup failed. Git might be in a corrupted state. HUMAN INTERVENTION REQUIRED.`
 
 ## Framework Modifications
 - `scripts/handoff_prompter.py`
