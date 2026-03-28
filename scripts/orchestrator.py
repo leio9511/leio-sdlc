@@ -8,6 +8,8 @@ import argparse
 import uuid
 import time
 import fcntl
+import signal
+import traceback
 
 # Global marker for Git Hook authentication (PRD-1012)
 os.environ["SDLC_ORCHESTRATOR_RUNNING"] = "1"
@@ -137,7 +139,38 @@ def main():
     parser.add_argument("--global-dir", help="Global workspace path")
     parser.add_argument("--test-sleep", action="store_true")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
+
+    parser.add_argument("--cleanup", action="store_true", help="Quarantine crashed orchestrator state")
     args = parser.parse_args()
+
+    if args.cleanup:
+        lock_path = os.path.join(args.workdir, ".sdlc_repo.lock")
+        try:
+            f_lock = open(lock_path, "w")
+            fcntl.flock(f_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (BlockingIOError, IOError):
+            print("[FATAL_LOCK] Cannot clean up while another SDLC pipeline is active.")
+            sys.exit(1)
+        
+        os.chdir(args.workdir)
+        branch_res = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
+        branch_output = branch_res.stdout.strip()
+        if branch_output in ["master", "main"]:
+            print("Cannot quarantine master/main branch.")
+            sys.exit(1)
+            
+        subprocess.run(["git", "add", "-A"], check=False)
+        subprocess.run(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+        timestamp = int(time.time())
+        subprocess.run(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
+        subprocess.run(["git", "checkout", "master"], check=False)
+        
+        for lockfile in [".coder_session", ".sdlc_repo.lock"]:
+            try:
+                os.remove(os.path.join(args.workdir, lockfile))
+            except OSError:
+                pass
+        sys.exit(0)
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:
         print("[FATAL] Security Violation: Unless for testing purposes, skills must be executed from the ~/.openclaw/skills/ runtime directory. If you are intentionally running from source for testing, you must explicitly add the parameter: --enable-exec-from-workspace")
@@ -244,170 +277,196 @@ def main():
             sys.exit(1)
         notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
 
-    loops = 0
-    while True:
-        if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
-            print(f"Max runs reached. Exiting orchestrator.")
-            break
-        loops += 1
-        md_files = glob.glob(os.path.join(job_dir, "*.md"))
-        md_files.sort()
-        current_pr = None
-        for md_file in md_files:
-            with open(md_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-                if re.search(r'^status:\s*in_progress', content, re.MULTILINE):
-                    current_pr = md_file
-                    break
-        if not current_pr:
-            result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "get_next_pr.py"), "--workdir", workdir, "--job-dir", job_dir], capture_output=True, text=True)
-            output = result.stdout.strip()
-            if "[QUEUE_EMPTY]" in output or not output:
-                print("No open PRs found. Exiting.")
-                notify_channel(effective_channel, "Success: All PRs completed!", "all_done", {"prd_id": prd_filename})
-                sys.exit(0)
-            current_pr = output.split('\n')[-1].strip()
-            if not os.path.exists(current_pr): sys.exit(1)
-            set_pr_status(current_pr, "in_progress")
 
-        if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir)
-        base_filename = os.path.splitext(os.path.basename(current_pr))[0]
-        parent_dir_name = os.path.basename(os.path.dirname(os.path.abspath(current_pr)))
-        branch_name = f"{parent_dir_name}/{base_filename}".replace(":", "_").replace(" ", "_").replace("?", "_")
-        reset_count = 0
-        pr_done = False
+    proc = None
+
+    def sig_handler(signum, frame):
+        raise SystemExit(1)
+    
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+
+    try:
+        loops = 0
         while True:
-            if pr_done: break
-            status_result = subprocess.run(["git", "diff", "--cached", "--quiet"])
-            if status_result.returncode != 0:
-                subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
-            print(f"State 2: Checking out branch {branch_name}")
-            try:
-                branch_check = subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
-                if branch_check.returncode == 0: safe_git_checkout(branch_name)
-                else: safe_git_checkout(branch_name, create=True)
-            except GitCheckoutError as e: sys.exit(1)
-            rejection_count = 0
-            state_5_trigger = False
+            if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
+                print(f"Max runs reached. Exiting orchestrator.")
+                break
+            loops += 1
+            md_files = glob.glob(os.path.join(job_dir, "*.md"))
+            md_files.sort()
+            current_pr = None
+            for md_file in md_files:
+                with open(md_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    if re.search(r'^status:\s*in_progress', content, re.MULTILINE):
+                        current_pr = md_file
+                        break
+            if not current_pr:
+                result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "get_next_pr.py"), "--workdir", workdir, "--job-dir", job_dir], capture_output=True, text=True)
+                output = result.stdout.strip()
+                if "[QUEUE_EMPTY]" in output or not output:
+                    print("No open PRs found. Exiting.")
+                    notify_channel(effective_channel, "Success: All PRs completed!", "all_done", {"prd_id": prd_filename})
+                    sys.exit(0)
+                current_pr = output.split('\n')[-1].strip()
+                if not os.path.exists(current_pr): sys.exit(1)
+                set_pr_status(current_pr, "in_progress")
+
+            if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir)
+            base_filename = os.path.splitext(os.path.basename(current_pr))[0]
+            parent_dir_name = os.path.basename(os.path.dirname(os.path.abspath(current_pr)))
+            branch_name = f"{parent_dir_name}/{base_filename}".replace(":", "_").replace(" ", "_").replace("?", "_")
+            reset_count = 0
+            pr_done = False
             while True:
-                if args.coder_session_strategy == "always": teardown_coder_session(workdir)
-                print(f"State 3: Spawning Coder for {current_pr}")
-                notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
+                if pr_done: break
+                status_result = subprocess.run(["git", "diff", "--cached", "--quiet"])
+                if status_result.returncode != 0:
+                    subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
+                print(f"State 2: Checking out branch {branch_name}")
                 try:
-                    coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], timeout=MAX_RUNTIME)
-                    if coder_result.returncode != 0:
-                        state_5_trigger = True
-                        break
-                except subprocess.TimeoutExpired:
-                    state_5_trigger = True
-                    break
-                status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
-                if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
-                if status_output.strip():
-                    coder_state_file = os.path.join(workdir, ".coder_state.json")
-                    dirty_acknowledged = False
-                    if os.path.exists(coder_state_file):
-                        try:
-                            import json
-                            with open(coder_state_file, "r") as f:
-                                state_data = json.load(f)
-                                if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
-                        except Exception: pass
-                    if not dirty_acknowledged:
-                        try:
-                            coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], timeout=MAX_RUNTIME)
-                            if coder_result.returncode != 0:
-                                state_5_trigger = True
-                                break
-                        except subprocess.TimeoutExpired:
+                    branch_check = subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
+                    if branch_check.returncode == 0: safe_git_checkout(branch_name)
+                    else: safe_git_checkout(branch_name, create=True)
+                except GitCheckoutError as e: sys.exit(1)
+                rejection_count = 0
+                state_5_trigger = False
+                while True:
+                    if args.coder_session_strategy == "always": teardown_coder_session(workdir)
+                    print(f"State 3: Spawning Coder for {current_pr}")
+                    notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
+                    try:
+                        coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], timeout=MAX_RUNTIME)
+                        if coder_result.returncode != 0:
                             state_5_trigger = True
                             break
-                        continue
-                review_artifact = "Review_Report.md"
-                review_report_path = os.path.join(workdir, review_artifact)
-                if os.path.exists(review_report_path): os.remove(review_report_path)
-                print(f"State 4: Spawning Reviewer for {current_pr}")
-                notify_channel(effective_channel, f"Coder submitted changes for {base_filename}. Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact])
-                if os.path.exists(review_report_path):
-                    with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
-                else: review_content = ""
+                    except subprocess.TimeoutExpired:
+                        state_5_trigger = True
+                        break
+                    status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+                    if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
+                    if status_output.strip():
+                        coder_state_file = os.path.join(workdir, ".coder_state.json")
+                        dirty_acknowledged = False
+                        if os.path.exists(coder_state_file):
+                            try:
+                                import json
+                                with open(coder_state_file, "r") as f:
+                                    state_data = json.load(f)
+                                    if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
+                            except Exception: pass
+                        if not dirty_acknowledged:
+                            try:
+                                coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], timeout=MAX_RUNTIME)
+                                if coder_result.returncode != 0:
+                                    state_5_trigger = True
+                                    break
+                            except subprocess.TimeoutExpired:
+                                state_5_trigger = True
+                                break
+                            continue
+                    review_artifact = "Review_Report.md"
+                    review_report_path = os.path.join(workdir, review_artifact)
+                    if os.path.exists(review_report_path): os.remove(review_report_path)
+                    print(f"State 4: Spawning Reviewer for {current_pr}")
+                    notify_channel(effective_channel, f"Coder submitted changes for {base_filename}. Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
+                    subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact])
+                    if os.path.exists(review_report_path):
+                        with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
+                    else: review_content = ""
                 
-                # New Structured JSON Parsing logic
-                verdict = parse_review_verdict(review_content)
-                if verdict == "APPROVED":
-                    subprocess.run(["git", "reset", "--hard", "HEAD"])
-                    subprocess.run(["git", "clean", "-fd"])
-                    safe_git_checkout("master")
-                    merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
-                    if merge_result.returncode == 0:
-                        subprocess.run(["git", "branch", "-D", branch_name], check=True)
-                        set_pr_status(current_pr, "closed")
-                        notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
-                        trigger_github_sync(workdir, effective_channel, base_filename)
-                        teardown_coder_session(workdir)
-                        pr_done = True
-                        break
-                    else:
-                        state_5_trigger = True
-                        break
-                elif verdict == "ACTION_REQUIRED" or "[ACTION_REQUIRED]" in review_content:
-                    rejection_count += 1
-                    notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
-                    if rejection_count < 5:
-                        subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir])
-                        continue
-                    else:
-                        arbitrator_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], capture_output=True, text=True)
-                        if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
-                            subprocess.run(["git", "reset", "--hard", "HEAD"])
-                            subprocess.run(["git", "clean", "-fd"])
-                            safe_git_checkout("master")
-                            merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
-                            if merge_result.returncode == 0:
-                                subprocess.run(["git", "branch", "-D", branch_name], check=True)
-                                set_pr_status(current_pr, "closed")
-                                notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
-                                trigger_github_sync(workdir, effective_channel, base_filename)
-                                teardown_coder_session(workdir)
-                                pr_done = True
-                                break
-                            else:
-                                state_5_trigger = True
-                                break
-                        else:
-                            state_5_trigger = True
-                            break
-                else:
-                    state_5_trigger = True
-                    break
-            if state_5_trigger:
-                if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
-                if reset_count == 0:
-                    print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
-                    subprocess.run(["git", "reset", "--hard"], check=False)
-                    subprocess.run(["git", "clean", "-fd"], check=False)
-                    safe_git_checkout("master")
-                    subprocess.run(["git", "branch", "-D", branch_name], check=False)
-                    reset_count += 1
-                    continue
-                else:
-                    slice_depth = get_pr_slice_depth(current_pr)
-                    if slice_depth < 2:
-                        pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                        subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir])
-                        pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                        new_files = pr_files_after - pr_files_before
-                        if len(new_files) >= 2:
-                            set_pr_status(current_pr, "superseded")
+                    # New Structured JSON Parsing logic
+                    verdict = parse_review_verdict(review_content)
+                    if verdict == "APPROVED":
+                        subprocess.run(["git", "reset", "--hard", "HEAD"])
+                        subprocess.run(["git", "clean", "-fd"])
+                        safe_git_checkout("master")
+                        merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                        if merge_result.returncode == 0:
+                            subprocess.run(["git", "branch", "-D", branch_name], check=True)
+                            set_pr_status(current_pr, "closed")
+                            notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
+                            trigger_github_sync(workdir, effective_channel, base_filename)
+                            teardown_coder_session(workdir)
                             pr_done = True
                             break
                         else:
+                            state_5_trigger = True
+                            break
+                    elif verdict == "ACTION_REQUIRED" or "[ACTION_REQUIRED]" in review_content:
+                        rejection_count += 1
+                        notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
+                        if rejection_count < 5:
+                            subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir])
+                            continue
+                        else:
+                            arbitrator_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], capture_output=True, text=True)
+                            if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
+                                subprocess.run(["git", "reset", "--hard", "HEAD"])
+                                subprocess.run(["git", "clean", "-fd"])
+                                safe_git_checkout("master")
+                                merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                                if merge_result.returncode == 0:
+                                    subprocess.run(["git", "branch", "-D", branch_name], check=True)
+                                    set_pr_status(current_pr, "closed")
+                                    notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
+                                    trigger_github_sync(workdir, effective_channel, base_filename)
+                                    teardown_coder_session(workdir)
+                                    pr_done = True
+                                    break
+                                else:
+                                    state_5_trigger = True
+                                    break
+                            else:
+                                state_5_trigger = True
+                                break
+                    else:
+                        state_5_trigger = True
+                        break
+                if state_5_trigger:
+                    if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
+                    if reset_count == 0:
+                        print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
+                        subprocess.run(["git", "reset", "--hard"], check=False)
+                        subprocess.run(["git", "clean", "-fd"], check=False)
+                        safe_git_checkout("master")
+                        subprocess.run(["git", "branch", "-D", branch_name], check=False)
+                        reset_count += 1
+                        continue
+                    else:
+                        slice_depth = get_pr_slice_depth(current_pr)
+                        if slice_depth < 2:
+                            pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
+                            subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir])
+                            pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
+                            new_files = pr_files_after - pr_files_before
+                            if len(new_files) >= 2:
+                                set_pr_status(current_pr, "superseded")
+                                pr_done = True
+                                break
+                            else:
+                                set_pr_status(current_pr, "blocked_fatal")
+                                sys.exit(1)
+                        else:
                             set_pr_status(current_pr, "blocked_fatal")
                             sys.exit(1)
-                    else:
-                        set_pr_status(current_pr, "blocked_fatal")
-                        sys.exit(1)
+
+
+    except SystemExit as e:
+        if str(e) == "1":
+            print(HandoffPrompter.get_prompt("fatal_interrupt"))
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        print(HandoffPrompter.get_prompt("fatal_crash"))
+        raise
+    finally:
+        if 'proc' in locals() and proc is not None and proc.poll() is None:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except OSError:
+                pass
 
 if __name__ == "__main__":
     main()
