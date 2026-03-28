@@ -1,11 +1,12 @@
 # STATE.md - leio-sdlc Development State (Kanban)
 
 - **Project**: leio-sdlc (Automated SDLC Orchestrator)
-- **Current Version**: 0.7.0
+- **Current Version**: 0.8.0
 - **Status**: [SDLC Hardening] - Implementing native notifications, fail-fast git hygiene, and deterministic state tracking.
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1039] PRD-1039 v11: Automated Orchestrator Cleanup ## 🏆 Recently Completed Forensic Quarantine**: Implemented crash-proof process group isolation and lock-aware `--cleanup` flag for robust agent teardown. (v0.8.0)
 - [x] **[ISSUE-1036] PRD-033: SDLC Observability & Ignition Guardrail**: Implemented mandatory ignition handshake, real-time Slack intermediate pulses (Coder/Reviewer/Merge), and full migration of the review protocol from `[LGTM]` string matching to structured JSON parsing. (v0.7.0)
 - [x] **[ISSUE-1026/1033] PRD-032 v2: Strict Execution Boundary**: Enforced `~/.openclaw/skills/` as the only allowed runtime directory. Blocking source code execution from the workspace unless `--enable-exec-from-workspace` is provided. (v0.6.1)
 - [x] **[ISSUE-1025] PRD-1025: Reviewer LGTM Bypass**: Refactored orchestrator to parse strict JSON status and physically isolated history diffs in reviewer prompt.
