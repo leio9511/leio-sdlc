@@ -5,9 +5,10 @@ As learned from recent failure incidents, soft constraints (prompt-level rules) 
 
 ## Requirements
 
-1. **Scope Protection**:
+1. **Scope Protection & Opt-in Guardrail**:
    - The protection must strictly apply ONLY to the main branch (`master` or `main`).
-   - Feature branches (e.g., `PRD_XXX`) used by sub-agents (Coder/Reviewer) must remain unrestricted to allow normal iterative commits during the SDLC pipeline.
+   - Feature branches (e.g., `PRD_XXX`) used by sub-agents (Coder/Reviewer) must remain unrestricted.
+   - **Opt-in Logic**: The hook must first check if a `.sdlc_guardrail` file exists in the repository root. If not found, it must `exit 0` implicitly, allowing standard commits on generic projects.
 
 2. **Hook Redirection (core.hooksPath)**:
    - Instead of hiding the hook in the opaque `.git/hooks/` directory, create a version-controlled directory named `.sdlc_hooks/`.
@@ -19,8 +20,9 @@ As learned from recent failure incidents, soft constraints (prompt-level rules) 
    - The `pre-commit` hook must read a temporary, per-command Git config value (e.g., `git config sdlc.runtime`).
    - If `sdlc.runtime` is not equal to `"1"`, the commit must be intercepted and rejected.
 
-4. **"Glass-Break" Emergency Override (Actionable Error)**:
+4. **"Glass-Break" Emergency Override & JIT Prompt Enforcement**:
    - If a human administrator or the Main Agent attempts a direct `git commit` on the protected branch, the hook must exit non-zero and print a highly visible, self-explanatory error message.
+   - **Role Awakening**: The error message MUST remind the Agent of its role: "As a Manager, you should NEVER commit directly! Run orchestrator.py instead."
    - The error message MUST explicitly provide the exact command required to bypass the hook in emergencies:
      `git -c sdlc.override=true commit -m "..."`
    - The hook script must check for `sdlc.override` and grant immediate bypass if set to `"true"`.
