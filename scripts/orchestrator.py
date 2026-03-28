@@ -141,10 +141,11 @@ def main():
     parser.add_argument("--test-sleep", action="store_true")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass # Reaper safety check: process already reaped or pgid not found the workspace path check")
 
-    parser.add_argument("--cleanup", action="store_true", help="Quarantine crashed orchestrator state")
+    parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
     args = parser.parse_args()
 
     if args.cleanup:
+        # 1. Concurrency Guard (Crucial)
         lock_path = os.path.join(args.workdir, ".sdlc_repo.lock")
         try:
             f_lock = open(lock_path, "w")
@@ -153,6 +154,7 @@ def main():
             print("[FATAL_LOCK] Cannot clean up while another SDLC pipeline is active.")
             sys.exit(1)
         
+        # 2-7. Quarantine logic: Stage, WIP commit, rename, checkout master
         os.chdir(args.workdir)
         branch_res = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
         branch_output = branch_res.stdout.strip()
@@ -166,15 +168,17 @@ def main():
         subprocess.run(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
         subprocess.run(["git", "checkout", "master"], check=False)
         
+        # 8. Targeted Artifact Obliteration (os.remove for daemon locks)
         for lockfile in [".coder_session", ".sdlc_repo.lock"]:
             try:
                 os.remove(os.path.join(args.workdir, lockfile))
             except OSError:
-                pass # Reaper safety check: process already reaped or pgid not found
+                pass # Already deleted
         sys.exit(0)
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:
         print("[FATAL] Security Violation: Unless for testing purposes, skills must be executed from the ~/.openclaw/skills/ runtime directory. If you are intentionally running from source for testing, you must explicitly add the parameter: --enable-exec-from-workspace")
+        print(HandoffPrompter.get_prompt("fatal_crash"))
         sys.exit(1)
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -194,10 +198,12 @@ def main():
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
         if not os.path.exists(".git"):
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
+            print(HandoffPrompter.get_prompt("dirty_workspace"))
             sys.exit(1)
         branch_output = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
         if branch_output not in ["master", "main"]:
             print(f"[FATAL] Orchestrator must be started from the master or main branch. Current: {branch_output}")
+            print(HandoffPrompter.get_prompt("dirty_workspace"))
             sys.exit(1)
 
     try:
@@ -206,6 +212,7 @@ def main():
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         print("[FATAL] Another SDLC pipeline is currently running. Concurrent execution is blocked.")
+        print(HandoffPrompter.get_prompt("dirty_workspace"))
         sys.exit(1)
 
     status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
@@ -218,7 +225,7 @@ def main():
     effective_channel = args.channel or os.environ.get("OPENCLAW_SESSION_KEY") or os.environ.get("OPENCLAW_CHANNEL_ID")
     if not effective_channel:
         print("[FATAL] Missing channel parameter.")
-        print("[FATAL_STARTUP]")
+        print(HandoffPrompter.get_prompt("missing_channel"))
         sys.exit(1)
 
     # --- IGNITION GUARDRAIL ---
@@ -239,6 +246,7 @@ def main():
         if res.returncode != 0:
             print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
             if res.stderr: print(res.stderr.strip(), file=sys.stderr)
+            print(HandoffPrompter.get_prompt("missing_channel"))
             sys.exit(1)
         else:
             print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
@@ -246,6 +254,7 @@ def main():
         print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
         if "invalid" in effective_channel:
             print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
+            print(HandoffPrompter.get_prompt("missing_channel"))
             sys.exit(1)
     # --------------------------
 
@@ -273,10 +282,12 @@ def main():
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
         if not os.path.exists(job_dir):
             print("[FATAL] Planner failed to generate any PRs.")
+            print(HandoffPrompter.get_prompt("planner_failure"))
             sys.exit(1)
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
         if len(md_files) == 0:
             print("[FATAL] Planner failed to generate any PRs.")
+            print(HandoffPrompter.get_prompt("planner_failure"))
             sys.exit(1)
         notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
 
@@ -284,6 +295,7 @@ def main():
     proc = None
 
     def sig_handler(signum, frame):
+        print(HandoffPrompter.get_prompt("fatal_interrupt"))
         raise SystemExit(1)
     
     signal.signal(signal.SIGTERM, sig_handler)
@@ -310,10 +322,13 @@ def main():
                 output = result.stdout.strip()
                 if "[QUEUE_EMPTY]" in output or not output:
                     print("No open PRs found. Exiting.")
+                    print(HandoffPrompter.get_prompt("happy_path"))
                     notify_channel(effective_channel, "Success: All PRs completed!", "all_done", {"prd_id": prd_filename})
                     sys.exit(0)
                 current_pr = output.split('\n')[-1].strip()
-                if not os.path.exists(current_pr): sys.exit(1)
+                if not os.path.exists(current_pr):
+                    print(HandoffPrompter.get_prompt("dead_end"))
+                    sys.exit(1)
                 set_pr_status(current_pr, "in_progress")
 
             if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir)
@@ -332,7 +347,9 @@ def main():
                     branch_check = subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
                     if branch_check.returncode == 0: safe_git_checkout(branch_name)
                     else: safe_git_checkout(branch_name, create=True)
-                except GitCheckoutError as e: sys.exit(1)
+                except GitCheckoutError as e:
+                    print(HandoffPrompter.get_prompt("git_checkout_error"))
+                    sys.exit(1)
                 rejection_count = 0
                 state_5_trigger = False
                 while True:
@@ -473,15 +490,18 @@ def main():
                                 break
                             else:
                                 set_pr_status(current_pr, "blocked_fatal")
+                                print(HandoffPrompter.get_prompt("dead_end"))
                                 sys.exit(1)
                         else:
                             set_pr_status(current_pr, "blocked_fatal")
+                            print(HandoffPrompter.get_prompt("dead_end"))
                             sys.exit(1)
 
 
+    except KeyboardInterrupt:
+        print(HandoffPrompter.get_prompt("fatal_interrupt"))
+        raise
     except SystemExit as e:
-        if str(e) == "1":
-            print(HandoffPrompter.get_prompt("fatal_interrupt"))
         raise
     except Exception as e:
         traceback.print_exc()
