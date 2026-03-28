@@ -26,7 +26,7 @@ def set_pr_status(pr_file, new_status):
     with open(pr_file, 'w', encoding='utf-8') as f:
         f.write(updated)
     subprocess.run(["git", "add", pr_file], check=False)
-    subprocess.run(["git", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
+    subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
 
 def get_pr_slice_depth(pr_file):
     with open(pr_file, 'r', encoding='utf-8') as f:
@@ -79,12 +79,15 @@ def validate_prd_is_committed(prd_file, workdir):
         try:
             subprocess.run(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
-            print(f"[FATAL] PRD file '{prd_file}' is untracked by Git. Please commit it before running.")
-            sys.exit(1)
+            print(f"[SDLC Framework] PRD file '{prd_file}' is untracked. Auto-committing for ingestion.")
+            subprocess.run(["git", "add", prd_path_abs], check=True, cwd=workdir)
+            subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD"], check=True, cwd=workdir)
+
         status_out = subprocess.run(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
-            print(f"[FATAL] PRD file '{prd_file}' has uncommitted changes. Please commit it before running.")
-            sys.exit(1)
+            print(f"[SDLC Framework] PRD file '{prd_file}' has uncommitted changes. Auto-committing.")
+            subprocess.run(["git", "add", prd_path_abs], check=True, cwd=workdir)
+            subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD changes"], check=True, cwd=workdir)
 
 def parse_review_verdict(content):
     """
@@ -277,7 +280,7 @@ def main():
             if pr_done: break
             status_result = subprocess.run(["git", "diff", "--cached", "--quiet"])
             if status_result.returncode != 0:
-                subprocess.run(["git", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
+                subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
             print(f"State 2: Checking out branch {branch_name}")
             try:
                 branch_check = subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])

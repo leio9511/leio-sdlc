@@ -64,6 +64,9 @@ cd "$PROJECT_DIR" || exit 1
 
     echo "Running Orchestrator GitHub Sync Test..."
     bash scripts/test_github_sync_integration.sh
+
+    echo "Running Pre-Commit Hook Test..."
+    bash scripts/test_pre_commit_hook.sh
     
 ) > "$LOG_FILE" 2>&1
 # ---------------------------------------------

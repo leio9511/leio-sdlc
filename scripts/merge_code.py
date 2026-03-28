@@ -59,7 +59,8 @@ def main():
         sys.exit(0)
     else:
         try:
-            result = subprocess.run(["git", "merge", branch], check=True, text=True, capture_output=True)
+            # Use -c flag to pass runtime authentication to hook
+            result = subprocess.run(["git", "-c", "sdlc.runtime=1", "merge", branch], check=True, text=True, capture_output=True)
             print(result.stdout)
         except subprocess.CalledProcessError as e:
             print(f"Merge failed: {e.stderr}. Aborting merge.", file=sys.stderr)

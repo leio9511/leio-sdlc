@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Enforce SDLC via Git Pre-Commit Hook (ISSUE-1012)
+
+# 1. Opt-in Guardrail
+if [ ! -f .sdlc_guardrail ]; then
+    exit 0
+fi
+
+# 2. Scope Protection: ONLY master or main branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" ]]; then
+    exit 0
+fi
+
+# 3. Authentication via Native Git Configuration
+SDLC_RUNTIME=$(git config sdlc.runtime || echo "0")
+SDLC_OVERRIDE=$(git config sdlc.override || echo "false")
+
+if [[ "$SDLC_RUNTIME" == "1" || "$SDLC_OVERRIDE" == "true" ]]; then
+    exit 0
+fi
+
+# 4. Glass-Break Emergency Override & JIT Prompt Enforcement
+echo "==============================================================="
+echo "❌ GIT COMMIT REJECTED ON PROTECTED BRANCH: $CURRENT_BRANCH"
+echo "==============================================================="
+echo "Role Awakening: As a Manager, you should NEVER commit directly!"
+echo "Please run orchestrator.py to perform changes via the SDLC pipeline."
+echo ""
+echo "Emergency Override: If you absolutely must commit directly, use:"
+echo "git -c sdlc.override=true commit -m \"...\""
+echo "==============================================================="
+
+exit 1

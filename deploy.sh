@@ -109,6 +109,12 @@ perform_hard_copy_deployment() {
         echo "🌐 Synchronizing code to GitHub..."
         python3 "$SYNC_SCRIPT" --project-dir "$PWD" || echo "⚠️ GitHub sync failed but deployment succeeded."
     fi
+    
+    # 7. Install Git Hooks
+    if [ -d ".sdlc_hooks" ]; then
+        echo "🎣 Installing Git hooks..."
+        git config core.hooksPath .sdlc_hooks
+    fi
 }
 
 perform_hard_copy_deployment "$@"
