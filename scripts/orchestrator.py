@@ -266,7 +266,9 @@ def main():
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
-            subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], check=True)
+            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], start_new_session=True)
+            proc.wait()
+            if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
         except subprocess.CalledProcessError: pass
         if not os.path.exists(job_dir):
             print("[FATAL] Planner failed to generate any PRs.")
@@ -337,7 +339,15 @@ def main():
                     print(f"State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     try:
-                        coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], timeout=MAX_RUNTIME)
+                        proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], start_new_session=True)
+                        try:
+                            proc.wait(timeout=MAX_RUNTIME)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                            raise
+                        class _CoderRes: pass
+                        coder_result = _CoderRes()
+                        coder_result.returncode = proc.returncode
                         if coder_result.returncode != 0:
                             state_5_trigger = True
                             break
@@ -358,7 +368,15 @@ def main():
                             except Exception: pass
                         if not dirty_acknowledged:
                             try:
-                                coder_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], timeout=MAX_RUNTIME)
+                                proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], start_new_session=True)
+                                try:
+                                    proc.wait(timeout=MAX_RUNTIME)
+                                except subprocess.TimeoutExpired:
+                                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                                    raise
+                                class _CoderRes: pass
+                                coder_result = _CoderRes()
+                                coder_result.returncode = proc.returncode
                                 if coder_result.returncode != 0:
                                     state_5_trigger = True
                                     break
@@ -371,7 +389,8 @@ def main():
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     print(f"State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename}. Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact])
+                    proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact], start_new_session=True)
+                    proc.wait()
                     if os.path.exists(review_report_path):
                         with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
                     else: review_content = ""
@@ -398,10 +417,15 @@ def main():
                         rejection_count += 1
                         notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                         if rejection_count < 5:
-                            subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir])
+                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir], start_new_session=True)
+                            proc.wait()
                             continue
                         else:
-                            arbitrator_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], capture_output=True, text=True)
+                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            out, err = proc.communicate()
+                            class _ArbRes: pass
+                            arbitrator_result = _ArbRes()
+                            arbitrator_result.stdout = out
                             if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
                                 subprocess.run(["git", "reset", "--hard", "HEAD"])
                                 subprocess.run(["git", "clean", "-fd"])
@@ -438,7 +462,8 @@ def main():
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                            subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir])
+                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], start_new_session=True)
+                            proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before
                             if len(new_files) >= 2:
