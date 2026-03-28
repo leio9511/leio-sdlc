@@ -22,7 +22,13 @@ This forces the human operator (or the main Agent) to manually intervene and exe
    - When executed with `python3 scripts/orchestrator.py --cleanup`, the script should bypass the normal SDLC pipeline and immediately run the global teardown sequence described above, then exit gracefully. 
    - This provides the Manager/human with a deterministic, "safe" tool to reset a corrupted environment without typing raw Git commands.
 
+4. **Handoff Prompter & Self-Explanation Adjustments**:
+   - The `git_checkout_error` prompt in `scripts/handoff_prompter.py` currently instructs the Agent: `You must run git branch -D and git clean -fd`. This must be updated to: `The orchestrator automatically executed a safe rollback to master. Please review the logs.`
+   - Add a new prompt for mid-flight crashes/interrupts (e.g., `fatal_crash`): `[FATAL_CRASH] The Orchestrator encountered a fatal error mid-flight. A safe teardown sequence was automatically executed (reset to master). You do NOT need to manually clean the workspace. Please review the Orchestrator logs.`
+   - **Crucial Boundary**: The pre-flight `dirty_workspace` check MUST NOT trigger the automated cleanup. If the workspace is dirty *before* the Orchestrator starts, it must exit immediately and preserve the human's/Agent's uncommitted work as it does today.
+
 ## Framework Modifications
+- `scripts/handoff_prompter.py`
 - `scripts/orchestrator.py`
 
 ## Architecture
