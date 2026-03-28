@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-002: Implement Lock-Aware Forensic Quarantine Flag and Handoff Prompts
 
