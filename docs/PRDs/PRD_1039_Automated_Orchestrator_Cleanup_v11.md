@@ -1,11 +1,21 @@
 # PRD: Implement Graceful Aborts and Forensic Quarantine for Orchestrator (ISSUE-1039 v11)
 
-## Context
+## Context & The "Death Loop" Dilemma
 When the SDLC `orchestrator.py` script exits unexpectedly (e.g., Python exceptions, SIGTERM, SIGINT, or logical fatal errors), it terminates abruptly with raw `sys.exit(1)` calls. This leaves the Git repository in a "dirty" state and orphans child processes (e.g., Coder subagents, test scripts), causing race conditions that corrupt the workspace in the background.
+
+**CRITICAL NOTE FOR CODER (The Death Loop):**
+You are modifying the very engine that governs your own lifecycle. The *current* (old) orchestrator logic deletes your `feature/` branch if your tests fail (Reviewer rejection). 
+**If you receive an `ACTION_REQUIRED` from the Reviewer, YOUR PREVIOUS CODE WAS DELETED ALONG WITH THE BRANCH. You must re-write the entire solution (Code + Tests) from scratch on every attempt.** Do not assume your previous partial progress still exists on disk.
 
 Previous designs failed architectural audits due to synchronous `subprocess.run` tracking limitations, destructive Git commands (`git reset --hard`), indiscriminate stashing, global bans on `git branch -D` (which violated successful merge rules), Python sub-process shell injection risks, `BaseException` hierarchy bugs (missing `SystemExit` coverage), and bleeding ignored toxic artifacts via catastrophic `git clean -x` commands. 
 
 The most recent iteration (v10) failed because it introduced a `finally` block that could crash itself (`UnboundLocalError` or `ProcessLookupError` if the subprocess wasn't initialized or already died), masking the original crash. It also violated concurrency rules by allowing the `--cleanup` flag to blindly delete the repository lock, potentially corrupting active concurrent pipelines. We must implement a crash-proof `finally` reaper and a lock-aware `--cleanup` tool.
+
+## Required Expertise
+- **Deep Python Subprocess Management:** Understanding of `start_new_session=True`, process groups (`os.getpgid`, `os.killpg`), and asynchronous vs synchronous blocking (`proc.wait()`).
+- **Python Exception Hierarchies:** Mastery of the difference between `Exception` and `BaseException` (specifically how `sys.exit()` raises `SystemExit` and Ctrl+C raises `KeyboardInterrupt`).
+- **Distributed Concurrency:** Knowledge of Unix file locks (`fcntl.flock`, `LOCK_EX | LOCK_NB`).
+- **Git Forensics:** Deep understanding of Git state, `git branch -m`, empty commits (`--allow-empty`), and why `git clean -fdx` is a dangerous blast-radius weapon.
 
 ## Requirements
 
@@ -23,6 +33,13 @@ The most recent iteration (v10) failed because it introduced a `finally` block t
      ```
    - **Why `finally`?**: This guarantees that whether the orchestrator exits via a normal return, an unhandled `Exception`, a `KeyboardInterrupt` (SIGINT), or an explicit `sys.exit(1)` (which raises `SystemExit`, a `BaseException`), the subagents are ALWAYS killed before the process dies.
    - **Signal Handling**: Use the `signal` module to intercept `SIGTERM` and raise a custom exception or `SystemExit` to trigger the `finally` reaper.
+     ```python
+     # Example Signal Handler:
+     def sig_handler(signum, frame):
+         raise SystemExit(1)
+     signal.signal(signal.SIGTERM, sig_handler)
+     signal.signal(signal.SIGINT, sig_handler)
+     ```
    - After reaping, ensure the specific `HandoffPrompter` message is printed for the specific exit vector.
 
 2. **Lock-Aware Forensic Quarantine Flag (`--cleanup`)**:
