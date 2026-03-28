@@ -1,4 +1,4 @@
-status: in_progress
+status: closed
 
 # PR-[ID]: Implement Asynchronous Process Launching and Synchronous Wait
 
