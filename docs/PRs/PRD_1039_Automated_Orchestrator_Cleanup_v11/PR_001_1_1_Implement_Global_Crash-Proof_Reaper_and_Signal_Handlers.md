@@ -1,4 +1,4 @@
-status: in_progress
+status: closed
 
 # PR-[ID]: Implement Global Crash-Proof Reaper and Signal Handlers
 
