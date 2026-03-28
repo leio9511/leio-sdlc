@@ -103,7 +103,20 @@ perform_hard_copy_deployment() {
 
     echo "✅ DEPLOYMENT SUCCESS: $SLUG is now live via hard-copy swap."
 
-    # 6. Gateway Reload
+    # 6. GitHub Auto-Sync (PRD-035)
+    local SYNC_SCRIPT="$HOME_DIR/.openclaw/skills/leio-github-sync/scripts/sync.py"
+    if [ -f "$SYNC_SCRIPT" ] && [ -z "$HOME_MOCK" ]; then
+        echo "🌐 Synchronizing code to GitHub..."
+        python3 "$SYNC_SCRIPT" --project-dir "$PWD" || echo "⚠️ GitHub sync failed but deployment succeeded."
+    fi
+    
+    # 7. Install Git Hooks
+    if [ -d ".sdlc_hooks" ]; then
+        echo "🎣 Installing Git hooks..."
+        git config core.hooksPath .sdlc_hooks
+    fi
+
+    # 8. Gateway Reload (MUST BE THE FINAL STEP)
     if [ -z "$HOME_MOCK" ]; then
         echo "🔄 Restarting OpenClaw gateway..."
         openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."

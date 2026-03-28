@@ -110,7 +110,7 @@ perform_hard_copy_deployment() {
         git config core.hooksPath .sdlc_hooks
     fi
 
-    # 7. Gateway Reload
+    # 7. Gateway Reload (MUST BE THE FINAL STEP)
     if [ -z "$HOME_MOCK" ]; then
         echo "🔄 Restarting OpenClaw gateway..."
         openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
