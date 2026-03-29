@@ -30,21 +30,22 @@ def main():
         # Dynamically compute job directory from PRD filename
         prd_filename = os.path.basename(prd_file_abs)
         base_name, _ = os.path.splitext(prd_filename)
-        # Check if we are running in a project sandbox or standard skills dir
-        # In sandboxes (like FSM tests), we usually have a local docs/PRs structure
-        if os.path.exists("docs"):
-            args.out_dir = os.path.join("docs", "PRs", base_name)
-        elif os.path.exists("scripts/orchestrator.py"):
-             args.out_dir = os.path.join("docs", "PRs", base_name)
-        else:
-            global_run_base = os.environ.get("SDLC_GLOBAL_RUN_BASE", "/root/.openclaw/workspace/.sdlc_runs")
+        
+        # Priority 1: Environment variable for testing/explicit control
+        global_run_base = os.environ.get("SDLC_GLOBAL_RUN_BASE")
+        if global_run_base:
             args.out_dir = os.path.join(global_run_base, base_name)
+        # Priority 2: FSM-style local sandbox
+        elif os.path.exists("docs") or os.path.exists("scripts/orchestrator.py"):
+            args.out_dir = os.path.join("docs", "PRs", base_name)
+        # Priority 3: Production default
+        else:
+            args.out_dir = os.path.join("/root/.openclaw/workspace/.sdlc_runs", base_name)
     else:
         # If out-dir is provided, make sure it is absolute
         args.out_dir = os.path.abspath(args.out_dir)
 
-    # Resolve out_dir to absolute if it was relative (relative to workdir now)
-    # BUT if it was already absolute (e.g. from /tmp in FSM test), abspath(os.path.join(workdir, abs)) == abs.
+    # Final resolve (relative to workdir if not absolute)
     args.out_dir = os.path.abspath(os.path.join(workdir, args.out_dir))
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -167,14 +168,17 @@ def main():
         else:
             # PRD filename based check for MyProject (FSM Test)
             if "MyProject" in prd_file_abs:
-                filename = "PR_001_Mock.md"
+                filenames = ["PR_001_Mock.md"]
+            elif "dummy_complex_prd" in prd_file_abs:
+                filenames = ["PR_001_Mock.md", "PR_002_Mock.md"]
             else:
-                filename = "PR_A.md"
+                filenames = ["PR_A.md", "PR_B.md"]
             
-            out_file_path = os.path.join(args.out_dir, filename)
-            if not os.path.exists(out_file_path):
-                with open(out_file_path, "w") as f:
-                    f.write("status: open\\n\\n# PR-001: Mock PR\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
+            for filename in filenames:
+                out_file_path = os.path.join(args.out_dir, filename)
+                if not os.path.exists(out_file_path):
+                    with open(out_file_path, "w") as f:
+                        f.write(f"status: open\n\n# {filename}\n\n## 1. Objective\nMock Obj\n\n## 2. Scope & Implementation Details\nMock Scope\n\n## 3. TDD & Acceptance Criteria\nMock TDD\n")
             print('{"status": "mock_success", "role": "planner"}')
             
         sys.exit(0)
