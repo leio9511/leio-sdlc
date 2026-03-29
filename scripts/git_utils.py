@@ -1,8 +1,35 @@
 import subprocess
 import logging
+import os
+import sys
 
 class GitCheckoutError(Exception):
     pass
+
+class GitBoundaryError(Exception):
+    pass
+
+def check_git_boundary(workdir):
+    abs_workdir = os.path.abspath(workdir)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=abs_workdir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        git_toplevel = os.path.abspath(result.stdout.strip())
+        if git_toplevel != abs_workdir:
+            error_msg = f"[FATAL] Git boundary violation: '{abs_workdir}' is not the root of a git repository (found '{git_toplevel}')."
+            logging.error(error_msg)
+            print(error_msg, file=sys.stderr)
+            raise GitBoundaryError(error_msg)
+    except subprocess.CalledProcessError as e:
+        error_msg = f"[FATAL] Git boundary violation: '{abs_workdir}' does not appear to be inside a git repository."
+        logging.error(error_msg)
+        print(error_msg, file=sys.stderr)
+        raise GitBoundaryError(error_msg)
 
 def safe_git_checkout(branch_name, create=False):
     """
