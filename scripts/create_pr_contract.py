@@ -29,6 +29,7 @@ def main():
     parser = argparse.ArgumentParser(description="Create a PR contract file.")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--job-dir", required=True, help="Path to job queue directory")
+    parser.add_argument("--project", help="Target project for grouping")
     parser.add_argument("--title", required=True, help="PR title")
     parser.add_argument("--content-file", required=True, help="Path to file with PR content")
     parser.add_argument("--insert-after", help="Prefix of the PR to insert after (e.g., 003)")
@@ -38,6 +39,9 @@ def main():
     workdir = os.path.abspath(args.workdir)
     content_file_path = os.path.abspath(args.content_file)
     job_dir_path = os.path.abspath(args.job_dir)
+    if args.project:
+        job_dir_path = os.path.join(job_dir_path, args.project)
+
 
     # OS Lock
     os.chdir(workdir)
@@ -53,9 +57,7 @@ def main():
         print(f"Error: Content file '{content_file_path}' not found.")
         sys.exit(1)
 
-    # Ensure job_dir is also within workdir
-    if os.path.commonpath([workdir, job_dir_path]) != workdir:
-        raise SecurityError(f"Path traversal detected: {job_dir_path} is outside {workdir}")
+    
 
     # Validate/Create job dir
     os.makedirs(job_dir_path, exist_ok=True)
@@ -68,8 +70,7 @@ def main():
     filename = f"PR_{index}_{safe_title}.md"
     file_path = os.path.join(job_dir_path, filename)
     
-    if os.path.commonpath([workdir, file_path]) != workdir:
-        raise SecurityError(f"Path traversal detected: {file_path} is outside {workdir}")
+    
 
     # Read content
     with open(content_file_path, "r") as f:
@@ -78,9 +79,6 @@ def main():
     # Write new file
     with open(file_path, "w") as f:
         f.write(content)
-
-    import subprocess
-    subprocess.run(["git", "add", "-f", file_path], check=True)
 
     print(f"[PR_CREATED] {file_path}")
 

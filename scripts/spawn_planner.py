@@ -24,7 +24,8 @@ def main():
         # Dynamically compute job directory from PRD filename
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
-        args.out_dir = os.path.join("docs", "PRs", base_name)
+        global_run_base = "/root/.openclaw/workspace/.sdlc_runs"
+        args.out_dir = os.path.join(global_run_base, base_name)
 
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -103,7 +104,7 @@ def main():
             f"FAILED PR:\\n{failed_pr_content}\\n\\n"
             f"ORIGINAL PRD:\\n{prd_content}\\n\\n"
             f"ATTENTION: Your root workspace is rigidly locked to {workdir}. "
-            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir}{insert_after_flag} --title <title> --content-file <file>` "
+            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir} --project <project_name>{insert_after_flag} --title <title> --content-file <file>` "
             f"to generate the PR contracts instead of raw file writing. "
             f"The `--insert-after` parameter is MANDATORY for sequential ordering of the new sliced PRs.\\n"
             f"For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. "
@@ -123,7 +124,7 @@ def main():
             f"CORE INSTRUCTION: You are forbidden from generating a single monolithic PR contract. "
             f"You must break the PRD down into a functional, dependency-ordered chain of Micro-PRs without hardcoding specific file paths. Give implementation freedom to the Coder. "
             f"TDD GUARDRAIL: Every PR must be a fully working, self-contained increment. The CI pipeline runs at the end of EVERY PR and requires 100% green tests to merge. You CANNOT split writing a failing test into PR_1 and fixing it in PR_2. A single PR must include BOTH the test and the implementation. "
-            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir} --title <title> --content-file <file>` "
+            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir} --project <project_name> --title <title> --content-file <file>` "
             f"to generate the PR contracts instead of raw file writing. "
             f"For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. "
             f"Do NOT alter the `status: open` YAML frontmatter.\\n"

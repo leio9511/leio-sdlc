@@ -47,6 +47,11 @@ def acquire_global_locks(projects, workdir):
         try:
             fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Write JSON payload: PID and workdir
+            payload = {"pid": os.getpid(), "active_workdir": os.path.abspath(workdir)}
+            os.ftruncate(fd, 0)
+            os.lseek(fd, 0, 0)
+            os.write(fd, json.dumps(payload).encode('utf-8'))
             acquired_locks.append(lock_path)
             fds.append(fd)
         except (BlockingIOError, IOError, OSError):
@@ -78,8 +83,6 @@ def set_pr_status(pr_file, new_status):
     updated = re.sub(r'^status:\s*\S+', f'status: {new_status}', content, count=1, flags=re.MULTILINE)
     with open(pr_file, 'w', encoding='utf-8') as f:
         f.write(updated)
-    subprocess.run(["git", "add", pr_file], check=False)
-    subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
 
 def get_pr_slice_depth(pr_file):
     with open(pr_file, 'r', encoding='utf-8') as f:
