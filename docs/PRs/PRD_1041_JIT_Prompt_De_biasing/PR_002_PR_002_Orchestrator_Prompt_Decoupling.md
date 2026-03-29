@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-1041-2: Orchestrator Prompt Decoupling and Security Refactor
 
