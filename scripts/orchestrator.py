@@ -224,6 +224,23 @@ def main():
                 os.remove(os.path.join(args.workdir, lockfile))
             except OSError:
                 pass # Already deleted
+        
+        manifest_path = os.path.join(args.workdir, ".sdlc_lock_manifest.json")
+        if os.path.exists(manifest_path):
+            try:
+                import json
+                with open(manifest_path, "r") as f:
+                    manifest_data = json.load(f)
+                for lock_path in manifest_data.get("locks", []):
+                    try:
+                        if os.path.exists(lock_path):
+                            os.remove(lock_path)
+                    except OSError:
+                        pass
+                os.remove(manifest_path)
+            except Exception as e:
+                print(f"[Warning] Failed to clean up manifest locks: {e}")
+
         sys.exit(0)
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:

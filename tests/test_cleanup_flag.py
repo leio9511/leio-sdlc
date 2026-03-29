@@ -23,6 +23,17 @@ def test_cleanup_quarantine():
         with open(".coder_session", "w") as f:
             f.write("session123")
             
+        dummy_lock_1 = os.path.join(td, "dummy1.lock")
+        dummy_lock_2 = os.path.join(td, "dummy2.lock")
+        with open(dummy_lock_1, "w") as f:
+            f.write("locked")
+        with open(dummy_lock_2, "w") as f:
+            f.write("locked")
+            
+        import json
+        with open(".sdlc_lock_manifest.json", "w") as f:
+            json.dump({"locks": [dummy_lock_1, dummy_lock_2]}, f)
+            
         # Run orchestrator cleanup
         orchestrator_path = "/root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py"
         res = subprocess.run([
@@ -48,6 +59,9 @@ def test_cleanup_quarantine():
         # 3. Locks deleted
         assert not os.path.exists(".sdlc_repo.lock")
         assert not os.path.exists(".coder_session")
+        assert not os.path.exists(dummy_lock_1)
+        assert not os.path.exists(dummy_lock_2)
+        assert not os.path.exists(".sdlc_lock_manifest.json")
 
 def test_cleanup_lock_blocked():
     with tempfile.TemporaryDirectory() as td:
