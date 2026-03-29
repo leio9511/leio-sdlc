@@ -201,7 +201,7 @@ def main():
 
 
 
-    if args.cleanup:
+    if args.cleanup is True:
         lock_dir = os.path.expanduser("~/.openclaw/workspace/locks")
         if not os.path.exists(lock_dir):
             sys.exit(0)

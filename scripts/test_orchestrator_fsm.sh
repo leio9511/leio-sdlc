@@ -22,6 +22,7 @@ INNER_EOF
     git commit --allow-empty -m "init" > /dev/null 2>&1
     echo "*.log" > .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
+    echo ".sdlc_runs/" >> .gitignore
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
