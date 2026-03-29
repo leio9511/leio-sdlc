@@ -22,6 +22,56 @@ from handoff_prompter import HandoffPrompter
 
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
+import json
+
+def parse_affected_projects(prd_file):
+    if not os.path.exists(prd_file):
+        return []
+    with open(prd_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    match = re.search(r'^\s*Affected_Projects:\s*\[(.*?)\]', content, re.MULTILINE | re.IGNORECASE)
+    if match:
+        projects_str = match.group(1)
+        projects = [p.strip() for p in projects_str.split(',') if p.strip()]
+        return sorted(projects)
+    return []
+
+def acquire_global_locks(projects, workdir):
+    lock_dir = os.path.expanduser("~/.openclaw/workspace/locks")
+    os.makedirs(lock_dir, exist_ok=True)
+    acquired_locks = []
+    fds = []
+    
+    for project in projects:
+        lock_path = os.path.join(lock_dir, f"{project}.lock")
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired_locks.append(lock_path)
+            fds.append(fd)
+        except (BlockingIOError, IOError, OSError):
+            print(f"[FATAL_LOCK] Failed to acquire global lock for project '{project}'.")
+            # Rollback: Close and REMOVE all locks acquired in this batch
+            for rollback_fd in reversed(fds):
+                try:
+                    fcntl.flock(rollback_fd, fcntl.LOCK_UN)
+                    os.close(rollback_fd)
+                except Exception:
+                    pass
+            for rollback_path in acquired_locks:
+                try:
+                    if os.path.exists(rollback_path):
+                        os.remove(rollback_path)
+                except OSError:
+                    pass
+            sys.exit(1)
+            
+    manifest_path = os.path.join(workdir, ".sdlc_lock_manifest.json")
+    with open(manifest_path, "w") as f:
+        json.dump({"locks": acquired_locks}, f)
+        
+    return acquired_locks, fds
+
 def set_pr_status(pr_file, new_status):
     with open(pr_file, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -193,6 +243,12 @@ def main():
         with open(lock_path, "w") as f: f.write("locked")
         time.sleep(2)
         sys.exit(0)
+
+    affected_projects = parse_affected_projects(args.prd_file)
+    if affected_projects:
+        global_locks, global_fds = acquire_global_locks(affected_projects, workdir)
+    else:
+        global_locks, global_fds = [], []
 
     validate_prd_is_committed(args.prd_file, workdir)
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
