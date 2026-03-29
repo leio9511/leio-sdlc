@@ -244,8 +244,8 @@ def main():
         sys.exit(0)
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:
-        print("[FATAL] Security Violation: Unless for testing purposes, skills must be executed from the ~/.openclaw/skills/ runtime directory. If you are intentionally running from source for testing, you must explicitly add the parameter: --enable-exec-from-workspace")
-        print(HandoffPrompter.get_prompt("fatal_crash"))
+        print("[FATAL] Security Violation: This skill is executing from a restricted source directory. For your safety, execution is blocked unless authorized via --enable-exec-from-workspace.")
+        print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -271,12 +271,12 @@ def main():
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
         if not os.path.exists(".git"):
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
-            print(HandoffPrompter.get_prompt("dirty_workspace"))
+            print(HandoffPrompter.get_prompt("invalid_git_boundary"))
             sys.exit(1)
         branch_output = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
         if branch_output not in ["master", "main"]:
             print(f"[FATAL] Orchestrator must be started from the master or main branch. Current: {branch_output}")
-            print(HandoffPrompter.get_prompt("dirty_workspace"))
+            print(HandoffPrompter.get_prompt("invalid_git_boundary"))
             sys.exit(1)
 
     try:
@@ -285,7 +285,7 @@ def main():
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         print("[FATAL] Another SDLC pipeline is currently running. Concurrent execution is blocked.")
-        print(HandoffPrompter.get_prompt("dirty_workspace"))
+        print(HandoffPrompter.get_prompt("pipeline_locked"))
         sys.exit(1)
 
     status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
