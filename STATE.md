@@ -6,7 +6,9 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
-- [x] **[ISSUE-1039] PRD-1039 v11: Automated Orchestrator Cleanup ## 🏆 Recently Completed Forensic Quarantine**: Implemented crash-proof process group isolation and lock-aware `--cleanup` flag for robust agent teardown. (v0.8.0)
+- [x] **[PRD-1040] Global Pipeline Lock v4**: Implemented static frontmatter parsing, atomic lexicographical lock acquisition, and fail-fast rollback with manifest-based cleanup. (v0.9.0)
+- [x] **[ISSUE-1039] PRD-1039 v11: Automated Orchestrator Cleanup ## 🏆 Recently Completed
+- [x] **[PRD-1040] Global Pipeline Lock v4**: Implemented static frontmatter parsing, atomic lexicographical lock acquisition, and fail-fast rollback with manifest-based cleanup. (v0.9.0) Forensic Quarantine**: Implemented crash-proof process group isolation and lock-aware `--cleanup` flag for robust agent teardown. (v0.8.0)
 - [x] **[ISSUE-1036] PRD-033: SDLC Observability & Ignition Guardrail**: Implemented mandatory ignition handshake, real-time Slack intermediate pulses (Coder/Reviewer/Merge), and full migration of the review protocol from `[LGTM]` string matching to structured JSON parsing. (v0.7.0)
 - [x] **[ISSUE-1026/1033] PRD-032 v2: Strict Execution Boundary**: Enforced `~/.openclaw/skills/` as the only allowed runtime directory. Blocking source code execution from the workspace unless `--enable-exec-from-workspace` is provided. (v0.6.1)
 - [x] **[ISSUE-1025] PRD-1025: Reviewer LGTM Bypass**: Refactored orchestrator to parse strict JSON status and physically isolated history diffs in reviewer prompt.

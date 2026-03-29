@@ -1,4 +1,5 @@
 ---
+Status: Completed
 Affected_Projects: [leio-sdlc, AMS]
 ---
 
@@ -13,7 +14,8 @@ The previous V3 PRD for the Global Pipeline Lock feature was rejected due to thr
 This v4 revision introduces strict static frontmatter parsing, atomic acquisition with rollback mechanisms, and a lock manifest to guarantee safe and isolated cleanup.
 
 ## Requirements
-1.  **Static Frontmatter Declaration**: PRD documents MUST contain a static frontmatter or a clear header section (e.g., `Affected_Projects: [leio-sdlc, AMS]`).
+1.  **Static Frontmatter Declaration**: PRD documents MUST contain a static frontmatter or a clear header section (e.g., `Status: Completed
+Affected_Projects: [leio-sdlc, AMS]`).
 2.  **Pre-Flight Parsing**: The Orchestrator parses this `Affected_Projects` list at the very start of execution (T=0) to know exactly which locks to acquire before invoking the Planner or any other components.
 3.  **Atomic Acquisition & Rollback**: Lock acquisition MUST be atomic. The Orchestrator sorts the projects lexicographically and attempts to lock them via file system locks (e.g., `.openclaw/workspace/locks/<project_name>.lock`).
 4.  **Fail-Fast & Rollback Protocol**: If ANY lock fails to acquire, the Orchestrator MUST catch the error, perform a reverse Rollback to release any locks it already successfully acquired in this batch, and then exit to prevent Lock Leakage.
