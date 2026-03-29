@@ -15,6 +15,7 @@ exit 0
 INNER_EOF
     chmod +x "bin/openclaw"
     export PATH="$(pwd)/bin:$PATH"
+    export SDLC_GLOBAL_RUN_BASE="$(pwd)/.sdlc_runs"
     git init > /dev/null 2>&1
     git config user.name "E2E Test"
     git config user.email "e2e@example.com"
@@ -24,7 +25,7 @@ echo ".sdlc_repo.lock" >> .gitignore
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
-    mkdir -p docs/PRs/dummy_prd
+    mkdir -p .sdlc_runs/dummy_prd
     mkdir -p scripts
     
     # We copy the real orchestrator.py to run
@@ -53,7 +54,7 @@ function run_test_green_path() {
     echo "--- Running Green Path Test ---"
     setup_sandbox
     
-    cat << 'INNER_EOF' > docs/PRs/dummy_prd/PR_001_Test.md
+    cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
 status: open
 slice_depth: 0
 INNER_EOF
@@ -76,7 +77,7 @@ INNER_EOF
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
     python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
-    if ! grep -q "status: closed" docs/PRs/dummy_prd/PR_001_Test.md; then
+    if ! grep -q "status: closed" .sdlc_runs/dummy_prd/PR_001_Test.md; then
         echo "Green Path Failed: PR not closed"
         cat orchestrator.log
         exit 1
@@ -93,7 +94,7 @@ function run_test_red_path_override() {
     echo "--- Running Red Path Override Test ---"
     setup_sandbox
     
-    cat << 'INNER_EOF' > docs/PRs/dummy_prd/PR_002_Test.md
+    cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_002_Test.md
 status: open
 slice_depth: 0
 INNER_EOF
@@ -120,7 +121,7 @@ INNER_EOF
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
     python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
-    if ! grep -q "status: closed" docs/PRs/dummy_prd/PR_002_Test.md; then
+    if ! grep -q "status: closed" .sdlc_runs/dummy_prd/PR_002_Test.md; then
         echo "Red Path Override Failed: PR not closed"
         cat orchestrator.log
         exit 1
@@ -132,7 +133,7 @@ function run_test_red_path_slice() {
     echo "--- Running Red Path Slice Test ---"
     setup_sandbox
     
-    cat << 'INNER_EOF' > docs/PRs/dummy_prd/PR_003_Test.md
+    cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_003_Test.md
 status: open
 slice_depth: 0
 INNER_EOF
@@ -148,20 +149,20 @@ INNER_EOF
     
     cat << 'INNER_EOF' > scripts/spawn_planner.py
 import sys, os
-with open("docs/PRs/dummy_prd/PR_003_Test.1.md", "w") as f: f.write("status: open\nslice_depth: 1\n")
-with open("docs/PRs/dummy_prd/PR_003_Test.2.md", "w") as f: f.write("status: open\nslice_depth: 1\n")
+with open(".sdlc_runs/dummy_prd/PR_003_Test.1.md", "w") as f: f.write("status: open\nslice_depth: 1\n")
+with open(".sdlc_runs/dummy_prd/PR_003_Test.2.md", "w") as f: f.write("status: open\nslice_depth: 1\n")
 INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
     python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
-    if ! grep -q "status: superseded" docs/PRs/dummy_prd/PR_003_Test.md; then
+    if ! grep -q "status: superseded" .sdlc_runs/dummy_prd/PR_003_Test.md; then
         echo "Red Path Slice Failed: PR not superseded"
         cat orchestrator.log
         exit 1
     fi
-    if [ ! -f "docs/PRs/dummy_prd/PR_003_Test.1.md" ]; then
+    if [ ! -f ".sdlc_runs/dummy_prd/PR_003_Test.1.md" ]; then
         echo "Red Path Slice Failed: Sliced PRs not created"
         cat orchestrator.log
         exit 1
@@ -189,17 +190,20 @@ parser.add_argument("--job-dir")
 parser.add_argument("--workdir")
 parser.add_argument("--title")
 parser.add_argument("--content-file")
+parser.add_argument("--project")
 args = parser.parse_args()
 import os
+os.makedirs(args.job_dir, exist_ok=True)
 with open(os.path.join(args.job_dir, "PR_Dummy.md"), "w") as f:
     f.write("status: open\n")
 INNER_EOF
 
     export SDLC_TEST_MODE=true
-    python3 scripts/spawn_planner.py --prd-file docs/PRDs/Dummy_Project.md --workdir "$(pwd)" --out-dir docs/PRs/Dummy_Project --global-dir "$PROJECT_ROOT" > planner.log 2>&1
+    export SDLC_GLOBAL_RUN_BASE="$(pwd)/.sdlc_runs"
+    python3 scripts/spawn_planner.py --prd-file docs/PRDs/Dummy_Project.md --workdir "$(pwd)" --out-dir .sdlc_runs/Dummy_Project --global-dir "$PROJECT_ROOT" > planner.log 2>&1
     
-    if [ ! -d "docs/PRs/Dummy_Project" ]; then
-        echo "Planner Isolation Failed: Directory docs/PRs/Dummy_Project not created"
+    if [ ! -d ".sdlc_runs/Dummy_Project" ]; then
+        echo "Planner Isolation Failed: Directory .sdlc_runs/Dummy_Project not created"
         cat planner.log
         exit 1
     fi
@@ -213,13 +217,13 @@ function run_test_orchestrator_noise_injection() {
     mkdir -p docs/PRDs
     echo "dummy prd" > docs/PRDs/Target_Project.md
     
-    mkdir -p docs/PRs/Target_Project
-    cat << 'INNER_EOF' > docs/PRs/Poison_PR.md
+    mkdir -p .sdlc_runs/Target_Project
+    cat << 'INNER_EOF' > .sdlc_runs/Poison_PR.md
 status: open
 slice_depth: 0
 INNER_EOF
 
-    cat << 'INNER_EOF' > docs/PRs/Target_Project/Target_PR.md
+    cat << 'INNER_EOF' > .sdlc_runs/Target_Project/Target_PR.md
 status: open
 slice_depth: 0
 INNER_EOF
@@ -242,12 +246,12 @@ INNER_EOF
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
     python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Target_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
-    if ! grep -q "status: closed" docs/PRs/Target_Project/Target_PR.md; then
+    if ! grep -q "status: closed" .sdlc_runs/Target_Project/Target_PR.md; then
         echo "Noise Injection Failed: Target PR not closed"
         cat orchestrator.log
         exit 1
     fi
-    if grep -q "status: closed" docs/PRs/Poison_PR.md; then
+    if grep -q "status: closed" .sdlc_runs/Poison_PR.md; then
         echo "Noise Injection Failed: Poison PR was modified"
         cat orchestrator.log
         exit 1
@@ -290,9 +294,14 @@ function run_test_state_0_pure_start() {
     git commit -m "add myproject prd" > /dev/null 2>&1
 
     cat << 'INNER_EOF' > scripts/spawn_planner.py
-import sys, os
-os.makedirs("docs/PRs/MyProject", exist_ok=True)
-with open("docs/PRs/MyProject/PR_001_Mock.md", "w") as f:
+import sys, os, argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--prd-file")
+parser.add_argument("--workdir")
+parser.add_argument("--global-dir")
+args = parser.parse_args()
+os.makedirs(".sdlc_runs/MyProject", exist_ok=True)
+with open(".sdlc_runs/MyProject/PR_001_Mock.md", "w") as f:
     f.write("status: open\n")
 INNER_EOF
 
@@ -315,7 +324,9 @@ INNER_EOF
         echo "Pure Start Failed: Log missing"
         cat orchestrator.log; exit 1
     fi
-    if ! grep -q "status: closed" docs/PRs/MyProject/PR_001_Mock.md; then
+    
+    # We check relative path because FSM test uses it
+    if ! grep -q "status: closed" .sdlc_runs/MyProject/PR_001_Mock.md; then
         echo "Pure Start Failed: PR not closed"
         cat orchestrator.log; exit 1
     fi
@@ -327,8 +338,8 @@ function run_test_state_0_idempotency() {
     setup_sandbox
     mkdir -p docs/PRDs
     echo "dummy" > docs/PRDs/MyProject.md
-    mkdir -p docs/PRs/MyProject
-    cat << 'INNER_EOF' > docs/PRs/MyProject/PR_001_Existing.md
+    mkdir -p .sdlc_runs/MyProject
+    cat << 'INNER_EOF' > .sdlc_runs/MyProject/PR_001_Existing.md
 status: open
 INNER_EOF
 
@@ -364,7 +375,7 @@ INNER_EOF
         echo "Idempotency Failed: Planner was called"
         cat orchestrator.log; exit 1
     fi
-    if ! grep -q "status: closed" docs/PRs/MyProject/PR_001_Existing.md; then
+    if ! grep -q "status: closed" .sdlc_runs/MyProject/PR_001_Existing.md; then
         echo "Idempotency Failed: PR not closed"
         cat orchestrator.log; exit 1
     fi
@@ -376,8 +387,8 @@ function run_test_state_0_force_replan() {
     setup_sandbox
     mkdir -p docs/PRDs
     echo "dummy" > docs/PRDs/MyProject.md
-    mkdir -p docs/PRs/MyProject
-    cat << 'INNER_EOF' > docs/PRs/MyProject/PR_Old.md
+    mkdir -p .sdlc_runs/MyProject
+    cat << 'INNER_EOF' > .sdlc_runs/MyProject/PR_Old.md
 status: open
 INNER_EOF
 
@@ -385,9 +396,15 @@ INNER_EOF
     git commit -m "add old pr" > /dev/null 2>&1
 
     cat << 'INNER_EOF' > scripts/spawn_planner.py
-import sys, os
-os.makedirs("docs/PRs/MyProject", exist_ok=True)
-with open("docs/PRs/MyProject/PR_New.md", "w") as f:
+import sys, os, argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--prd-file")
+parser.add_argument("--workdir")
+parser.add_argument("--global-dir")
+parser.add_argument("--force-replan", action="store_true")
+args = parser.parse_args()
+os.makedirs(".sdlc_runs/MyProject", exist_ok=True)
+with open(".sdlc_runs/MyProject/PR_New.md", "w") as f:
     f.write("status: open\n")
 INNER_EOF
 
@@ -410,7 +427,7 @@ INNER_EOF
         echo "Force Replan Failed: Old PR not deleted"
         cat orchestrator.log; exit 1
     fi
-    if ! grep -q "status: closed" docs/PRs/MyProject/PR_New.md; then
+    if ! grep -q "status: closed" .sdlc_runs/MyProject/PR_New.md; then
         echo "Force Replan Failed: New PR not processed"
         cat orchestrator.log; exit 1
     fi

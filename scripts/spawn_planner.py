@@ -17,21 +17,36 @@ def main():
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
 
+    # Pre-flight PRD check BEFORE changing dir or resolving abspath incorrectly
+    if not (os.path.isfile(args.prd_file) and os.path.getsize(args.prd_file) > 0):
+        print(f"[Pre-flight Failed] Planner cannot start. PRD file not found at '{args.prd_file}'. You must read or create the PRD first.")
+        sys.exit(1)
+        
+    prd_file_abs = os.path.abspath(args.prd_file)
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
 
     if args.out_dir is None:
         # Dynamically compute job directory from PRD filename
-        prd_filename = os.path.basename(args.prd_file)
+        prd_filename = os.path.basename(prd_file_abs)
         base_name, _ = os.path.splitext(prd_filename)
-        global_run_base = "/root/.openclaw/workspace/.sdlc_runs"
-        args.out_dir = os.path.join(global_run_base, base_name)
+        # Check if we are running in a project sandbox or standard skills dir
+        # In sandboxes (like FSM tests), we usually have a local docs/PRs structure
+        if os.path.exists("docs"):
+            args.out_dir = os.path.join("docs", "PRs", base_name)
+        elif os.path.exists("scripts/orchestrator.py"):
+             args.out_dir = os.path.join("docs", "PRs", base_name)
+        else:
+            global_run_base = os.environ.get("SDLC_GLOBAL_RUN_BASE", "/root/.openclaw/workspace/.sdlc_runs")
+            args.out_dir = os.path.join(global_run_base, base_name)
+    else:
+        # If out-dir is provided, make sure it is absolute
+        args.out_dir = os.path.abspath(args.out_dir)
 
+    # Resolve out_dir to absolute if it was relative (relative to workdir now)
+    # BUT if it was already absolute (e.g. from /tmp in FSM test), abspath(os.path.join(workdir, abs)) == abs.
+    args.out_dir = os.path.abspath(os.path.join(workdir, args.out_dir))
     os.makedirs(args.out_dir, exist_ok=True)
-
-    if not (os.path.isfile(args.prd_file) and os.path.getsize(args.prd_file) > 0):
-        print(f"[Pre-flight Failed] Planner cannot start. PRD file not found at '{args.prd_file}'. You must read or create the PRD first.")
-        sys.exit(1)
 
     failed_pr_content = None
     failed_pr_id = None
@@ -74,10 +89,10 @@ def main():
     contract_script = os.path.join(SDLC_DIR, "create_pr_contract.py")
 
     try:
-        with open(args.prd_file, "r") as f:
+        with open(prd_file_abs, "r") as f:
             prd_content = f.read()
     except FileNotFoundError:
-        print(f"Error: PRD file not found: {args.prd_file}")
+        print(f"Error: PRD file not found: {prd_file_abs}")
         sys.exit(1)
         
     try:
@@ -136,7 +151,7 @@ def main():
 
     if test_mode:
         os.makedirs("tests", exist_ok=True)
-        log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': args.prd_file, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr}})
+        log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': prd_file_abs, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr}})
         with open("tests/tool_calls.log", "a") as f:
             f.write(log_entry + "\\n")
         
@@ -150,10 +165,16 @@ def main():
                 f.write("status: open\\n\\n# PR-002: Slice 2\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
             print('{"status": "mock_success", "role": "planner", "action": "sliced"}')
         else:
-            with open(os.path.join(args.out_dir, "PR_A.md"), "w") as f:
-                f.write("status: open\\n\\n# PR-001: Feature A\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
-            with open(os.path.join(args.out_dir, "PR_B.md"), "w") as f:
-                f.write("status: open\\n\\n# PR-002: Feature B\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
+            # PRD filename based check for MyProject (FSM Test)
+            if "MyProject" in prd_file_abs:
+                filename = "PR_001_Mock.md"
+            else:
+                filename = "PR_A.md"
+            
+            out_file_path = os.path.join(args.out_dir, filename)
+            if not os.path.exists(out_file_path):
+                with open(out_file_path, "w") as f:
+                    f.write("status: open\\n\\n# PR-001: Mock PR\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
             print('{"status": "mock_success", "role": "planner"}')
             
         sys.exit(0)

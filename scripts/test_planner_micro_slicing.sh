@@ -3,11 +3,16 @@ set -e
 
 echo "Running Micro-Slicing Act Test..."
 
-SANDBOX="tests/planner_sandbox_$$"
-mkdir -p "$SANDBOX/prs"
-rm -f "$SANDBOX"/prs/*.md || true
+SANDBOX="$(pwd)/tests/planner_sandbox_$$"
+mkdir -p "$SANDBOX"
+export SDLC_GLOBAL_RUN_BASE="$(pwd)/tests/planner_sandbox_$$/.sdlc_runs"
+GLOBAL_RUN_BASE=$SDLC_GLOBAL_RUN_BASE
+PRD_NAME="dummy_complex_prd"
+OUT_DIR="$GLOBAL_RUN_BASE/$PRD_NAME"
+mkdir -p "$OUT_DIR"
+rm -f "$OUT_DIR"/*.md || true
 
-cat << 'EOF' > "$SANDBOX/dummy_complex_prd.md"
+cat << 'INNER_EOF' > "$SANDBOX/dummy_complex_prd.md"
 # Complex Feature: Full Stack Login System
 This is a complex feature that REQUIRES multiple PRs.
 1. Database Schema for Users
@@ -15,13 +20,13 @@ This is a complex feature that REQUIRES multiple PRs.
 3. API Endpoints (Flask)
 4. UI Integration (React)
 Please generate a sequential, dependency-ordered chain of Micro-PRs.
-EOF
+INNER_EOF
 
 # Run Planner
-SDLC_TEST_MODE=true python3 scripts/spawn_planner.py --prd-file "$SANDBOX/dummy_complex_prd.md" --out-dir "$SANDBOX/prs" --workdir "$(pwd)" --global-dir "$(pwd)"
+SDLC_TEST_MODE=true python3 scripts/spawn_planner.py --prd-file "$SANDBOX/dummy_complex_prd.md" --workdir "$(pwd)" --global-dir "$(pwd)"
 
 # Assertions
-PR_COUNT=$(ls -1q "$SANDBOX/prs/"*.md 2>/dev/null | wc -l)
+PR_COUNT=$(ls -1q "$OUT_DIR/"*.md 2>/dev/null | wc -l)
 
 if [ "$PR_COUNT" -le 1 ]; then
     echo "❌ Micro-Slicing failed: Planner generated only $PR_COUNT PR(s)."
@@ -32,7 +37,7 @@ echo "✅ Planner generated $PR_COUNT PRs."
 
 # Verify "status: open" and alphabetical prefixes
 PREV_NAME=""
-for file in "$SANDBOX/prs/"*.md; do
+for file in "$OUT_DIR/"*.md; do
     filename=$(basename "$file")
     
     # Check status: open
