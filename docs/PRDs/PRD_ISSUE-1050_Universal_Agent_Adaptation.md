@@ -4,6 +4,8 @@ Affected_Projects: [leio-sdlc]
 
 # PRD: ISSUE-1050 Universal Agent Adaptation (v9 Final)
 
+**Status**: Completed
+
 ## 1. Context & Problem Definition (核心问题与前因后果)
 The `leio-sdlc` project currently hardcodes Anthropics Claude as the primary LLM driver. To ensure vendor neutrality and resilience, we must implement a Universal Agent Adaptation layer that natively supports other models, specifically starting with Google Gemini via the `openclaw` CLI. Previous iterations successfully established strong architectural defenses, but the 8th round of Red Team auditing flagged a critical flaw: embedding real, costly LLM network calls directly into the `preflight.sh` CI hook, which violates the token-optimized CI principle. Boss has mandated a final v9 architecture that preserves all prior defenses while strictly isolating real LLM integration tests into a parameterized script.
 
