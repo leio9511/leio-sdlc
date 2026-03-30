@@ -2,6 +2,7 @@
 import argparse
 import os
 import sys
+from agent_driver import invoke_agent, build_prompt
 import subprocess
 import uuid
 
@@ -31,23 +32,14 @@ def main():
     diff_cmd = f"git diff {args.diff_target} --no-color > {diff_file}"
     subprocess.run(diff_cmd, shell=True)
 
-    task_string = (
-        f"ATTENTION: Your root workspace is rigidly locked to {workdir}. "
-        f"You are the Arbitrator. The Coder and Reviewer have reached an impasse after 5 rejections.\n\n"
-        f"--- PR Contract ---\n"
-        f"{pr_content}\n"
-        f"-------------------\n\n"
-        f"Use the `read` tool to read the file: {diff_file} \n"
-        f"You MUST read 'Review_Report.md' to understand the Reviewer's objections.\n"
-        f"Your ONLY job is to output exactly one of these two tokens as the final word in your response:\n"
-        f"1. [OVERRIDE_LGTM] - If you believe the code satisfies the contract and the Reviewer is being too pedantic.\n"
-        f"2. [CONFIRM_REJECT] - If you agree with the Reviewer that the code is materially defective.\n\n"
-        f"Use the `write` tool to save your final decision to '{workdir}/arbitration_report.txt' and include either [OVERRIDE_LGTM] or [CONFIRM_REJECT] in the file.\n"
+    task_string = build_prompt("arbitrator",
+        workdir=workdir,
+        pr_content=pr_content,
+        diff_file=diff_file
     )
     
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-    cmd = ["openclaw", "agent", "--session-id", session_id, "-m", task_string]
-    subprocess.run(cmd, capture_output=True, text=True)
+    invoke_agent(task_string, session_key=session_id, role='arbitrator')
 
     report_path = os.path.join(workdir, "arbitration_report.txt")
     if os.path.exists(report_path):

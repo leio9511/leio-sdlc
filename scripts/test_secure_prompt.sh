@@ -12,6 +12,7 @@ git checkout -b feature/test
 mkdir -p playbooks TEMPLATES scripts
 echo "playbook" > playbooks/coder_playbook.md
 cp ${PROJECT_ROOT}/scripts/spawn_coder.py scripts/
+cp ${PROJECT_ROOT}/scripts/agent_driver.py scripts/
 
 # Create a fake openclaw wrapper to inspect arguments
 cat << 'INNER_EOF' > scripts/openclaw

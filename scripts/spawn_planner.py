@@ -3,6 +3,7 @@ import tempfile
 import os
 import json
 import sys
+from agent_driver import invoke_agent, build_prompt
 import subprocess
 import uuid
 import re
@@ -93,42 +94,24 @@ def main():
 
     if args.slice_failed_pr is not None:
         insert_after_flag = f" --insert-after {failed_pr_id}" if failed_pr_id else ""
-        task_string = (
-            f"The following PR has failed multiple times because it is too complex for the Coder. "
-            f"Your task is to break THIS SPECIFIC PR down into at least 2 smaller, sequential Micro-PRs. "
-            f"Do not change the overall goal of the project, just reduce the scope per PR. "
-            f"Use the original PRD for context.\\n\\n"
-            f"You are explicitly forbidden from manually editing the markdown file's status field.\\n\\n"
-            f"--- PLANNER PLAYBOOK ---\\n{playbook_content}\\n------------------------\\n\\n"
-            f"FAILED PR:\\n{failed_pr_content}\\n\\n"
-            f"ORIGINAL PRD:\\n{prd_content}\\n\\n"
-            f"ATTENTION: Your root workspace is rigidly locked to {workdir}. "
-            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir}{insert_after_flag} --title <title> --content-file <file>` "
-            f"to generate the PR contracts instead of raw file writing. "
-            f"The `--insert-after` parameter is MANDATORY for sequential ordering of the new sliced PRs.\\n"
-            f"For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. "
-            f"Do NOT alter the `status: open` YAML frontmatter.\\n"
-            f"TEMPLATE:\\n{template_content}\\n"
-            f"TDD GUARDRAIL: Every PR must be a self-contained, mergeable unit. You CANNOT write a failing test in PR_1 and fix it in PR_2. A single PR must include BOTH the test and the implementation so it passes the pipeline cleanly. "
-            f"You MUST generate at least 2 Micro-PRs for this feature. Start now."
+        task_string = build_prompt("planner_slice",
+            workdir=workdir,
+            playbook_content=playbook_content,
+            failed_pr_content=failed_pr_content,
+            prd_content=prd_content,
+            contract_script=contract_script,
+            out_dir=args.out_dir,
+            insert_after_flag=insert_after_flag,
+            template_content=template_content
         )
     else:
-        task_string = (
-            f"ATTENTION: Your root workspace is rigidly locked to {workdir}. "
-            f"You are strictly forbidden from reading, writing, or modifying files outside this absolute path. "
-            f"Use explicit 'git add <file>' to stage changes safely within your directory.\\n\\n"
-            f"You are explicitly forbidden from manually editing the markdown file's status field.\\n\\n"
-            f"--- PLANNER PLAYBOOK ---\\n{playbook_content}\\n------------------------\\n\\n"
-            f"You are the leio-sdlc Planner. Please analyze the following PRD:\\n{prd_content}\\n\\n"
-            f"CORE INSTRUCTION: You are forbidden from generating a single monolithic PR contract. "
-            f"You must break the PRD down into a functional, dependency-ordered chain of Micro-PRs without hardcoding specific file paths. Give implementation freedom to the Coder. "
-            f"TDD GUARDRAIL: Every PR must be a fully working, self-contained increment. The CI pipeline runs at the end of EVERY PR and requires 100% green tests to merge. You CANNOT split writing a failing test into PR_1 and fixing it in PR_2. A single PR must include BOTH the test and the implementation. "
-            f"You MUST use `python3 {contract_script} --workdir {workdir} --job-dir {args.out_dir} --title <title> --content-file <file>` "
-            f"to generate the PR contracts instead of raw file writing. "
-            f"For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. "
-            f"Do NOT alter the `status: open` YAML frontmatter.\\n"
-            f"TEMPLATE:\\n{template_content}\\n"
-            f"Start now."
+        task_string = build_prompt("planner",
+            workdir=workdir,
+            playbook_content=playbook_content,
+            prd_content=prd_content,
+            contract_script=contract_script,
+            out_dir=args.out_dir,
+            template_content=template_content
         )
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
@@ -160,33 +143,7 @@ def main():
         import time
         print("Calling OpenClaw real API...")
         session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-        fd, path = tempfile.mkstemp(suffix=".txt", prefix="sdlc_prompt_", dir="/tmp", text=True)
-        try:
-            os.chmod(path, 0o600)
-            with os.fdopen(fd, 'w') as tmp:
-                tmp.write(task_string)
-            
-            secure_msg = f"Read your complete task instructions from {path}. Do not modify this file."
-            cmd = ["openclaw", "agent", "--session-id", session_id, "-m", secure_msg]
-            
-            for attempt in range(3):
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode == 0:
-                    print("Successfully spawned Planner subagent.")
-                    print(result.stdout)
-                    break
-                else:
-                    print(f"Error: subprocess returned non-zero exit status {result.returncode}")
-                    if result.stderr:
-                        print(result.stderr)
-                    if attempt < 2:
-                        sleep_time = 3 * (2 ** attempt)
-                        time.sleep(sleep_time)
-                    else:
-                        sys.exit(1)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        invoke_agent(task_string, session_key=session_id, role="planner")
 
 if __name__ == "__main__":
     main()

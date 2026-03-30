@@ -25,10 +25,12 @@ INNER_EOF
     git commit -m "add gitignore" > /dev/null 2>&1
 
     mkdir -p docs/PRDs
-    mkdir -p scripts
+    mkdir -p scripts config
     
     # Copy essential scripts
     cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
+    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
+    cp "${PROJECT_ROOT}/config/prompts.json" config/
     cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
     cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
     cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/

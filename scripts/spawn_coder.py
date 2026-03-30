@@ -3,6 +3,7 @@ import argparse
 import tempfile
 import os
 import sys
+from agent_driver import invoke_agent, build_prompt
 import subprocess
 import time
 from pathlib import Path
@@ -13,34 +14,9 @@ def extract_pr_id(pr_file_path):
         if len(parts) >= 2:
             return f"PR_{parts[1]}"
     return basename.split(".")[0]
-def openclaw_agent_call(session_key, message):
-    import tempfile
-    fd, path = tempfile.mkstemp(suffix=".txt", prefix="sdlc_prompt_", dir="/tmp", text=True)
-    try:
-        os.chmod(path, 0o600)
-        with os.fdopen(fd, 'w') as tmp:
-            tmp.write(message)
-        
-        secure_msg = f"Read your complete task instructions from {path}. Do not modify this file."
-        cmd = ["openclaw", "agent", "--session-id", session_key, "--message", secure_msg]
-        
-        for attempt in range(3):
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
-                return session_key
-            else:
-                if attempt < 2:
-                    time.sleep(3 * (2 ** attempt))
-                else:
-                    print(f"Error: subprocess returned non-zero exit status {result.returncode}")
-                    sys.exit(1)
-    finally:
-        if os.path.exists(path):
-            os.remove(path)
-    return None
 def send_feedback(session_key, message):
     """Function to append reviewer feedback to the existing session."""
-    openclaw_agent_call(session_key, message)
+    invoke_agent(message, session_key=session_key, role='coder')
     print(f"Sent feedback to session {session_key}")
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id):
     session_file = os.path.join(workdir, ".coder_session")
@@ -48,14 +24,14 @@ def handle_feedback_routing(workdir, feedback_file, task_string, pr_id):
     try:
         with open(feedback_file, "r") as f:
             feedback_content = f.read()
-        msg = f"\n--- Revision Feedback ---\n{feedback_content}\n\nYou are in a revision loop. Your previous attempt was rejected. Address the feedback above and modify the codebase accordingly."
+        msg = build_prompt("coder_revision", feedback_content=feedback_content)
         
         if os.path.exists(session_file):
             send_feedback(session_key, msg)
             return True, session_key
         else:
             task_string += msg
-            openclaw_agent_call(session_key, task_string)
+            invoke_agent(task_string, session_key=session_key, role='coder')
             with open(session_file, "w") as f:
                 f.write(session_key)
             print(f"Spawned new session {session_key} with feedback")
@@ -119,32 +95,32 @@ def main():
             with open(playbook_path, "r") as f:
                 playbook_content = f.read()
         
-        task_string = (
-            f"ATTENTION: Your root workspace is rigidly locked to {workdir}. "
-            f"You are strictly forbidden from reading, writing, or modifying files outside this absolute path. "
-            f"Use explicit 'git add <file>' to stage changes safely within your directory.\n\n"
-            f"You are strictly forbidden from manually editing the markdown file's `status` field.\n\n"
-            f"--- CODER PLAYBOOK ---\n{playbook_content}\n\n"
-            f"You are an autonomous Fat Coder. The PR Contract provides functional requirements, NOT exact file paths. YOU must search the workspace, read the code, and autonomously decide which files to modify to implement the feature. Prove your code works by writing and passing tests.\n\n--- PR Contract ({args.pr_file}) ---\n{pr_content}\n\n--- PRD ({args.prd_file}) ---\n{prd_content}\n"
+        task_string = build_prompt("coder", 
+            workdir=workdir, 
+            playbook_content=playbook_content, 
+            pr_file=args.pr_file, 
+            pr_content=pr_content, 
+            prd_file=args.prd_file, 
+            prd_content=prd_content
         )
         
         session_file = os.path.join(workdir, ".coder_session")
         session_key = f"sdlc_coder_{pr_id}"
         
         if args.system_alert:
-            msg = f"\n--- SYSTEM ALERT ---\nDirty git workspace detected!\n{args.system_alert}\n\nYou MUST clean up untracked artifacts using .gitignore or acknowledge them by writing {{\"dirty_acknowledged\": true}} to .coder_state.json. Ensure all your code changes for this PR are staged with explicit \`git add <file>\`."
+            msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
             if os.path.exists(session_file):
                 send_feedback(session_key, msg)
             else:
                 task_string += msg
-                openclaw_agent_call(session_key, task_string)
+                invoke_agent(task_string, session_key=session_key, role='coder')
                 with open(session_file, "w") as f:
                     f.write(session_key)
                 print(f"Spawned new session {session_key} with system alert")
         elif args.feedback_file:
             handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id)
         else:
-            openclaw_agent_call(session_key, task_string)
+            invoke_agent(task_string, session_key=session_key, role='coder')
             with open(session_file, "w") as f:
                 f.write(session_key)
             print(f"Spawned new session {session_key}")

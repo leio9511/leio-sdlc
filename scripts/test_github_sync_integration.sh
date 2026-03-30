@@ -21,8 +21,10 @@ function setup_sandbox() {
     mkdir -p docs/PRDs
     echo "# Dummy PRD" > docs/PRDs/dummy_prd.md
     
-    mkdir -p scripts
+    mkdir -p scripts config
     cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
+    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
+    cp "${PROJECT_ROOT}/config/prompts.json" config/
     cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
     cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
     cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/

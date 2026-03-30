@@ -2,6 +2,7 @@
 import argparse
 import os
 import sys
+from agent_driver import invoke_agent, build_prompt
 import subprocess
 import uuid
 
@@ -24,31 +25,14 @@ def main():
     with open("/root/.openclaw/workspace/projects/leio-sdlc/SKILL.md", "r") as f:
         skill_text = f.read()
 
-    task_string = f"""
-ATTENTION: Your root workspace is rigidly locked to {workdir}.
-You are strictly forbidden from reading, writing, or modifying files outside this absolute path.
-Use explicit 'git add <file>' to stage changes safely within your directory.
-
-You are the leio-sdlc Manager. 
-CRITICAL: You are running in a test sandbox! Before doing anything, you MUST run:
-`cd {workdir}`
-
-Then, process the job directory: {args.job_dir}
-Follow your runbook strictly. When finished, output [DONE] and exit.
-
---- RUNBOOK ---
-{skill_text}
-"""
+    task_string = build_prompt("manager",
+        workdir=workdir,
+        job_dir=args.job_dir,
+        skill_text=skill_text
+    )
     
     session_id = f"mgr-{uuid.uuid4().hex[:8]}"
-    cmd = ["openclaw", "agent", "--session-id", session_id, "-m", task_string]
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"Manager Agent Failed: {result.stderr}")
-        sys.exit(1)
-    else:
-        print(result.stdout)
+    invoke_agent(task_string, session_key=session_id, role="manager")
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+from agent_driver import invoke_agent, build_prompt
 proc = None
 import glob
 import subprocess

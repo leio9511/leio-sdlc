@@ -25,10 +25,12 @@ echo ".sdlc_repo.lock" >> .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
     mkdir -p .sdlc_runs/dummy_prd
-    mkdir -p scripts
+    mkdir -p scripts config
     
     # We copy the real orchestrator.py to run
     cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
+    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
+    cp "${PROJECT_ROOT}/config/prompts.json" config/
     cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
     cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
     cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
