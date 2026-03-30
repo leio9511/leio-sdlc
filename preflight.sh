@@ -68,6 +68,9 @@ cd "$PROJECT_DIR" || exit 1
     echo "Running Pre-Commit Hook Test..."
     bash scripts/test_pre_commit_hook.sh
     
+    echo "Running Triad Agent Driver Tests..."
+    python3 tests/test_triad_agent_driver.py
+
     echo "Running Cleanup Quarantine Test..."
     python3 tests/test_cleanup_flag.py
 ) > "$LOG_FILE" 2>&1
