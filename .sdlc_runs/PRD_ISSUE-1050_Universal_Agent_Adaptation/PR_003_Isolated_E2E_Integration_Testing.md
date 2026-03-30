@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-003: Isolated E2E Integration Testing
 
