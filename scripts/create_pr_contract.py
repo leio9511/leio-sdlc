@@ -31,6 +31,7 @@ def main():
     parser.add_argument("--job-dir", required=True, help="Path to job queue directory")
     parser.add_argument("--title", required=True, help="PR title")
     parser.add_argument("--content-file", required=True, help="Path to file with PR content")
+    parser.add_argument("--project", help="Project name (deprecated/ignored)")
     parser.add_argument("--insert-after", help="Prefix of the PR to insert after (e.g., 003)")
     args = parser.parse_args()
 

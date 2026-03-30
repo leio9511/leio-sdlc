@@ -49,4 +49,10 @@ OUTPUT5=$(python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$TEST_DIR" --t
 FILE5=$(echo "$OUTPUT5" | awk '{print $2}')
 if [[ "$FILE5" != *"/PR_003_Third_PR.md" ]]; then echo "❌ Wrong filename: $FILE5"; exit 1; fi
 
+# Positive 6: With project parameter (deprecated/ignored)
+OUTPUT6=$(python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$TEST_DIR" --title "Project PR" --content-file "$CONTENT_FILE" --project "leio-sdlc")
+echo "$OUTPUT6" | grep -q "\[PR_CREATED\]" || { echo "❌ Expected [PR_CREATED] output with --project"; exit 1; }
+FILE6=$(echo "$OUTPUT6" | awk '{print $2}')
+if [[ "$FILE6" != *"/PR_004_Project_PR.md" ]]; then echo "❌ Wrong filename for project test: $FILE6"; exit 1; fi
+
 echo "✅ test_create_pr_contract.sh PASSED"
