@@ -24,7 +24,7 @@ def main():
         # Dynamically compute job directory from PRD filename
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
-        args.out_dir = os.path.join("docs", "PRs", base_name)
+        args.out_dir = os.path.join(".sdlc_runs", base_name)
 
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -128,7 +128,7 @@ def main():
             f"For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. "
             f"Do NOT alter the `status: open` YAML frontmatter.\\n"
             f"TEMPLATE:\\n{template_content}\\n"
-            f"You MUST generate at least 2 Micro-PRs for this feature. Start now."
+            f"Start now."
         )
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"

@@ -9,7 +9,7 @@ setup_sandbox() {
     cd "$TEST_DIR"
     export PYTHONPATH="$TEST_DIR"
     export WORKSPACE_DIR="$TEST_DIR"
-    mkdir -p docs/PRDs docs/PRs/PRD
+    mkdir -p docs/PRDs .sdlc_runs/PRD
 }
 
 cleanup_sandbox() {
@@ -29,7 +29,8 @@ echo "# Mock PRD" > PRD.md
 # Test Scenario 1: Regression (Happy Path)
 echo "Running Test Scenario 1 (Regression)..."
 python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir .
-if [[ ! -f "docs/PRs/PRD/PR_A.md" || ! -f "docs/PRs/PRD/PR_B.md" ]]; then
+ls -lR .sdlc_runs
+if [[ ! -f ".sdlc_runs/PRD/PR_A.md" || ! -f ".sdlc_runs/PRD/PR_B.md" ]]; then
     echo "❌ Scenario 1 Failed: Expected mock PRs not created."
     exit 1
 fi
@@ -38,6 +39,7 @@ echo "✅ Scenario 1 Passed."
 # Test Scenario 2: File Missing
 echo "Running Test Scenario 2 (File Missing)..."
 if python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr fake.md > error_log.txt 2>&1; then
+ls -lR .sdlc_runs
     echo "❌ Scenario 2 Failed: Expected script to exit with error."
     exit 1
 fi
@@ -51,7 +53,8 @@ echo "✅ Scenario 2 Passed."
 echo "Running Test Scenario 3 (Successful Slice)..."
 echo "# Failed PR content" > PR_001_Failed_PR.md
 python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr PR_001_Failed_PR.md
-if [[ ! -f "docs/PRs/PRD/PR_Slice_1.md" || ! -f "docs/PRs/PRD/PR_Slice_2.md" ]]; then
+ls -lR .sdlc_runs
+if [[ ! -f ".sdlc_runs/PRD/PR_Slice_1.md" || ! -f ".sdlc_runs/PRD/PR_Slice_2.md" ]]; then
     echo "❌ Scenario 3 Failed: Expected mock slice PRs not created."
     exit 1
 fi
@@ -65,6 +68,7 @@ echo "✅ Scenario 3 Passed."
 echo "Running Test Scenario 4 (Successful Slice with sub-id)..."
 echo "# Failed PR content" > PR_002_1_Failed_PR.md
 python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr PR_002_1_Failed_PR.md
+ls -lR .sdlc_runs
 if ! grep -q -- "--insert-after 002_1" tests/task_string.log; then
     echo "❌ Scenario 4 Failed: Missing '--insert-after 002_1' in task string."
     cat tests/task_string.log

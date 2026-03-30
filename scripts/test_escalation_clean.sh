@@ -20,22 +20,23 @@ echo "initial" > init.txt
 git add init.txt
 git commit -m "init" > /dev/null 2>&1
 
-mkdir -p docs/PRs/dummy_prd scripts
+mkdir -p .sdlc_runs/dummy_prd scripts
 cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
 cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
 cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
 cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
+cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
 
 echo ".sdlc_run.lock" > .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
 echo "__pycache__/" >> .gitignore
 echo "*.pyc" >> .gitignore
 echo "*.log" >> .gitignore
-git add .gitignore scripts docs
+git add .gitignore scripts
 git commit -m "setup" > /dev/null 2>&1
 
-cat << 'INNER_EOF' > docs/PRs/dummy_prd/PR_001_Test.md
+cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
 status: open
 slice_depth: 0
 INNER_EOF

@@ -179,6 +179,21 @@ def trigger_github_sync(workdir, effective_channel, pr_id):
             print(f"[Warning] GitHub Sync failed: {str(e)}", file=sys.stderr)
             notify_channel(effective_channel, f"GitHub sync failed: {str(e)}", "github_sync_failed", {"pr_id": pr_id, "error": str(e)})
 
+def initialize_sandbox(workdir):
+    exclude_path = os.path.join(workdir, ".git", "info", "exclude")
+    if os.path.exists(os.path.dirname(exclude_path)):
+        # Check if already excluded
+        already_excluded = False
+        if os.path.exists(exclude_path):
+            with open(exclude_path, "r") as f:
+                if ".sdlc_runs/" in f.read():
+                    already_excluded = True
+        
+        if not already_excluded:
+            with open(exclude_path, "a") as f:
+                f.write("\n.sdlc_runs/\n")
+            print(f"Initialized local sandbox: added .sdlc_runs/ to .git/info/exclude")
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--workdir", required=True)
@@ -252,6 +267,7 @@ def main():
     workdir = os.path.abspath(args.workdir)
     from git_utils import check_git_boundary
     check_git_boundary(workdir)
+    initialize_sandbox(workdir)
     global_dir = os.path.dirname(RUNTIME_DIR) if not args.global_dir else os.path.abspath(args.global_dir)
     os.chdir(workdir)
 
@@ -333,7 +349,7 @@ def main():
 
     prd_filename = os.path.basename(args.prd_file)
     base_name, _ = os.path.splitext(prd_filename)
-    job_dir_rel = os.path.join("docs", "PRs", base_name)
+    job_dir_rel = os.path.join(".sdlc_runs", base_name)
     job_dir = os.path.abspath(os.path.join(workdir, job_dir_rel))
 
     if os.path.exists(job_dir) and not args.force_replan:

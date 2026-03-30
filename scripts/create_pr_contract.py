@@ -43,9 +43,6 @@ def main():
     # OS Lock
     os.chdir(workdir)
 
-    # Auto-Scaffolding
-    os.makedirs("docs/PRs", exist_ok=True)
-
     # Validate content file with Path Traversal Defense
     if os.path.commonpath([workdir, content_file_path]) != workdir:
         raise SecurityError(f"Path traversal detected: {content_file_path} is outside {workdir}")

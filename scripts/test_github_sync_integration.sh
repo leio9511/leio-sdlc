@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 export SDLC_TEST_MODE=true
+export SDLC_GLOBAL_RUN_BASE="$(pwd)/.sdlc_runs"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -16,7 +17,7 @@ function setup_sandbox() {
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
-    mkdir -p docs/PRs/dummy_prd
+    mkdir -p .sdlc_runs/dummy_prd
     mkdir -p docs/PRDs
     echo "# Dummy PRD" > docs/PRDs/dummy_prd.md
     
@@ -26,6 +27,7 @@ function setup_sandbox() {
     cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
     cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
     cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
+    cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
     
     echo ".sdlc_run.lock" >> .gitignore
     echo "__pycache__/" >> .gitignore
@@ -44,7 +46,7 @@ echo "=== Testing GitHub Sync Happy Path ==="
 setup_sandbox
 
 # Create mock PR
-cat << 'INNER_EOF' > docs/PRs/dummy_prd/PR_001_Test.md
+cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
 status: open
 slice_depth: 0
 # PR-001
@@ -52,7 +54,9 @@ INNER_EOF
 git add . && git commit -m "mock PR" >/dev/null
 
 cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys
+import sys, os
+os.system("echo 'changes' > dummy.txt")
+os.system("git add . && git commit -m 'changes' >/dev/null 2>&1")
 sys.exit(0)
 INNER_EOF
 cat << 'INNER_EOF' > scripts/spawn_reviewer.py
@@ -62,12 +66,13 @@ with open("Review_Report.md", "w") as f:
 sys.exit(0)
 INNER_EOF
 cat << 'INNER_EOF' > scripts/merge_code.py
-import sys, subprocess, argparse
+import sys, os, subprocess, argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--branch", required=True)
 parser.add_argument("--review-file", required=True)
 parser.add_argument("--force-lgtm", action="store_true")
 args, _ = parser.parse_known_args()
+os.system(f"git merge {args.branch} -m 'Merge' >/dev/null 2>&1")
 sys.exit(0)
 INNER_EOF
 
@@ -102,7 +107,7 @@ echo "=== Testing GitHub Sync Failure Path ==="
 setup_sandbox
 
 # Create mock PR
-cat << 'INNER_EOF' > docs/PRs/dummy_prd/PR_001_Test.md
+cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
 status: open
 slice_depth: 0
 # PR-001
@@ -110,7 +115,9 @@ INNER_EOF
 git add . && git commit -m "mock PR" >/dev/null
 
 cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys
+import sys, os
+os.system("echo 'changes' > dummy.txt")
+os.system("git add . && git commit -m 'changes' >/dev/null 2>&1")
 sys.exit(0)
 INNER_EOF
 cat << 'INNER_EOF' > scripts/spawn_reviewer.py
@@ -120,7 +127,13 @@ with open("Review_Report.md", "w") as f:
 sys.exit(0)
 INNER_EOF
 cat << 'INNER_EOF' > scripts/merge_code.py
-import sys
+import sys, os, subprocess, argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--branch", required=True)
+parser.add_argument("--review-file", required=True)
+parser.add_argument("--force-lgtm", action="store_true")
+args, _ = parser.parse_known_args()
+os.system(f"git merge {args.branch} -m 'Merge' >/dev/null 2>&1")
 sys.exit(0)
 INNER_EOF
 
