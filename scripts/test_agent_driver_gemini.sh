@@ -1,9 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "Running E2E integration test for agent_driver with Gemini..."
-export LLM_DRIVER=gemini
+if [ ! -z "$1" ]; then
+    TEST_MODEL=$1
+fi
 export TEST_MODEL="${TEST_MODEL:-google/gemini-2.0-flash}"
+
+echo "Running E2E integration test for agent_driver with Gemini (Model: $TEST_MODEL)..."
+export LLM_DRIVER=gemini
 
 # We just write a simple python script that calls invoke_agent and checks if it works
 cat << 'PYEOF' > test_invoke.py
@@ -28,6 +32,18 @@ except Exception as e:
 PYEOF
 
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
+
+# Run python and clean up temp file regardless of exit status
+set +e
 python3 test_invoke.py
+INVOKE_EXIT_CODE=$?
+set -e
 rm -f test_invoke.py
-echo "✅ agent_driver Gemini E2E test passed."
+
+if [ $INVOKE_EXIT_CODE -eq 0 ]; then
+    echo "✅ agent_driver Gemini E2E test passed."
+    exit 0
+else
+    echo "❌ agent_driver Gemini E2E test failed (Exit Code: $INVOKE_EXIT_CODE)."
+    exit $INVOKE_EXIT_CODE
+fi

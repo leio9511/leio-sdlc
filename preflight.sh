@@ -70,6 +70,8 @@ cd "$PROJECT_DIR" || exit 1
     
     echo "Running Triad Agent Driver Tests..."
     python3 tests/test_triad_agent_driver.py
+    echo "Running offline syntax check for agent_driver.py..."
+    python3 -m py_compile scripts/agent_driver.py
 
     echo "Running Cleanup Quarantine Test..."
     python3 tests/test_cleanup_flag.py
