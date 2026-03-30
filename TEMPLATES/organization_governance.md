@@ -23,14 +23,14 @@ n**主 Agent 行为熔断 (Main Agent Execution Guardrail)**：
 
 ### 3.1 标准发布流程 (Deploy Strategies)
 - **Non-Skill (独立应用/Daemon)**：继续采用**软链接蓝绿发布**。脚本将产物打包至 `~/.openclaw/.releases/<name>/<ts>`，并原子化切换执行目录的软链接。
-- **AgentSkill (OpenClaw 插件)**：必须采用**物理硬拷贝 (Hard Copy / Rsync)**。由于 OpenClaw 的防目录穿越安全策略禁止外部软链接，Skill 的 `deploy.sh` 必须将经过测试的代码原子化物理同步（如 `rsync --delete` 或 `mv`）到 `~/.openclaw/skills/<name>` 目录内，然后本地保存备份压缩包，并执行 `openclaw gateway restart` 热重载。
+- **AgentSkill (OpenClaw 插件)**：必须采用**物理硬拷贝 (Hard Copy / Rsync)**。由于 OpenClaw 的防目录穿越安全策略禁止外部软链接，Skill 的 `deploy.sh` 必须将经过测试的代码原子化物理同步（如 `rsync --delete` 或 `mv`）到 `环境变量 $AGENT_SKILLS_DIR (如未设置默认回退至 ~/.openclaw/skills/<name>)` 目录内，然后本地保存备份压缩包，并执行 `openclaw gateway restart` 热重载。
 
 ### 3.2 运行时回滚与旧爹修新儿 (Runtime Rollback Strategy)
 当新发布的 SDLC 引擎或 Skill 自身存在致命 Bug，导致流水线瘫痪时：
 - **【严禁】回滚 Git (DO NOT `git reset`)**：绝对不要丢弃写坏的 Git Commit！一旦回滚，作案现场和新写的逻辑将全部丢失。
 - **【必须】回滚 Runtime (Rollback Release)**：
   - Non-Skill：将软链接指回上一个能跑的健康版本目录。
-  - AgentSkill：从本地备份压缩包中恢复，物理覆盖回 `~/.openclaw/skills/<name>`。
+  - AgentSkill：从本地备份压缩包中恢复，物理覆盖回 `环境变量 $AGENT_SKILLS_DIR (如未设置默认回退至 ~/.openclaw/skills/<name>)`。
 - **自愈循环**：用回滚后的“旧健康引擎”拉起流水线，去 Workspace 里修复那些导致瘫痪的“坏代码”，修好后重新 commit 并发布新版本。打破“坏机器无法造出修理工具”的死锁。
 
 ## 4. 龙虾架构流转机制 (The Lobster Architecture)
@@ -54,5 +54,5 @@ n**主 Agent 行为熔断 (Main Agent Execution Guardrail)**：
 
 ## 6. 强制操作红线 (Strict Operational Rules)
 1. **Sub-agent Scoping (`cwd` 约束)**：主助手在 Spawn 子代理时，必须显式设置 `cwd` 为项目根目录，防止跨域污染。
-2. **MANDATORY FILE I/O POLICY**：所有 Agent 必须使用原生的 `read`, `write`, `edit` API 读写文件。绝对禁止使用 `exec` 执行 `echo`, `cat`, `sed`, `awk` 等 shell 命令修改文件，防止语法截断和上下文污染。
+2. **MANDATORY FILE I/O POLICY**：所有 Agent 必须使用其运行平台原生的 File System API (如原生文件读写工具) 读写文件。绝对禁止使用 `exec` 执行 `echo`, `cat`, `sed`, `awk` 等 shell 命令修改文件，防止语法截断和上下文污染。
 3. **Template-Driven**：绝不凭空捏造结构化文件，必须 `cp`自 `TEMPLATES/`。
