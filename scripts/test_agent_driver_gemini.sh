@@ -1,49 +1,66 @@
 #!/bin/bash
 set -e
 
-if [ ! -z "$1" ]; then
-    TEST_MODEL=$1
-fi
-export TEST_MODEL="${TEST_MODEL:-google/gemini-2.0-flash}"
+# test_agent_driver_gemini.sh
+# Standalone E2E test harness for Gemini driver integration
+# Usage: ./test_agent_driver_gemini.sh [model_name]
+# Defaults to google/gemini-2.0-flash if not provided.
 
-echo "Running E2E integration test for agent_driver with Gemini (Model: $TEST_MODEL)..."
-export LLM_DRIVER=gemini
+export LLM_DRIVER="gemini"
+export TEST_MODEL="${1:-${TEST_MODEL:-google/gemini-2.0-flash}}"
 
-# We just write a simple python script that calls invoke_agent and checks if it works
-cat << 'PYEOF' > test_invoke.py
+echo "==========================================="
+echo "Running Isolated E2E Test for Gemini Driver"
+echo "Model: $TEST_MODEL"
+echo "==========================================="
+
+PROJECT_DIR=$(dirname $(dirname $(realpath $0)))
+
+# Create a temporary python test script to invoke agent_driver
+TEST_SCRIPT=$(mktemp)
+cat << PYEOF > "$TEST_SCRIPT"
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
-from agent_driver import invoke_agent
+
+# Append the project scripts directory so agent_driver can be imported
+sys.path.insert(0, os.path.join("$PROJECT_DIR", "scripts"))
 
 try:
-    # A simple task that the model should just reply "ok" or something fast
-    # But since gemini is headless, it will print to stdout.
-    session_key = invoke_agent("Reply exactly with the word 'PONG'. Nothing else.", role="test")
-    if session_key:
-        print("Agent invocation succeeded.")
-        sys.exit(0)
+    from agent_driver import invoke_agent
+except ImportError as e:
+    print(f"Failed to import agent_driver: {e}")
+    sys.exit(1)
+
+task = "Respond with a simple 'OK' if you receive this message. This is a connectivity test."
+print("Testing Gemini driver invocation...")
+
+try:
+    # We bypass the actual execution in the test if gemini is not available on this CI
+    # But since it's an isolated integration test, it's expected to run.
+    session = invoke_agent(task, role="test_harness")
+    if session:
+        print("Test successful, session created.")
     else:
-        print("Agent invocation returned None.")
+        print("Test failed, no session created.")
         sys.exit(1)
 except Exception as e:
-    print(f"Agent invocation failed: {e}")
+    print(f"Test failed with exception: {e}")
     sys.exit(1)
 PYEOF
 
-export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
+python3 "$TEST_SCRIPT"
+RESULT=$?
 
-# Run python and clean up temp file regardless of exit status
-set +e
-python3 test_invoke.py
-INVOKE_EXIT_CODE=$?
-set -e
-rm -f test_invoke.py
+rm -f "$TEST_SCRIPT"
 
-if [ $INVOKE_EXIT_CODE -eq 0 ]; then
-    echo "✅ agent_driver Gemini E2E test passed."
+if [ $RESULT -eq 0 ]; then
+    echo "==========================================="
+    echo "✅ Isolated E2E Test Passed"
+    echo "==========================================="
     exit 0
 else
-    echo "❌ agent_driver Gemini E2E test failed (Exit Code: $INVOKE_EXIT_CODE)."
-    exit $INVOKE_EXIT_CODE
+    echo "==========================================="
+    echo "❌ Isolated E2E Test Failed"
+    echo "==========================================="
+    exit 1
 fi
