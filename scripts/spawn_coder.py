@@ -3,7 +3,7 @@ import argparse
 import tempfile
 import os
 import sys
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import build_prompt
 import subprocess
 import time
 from pathlib import Path
@@ -14,12 +14,28 @@ def extract_pr_id(pr_file_path):
         if len(parts) >= 2:
             return f"PR_{parts[1]}"
     return basename.split(".")[0]
-def send_feedback(session_key, message):
+def openclaw_agent_call(session_key, message, workdir='.'):
+    cmd = [
+        "openclaw",
+        "agent",
+        "--session-id",
+        session_key,
+        "--message",
+        message
+    ]
+    try:
+        subprocess.run(cmd, cwd=workdir, check=True)
+        return session_key
+    except subprocess.CalledProcessError as e:
+        print(f"Error calling openclaw agent: {e}")
+        sys.exit(1)
+
+def send_feedback(session_key, message, workdir='.'):
     """Function to append reviewer feedback to the existing session."""
-    invoke_agent(message, session_key=session_key, role='coder')
+    openclaw_agent_call(session_key, message, workdir=workdir)
     print(f"Sent feedback to session {session_key}")
-def handle_feedback_routing(workdir, feedback_file, task_string, pr_id):
-    session_file = os.path.join(workdir, args.run_dir, ".coder_session")
+def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
+    session_file = os.path.join(workdir, run_dir, ".coder_session")
     session_key = f"sdlc_coder_{pr_id}"
     try:
         with open(feedback_file, "r") as f:
@@ -27,11 +43,11 @@ def handle_feedback_routing(workdir, feedback_file, task_string, pr_id):
         msg = build_prompt("coder_revision", feedback_content=feedback_content)
         
         if os.path.exists(session_file):
-            send_feedback(session_key, msg)
+            send_feedback(session_key, msg, workdir=workdir)
             return True, session_key
         else:
             task_string += msg
-            invoke_agent(task_string, session_key=session_key, role='coder')
+            openclaw_agent_call(session_key, task_string, workdir=workdir)
             with open(session_file, "w") as f:
                 f.write(session_key)
             print(f"Spawned new session {session_key} with feedback")
@@ -111,17 +127,17 @@ def main():
         if args.system_alert:
             msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
             if os.path.exists(session_file):
-                send_feedback(session_key, msg)
+                send_feedback(session_key, msg, workdir=workdir)
             else:
                 task_string += msg
-                invoke_agent(task_string, session_key=session_key, role='coder')
+                openclaw_agent_call(session_key, task_string, workdir=workdir)
                 with open(session_file, "w") as f:
                     f.write(session_key)
                 print(f"Spawned new session {session_key} with system alert")
         elif args.feedback_file:
-            handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id)
+            handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id, args.run_dir)
         else:
-            invoke_agent(task_string, session_key=session_key, role='coder')
+            openclaw_agent_call(session_key, task_string, workdir=workdir)
             with open(session_file, "w") as f:
                 f.write(session_key)
             print(f"Spawned new session {session_key}")

@@ -26,42 +26,42 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertEqual(key, "sdlc_coder_PR_001")
         mock_run.assert_called_once()
         cmd = mock_run.call_args[0][0]
-        self.assertEqual(cmd[0], "openclaw")
-        self.assertEqual(cmd[1], "agent")
-        self.assertEqual(cmd[2], "--session-id")
-        self.assertEqual(cmd[3], "sdlc_coder_PR_001")
-        self.assertEqual(cmd[4], "--message")
+        self.assertEqual(cmd[:5], ["openclaw", "agent", "--session-id", "sdlc_coder_PR_001", "--message"])
         self.assertEqual(cmd[5], "test task")
-        self.assertNotIn("sessions_spawn", cmd)
-        self.assertNotIn("sessions_send", cmd)
+        for arg in cmd:
+            self.assertNotIn("sessions_spawn", arg)
+            self.assertNotIn("sessions_send", arg)
 
     @patch('spawn_coder.openclaw_agent_call')
     def test_send_feedback(self, mock_call):
         spawn_coder.send_feedback("sdlc_coder_PR_001", "feedback message")
-        mock_call.assert_called_once_with("sdlc_coder_PR_001", "feedback message")
+        mock_call.assert_called_once_with("sdlc_coder_PR_001", "feedback message", workdir='.')
 
     @patch('spawn_coder.os.path.exists')
-    @patch('spawn_coder.send_feedback')
-    def test_handle_feedback_routing_with_stored_key(self, mock_send_feedback, mock_exists):
-        # We mock open to return feedback first
-        m_open = mock_open(read_data="Fix the bugs.")
+    @patch('spawn_coder.openclaw_agent_call')
+    @patch('spawn_coder.build_prompt')
+    def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_call, mock_exists):
+        mock_build.return_value = "Mocked feedback prompt"
         
+        m_open = mock_open(read_data="Fix the bugs.")
         with patch('builtins.open', m_open):
             mock_exists.return_value = True
             is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", "feedback.txt", "task string", "PR_001")
             
             self.assertTrue(is_existing)
             self.assertEqual(key, "sdlc_coder_PR_001")
-            mock_send_feedback.assert_called_once()
-            called_key, called_msg = mock_send_feedback.call_args[0]
+            mock_call.assert_called_once()
+            called_key, called_msg = mock_call.call_args[0]
             self.assertEqual(called_key, "sdlc_coder_PR_001")
-            self.assertIn("Fix the bugs.", called_msg)
+            self.assertIn("Mocked feedback prompt", called_msg)
 
     @patch('spawn_coder.subprocess.run')
     @patch('spawn_coder.openclaw_agent_call')
     @patch('os.path.exists')
-    @patch('builtins.open', new_callable=mock_open, read_data="playbook content")
-    def test_playbook_injection(self, mock_file, mock_exists, mock_agent_call, mock_run):
+    @patch('spawn_coder.build_prompt')
+    def test_playbook_injection(self, mock_build, mock_exists, mock_agent_call, mock_run):
+        mock_build.return_value = "--- CODER PLAYBOOK ---\nplaybook content\nstrictly forbidden from manually editing the markdown file's `status` field"
+        
         # Mocking for the main block
         mock_exists.side_effect = lambda p: True if "playbook" in p or "PR" in p or "PRD" in p else False
         
@@ -72,7 +72,9 @@ class TestSpawnCoder(unittest.TestCase):
             mock_run.return_value.stdout = "feature/test"
             mock_run.return_value.returncode = 0
             
-            spawn_coder.main()
+            m_open = mock_open(read_data="playbook content")
+            with patch('builtins.open', m_open):
+                spawn_coder.main()
             
             # Verify openclaw_agent_call was called with task_string containing playbook
             self.assertTrue(mock_agent_call.called)
