@@ -17,6 +17,7 @@ echo "mock diff" > diff.txt
 
 # We need to mock openclaw binary
 mkdir -p "$TEMP_DIR/bin"
+mkdir -p "$TEMP_DIR/.sdlc_runs/dummy_prd"
 export PATH="$TEMP_DIR/bin:$PATH"
 
 echo "=== T1: Agent misses artifact (Fail-Fast) ==="
@@ -28,7 +29,7 @@ exit 0
 EOF
 chmod +x "$TEMP_DIR/bin/openclaw"
 
-if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --global-dir /root/.openclaw/workspace/projects/leio-sdlc 2>stderr.log; then
+if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir .sdlc_runs/dummy_prd --out-file .sdlc_runs/dummy_prd/Review_Report.md --global-dir /root/.openclaw/workspace/projects/leio-sdlc 2>stderr.log; then
     echo "❌ T1 Failed: python script should have exited with 1"
     exit 1
 fi
@@ -47,12 +48,12 @@ cat << 'EOF' > "$TEMP_DIR/bin/openclaw"
 #!/bin/bash
 echo "Agent executed and wrote file"
 # We parse the workdir from args? No, the working directory is already lock to workdir.
-touch Review_Report.md
+touch .sdlc_runs/dummy_prd/Review_Report.md
 exit 0
 EOF
 chmod +x "$TEMP_DIR/bin/openclaw"
 
-if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --global-dir /root/.openclaw/workspace/projects/leio-sdlc; then
+if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir .sdlc_runs/dummy_prd --out-file .sdlc_runs/dummy_prd/Review_Report.md --global-dir /root/.openclaw/workspace/projects/leio-sdlc; then
     echo "❌ T2 Failed: python script should have exited with 0"
     exit 1
 fi

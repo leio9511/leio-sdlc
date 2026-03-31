@@ -7,7 +7,7 @@ SANDBOX="/root/.openclaw/workspace/projects/leio-sdlc/tests/manager_sandbox_$$"
 mkdir -p "$SANDBOX"
 cd "$SANDBOX"
 
-JOB_DIR=".sdlc/jobs/Feature_X"
+JOB_DIR=".sdlc_runs/Feature_X"
 mkdir -p "$JOB_DIR"
 echo "status: open" > "$JOB_DIR/PR_001_DB.md"
 echo "status: open" > "$JOB_DIR/PR_002_API.md"

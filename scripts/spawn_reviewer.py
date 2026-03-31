@@ -119,7 +119,7 @@ def main():
         playbook_content=playbook_content,
         pr_content=pr_content,
         diff_file=diff_file,
-        out_file=args.out_file,
+        out_file=args.out_file, run_dir=args.run_dir,
         template_content=template_content
     )
     
