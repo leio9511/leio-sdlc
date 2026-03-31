@@ -2,6 +2,13 @@
 import argparse
 import os
 import sys
+
+# Dynamic module resolution for monorepo development vs production deployment
+current_dir = os.path.dirname(os.path.abspath(__file__))
+monorepo_scripts_dir = os.path.abspath(os.path.join(current_dir, "../../../scripts"))
+if os.path.exists(os.path.join(monorepo_scripts_dir, "agent_driver.py")):
+    sys.path.insert(0, monorepo_scripts_dir)
+
 from agent_driver import invoke_agent, build_prompt
 import uuid
 

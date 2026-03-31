@@ -2,7 +2,7 @@
 set -e
 
 # ==========================================
-# BOOTSTRAP: DEPLOYMENT SCRIPT
+# BOOTSTRAP: DEPLOYMENT SCRIPT (leio-auditor)
 # ==========================================
 # Hard Copy (Physical Sync) with Atomic Renaming
 
@@ -29,11 +29,11 @@ perform_hard_copy_deployment() {
 
     echo "[$(date '+%H:%M:%S')] Starting hard-copy deployment flow for $SLUG"
 
-    if [ "$RUN_TESTS" = true ] && [ -f "scripts/test_sdlc_cujs.sh" ]; then
-        echo "🧪 Running Preflight CUJ Tests..."
-        bash "scripts/test_sdlc_cujs.sh"
+    if [ "$RUN_TESTS" = true ]; then
+        echo "🧪 Running Preflight Checks..."
+        bash "preflight.sh"
         if [ $? -ne 0 ]; then
-            echo "❌ PREFLIGHT FAILED: CUJ test suite failed."
+            echo "❌ PREFLIGHT FAILED: check failed."
             exit 1
         fi
         echo "✅ PREFLIGHT PASSED."
@@ -45,12 +45,8 @@ perform_hard_copy_deployment() {
     fi
 
     # 1. Build release
-    if [ -f "scripts/build_release.sh" ]; then
-        bash "scripts/build_release.sh" || exit 1
-    else
-        mkdir -p dist
-        cp -r * dist/ 2>/dev/null || true
-    fi
+    mkdir -p dist
+    cp -r SKILL.md scripts/ dist/
 
     mkdir -p "$SKILLS_DIR"
     mkdir -p "$RELEASES_DIR"
@@ -91,17 +87,20 @@ perform_hard_copy_deployment() {
     mv -T "$TMP_DIR" "$PROD_DIR"
     rm -rf "$OLD_DIR"
 
-    # 4. Gateway Reload
-    if [ -z "$HOME_MOCK" ]; then
-        echo "🔄 Restarting OpenClaw gateway..."
-        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
-    fi
-
-    # 5. Auto-Cleanup
+    # 4. Auto-Cleanup
     echo "🧹 Pruning old backups..."
     ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
 
     echo "✅ DEPLOYMENT SUCCESS: $SLUG is now live via hard-copy swap."
+
+    # 5. GitHub Auto-Sync (PRD-035)
+    # Skipping sync for new projects until remote is set up
+
+    # 6. Gateway Reload (MUST BE THE FINAL STEP)
+    if [ -z "$HOME_MOCK" ]; then
+        echo "🔄 Restarting OpenClaw gateway..."
+        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+    fi
 }
 
 perform_hard_copy_deployment "$@"

@@ -1,0 +1,20 @@
+#!/bin/bash
+# ==========================================
+# AGENTIC SMOKE TEST TEMPLATE (Agent-to-Agent)
+# ==========================================
+# Usage: This script is called by preflight.sh or deploy.sh.
+# It spawns a sub-agent to verify if the skill's natural language 
+# interface (SKILL.md) and toolchain are actually working.
+
+SKILL_NAME=$(basename $(pwd))
+TEST_TASK="你现在是一名QA测试员。请测试技能 [$SKILL_NAME]。执行指令: [这里填入测试指令]，并验证是否正确触发了工具。成功请回复 TEST_PASSED。"
+
+echo "[$(date '+%H:%M:%S')] Spawning Agentic Smoke Test for $SKILL_NAME..."
+
+# The Manager (or the Coder in a sub-session) uses the sessions_spawn tool logic here.
+# In a real shell script, we use a CLI wrapper or a specific test runner.
+# For now, we define the pattern:
+# openclaw-test-skill --task "$TEST_TASK" --expect "TEST_PASSED"
+
+# Dummy implementation for the template
+exit 0

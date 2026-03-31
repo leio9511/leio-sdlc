@@ -40,3 +40,4 @@ tests/planner_sandbox_*
 .test_tmp/
 .tmp/
 .test_tmp/
+audit_prompt.txt
