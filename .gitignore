@@ -38,3 +38,5 @@ __pycache__/
 tests/planner_sandbox_*
 .test_tmp/
 .test_tmp/
+.tmp/
+.test_tmp/
