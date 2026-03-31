@@ -7,6 +7,7 @@
 
 ## 🏆 Recently Completed
 - [x] **[ISSUE-1050] PRD-1050 v9: Universal Agent Adaptation**: Natively support Gemini via openclaw CLI, implement agent_driver abstraction, JIT filesystem guardrails, and isolated integration tests (removed network calls from preflight).
+- [x] **[ISSUE-1052] SDLC Init and Isolated Runs**: Successfully implemented `.sdlc_runs` artifact isolation, `.gitignore` guardrail fixes, and forensic quarantine tracking (State 5 `git add -f`).
 - [x] **[PRD-1041] JIT Prompt De-biasing v6**: Refactored startup and boundary handoff prompts to strictly use non-destructive git operations and full paths for skills. Eliminated LLM attention bias. (v0.9.1)
 - [x] **[PRD-1040] Global Pipeline Lock v4**: Implemented static frontmatter parsing, atomic lexicographical lock acquisition, and fail-fast rollback with manifest-based cleanup. (v0.9.0)
 - [x] **[ISSUE-1039] PRD-1039 v11: Automated Orchestrator Cleanup Forensic Quarantine**: Implemented crash-proof process group isolation and lock-aware `--cleanup` flag for robust agent teardown. (v0.8.0)
