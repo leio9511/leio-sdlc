@@ -564,15 +564,31 @@ def main():
                         break
                 if state_5_trigger:
                     if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
+
+                    # Forensic Quarantine: Force-add .sdlc_runs/<PR_Name>/ before reset
+                    if os.path.exists(os.path.join(workdir, job_dir_rel)):
+                        print(f"State 5: Archiving forensic artifacts to toxic branch: {job_dir_rel}")
+                        subprocess.run(["git", "add", "-f", job_dir_rel], check=False)
+                        subprocess.run(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 STATE 5 ESCALATION FORENSIC SNAPSHOT"], check=False)
+
                     if reset_count == 0:
                         print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
                         subprocess.run(["git", "reset", "--hard"], check=False)
                         subprocess.run(["git", "clean", "-fd"], check=False)
                         safe_git_checkout("master")
                         subprocess.run(["git", "branch", "-D", branch_name], check=False)
+                        
                         reset_count += 1
                         continue
                     else:
+                        subprocess.run(["git", "checkout", "master"], check=False)
+                        
+                        # In test mode, we might delete the file or branch. Just skip the slice if we can't find it.
+                        if not os.path.exists(current_pr):
+                            print(f"[Warning] PR file {current_pr} not found after state 5 reset. Aborting slice.")
+                            print(HandoffPrompter.get_prompt("dead_end"))
+                            sys.exit(1)
+                            
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
