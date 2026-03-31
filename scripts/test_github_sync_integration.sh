@@ -63,7 +63,7 @@ sys.exit(0)
 INNER_EOF
 cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import sys, os
-with open("Review_Report.md", "w") as f:
+with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "Looks good"}\n```')
 sys.exit(0)
 INNER_EOF
@@ -124,7 +124,7 @@ sys.exit(0)
 INNER_EOF
 cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import sys, os
-with open("Review_Report.md", "w") as f:
+with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "Looks good"}\n```')
 sys.exit(0)
 INNER_EOF

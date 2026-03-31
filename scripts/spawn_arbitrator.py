@@ -11,6 +11,7 @@ def main():
     parser.add_argument("--pr-file", required=True, help="Path to the PR Contract file")
     parser.add_argument("--diff-target", required=True, help="Git diff target range (e.g., origin/master..HEAD)")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
+    parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     
     args = parser.parse_args()
     workdir = os.path.abspath(args.workdir)
@@ -28,20 +29,21 @@ def main():
     with open(args.pr_file, "r") as f:
         pr_content = f.read()
         
-    diff_file = "current_arbitration.diff"
+    diff_file = os.path.join(args.run_dir, "current_arbitration.diff")
     diff_cmd = f"git diff {args.diff_target} --no-color > {diff_file}"
     subprocess.run(diff_cmd, shell=True)
 
     task_string = build_prompt("arbitrator",
         workdir=workdir,
         pr_content=pr_content,
-        diff_file=diff_file
+        diff_file=diff_file,
+        review_report_path=os.path.join(args.run_dir, "Review_Report.md")
     )
     
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
     invoke_agent(task_string, session_key=session_id, role='arbitrator')
 
-    report_path = os.path.join(workdir, "arbitration_report.txt")
+    report_path = os.path.join(workdir, args.run_dir, "arbitration_report.txt")
     if os.path.exists(report_path):
         with open(report_path, "r") as f:
             content = f.read()

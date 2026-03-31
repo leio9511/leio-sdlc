@@ -2,9 +2,5 @@
 # SDLC Framework Protective Boundaries
 
 # Runtime State (PROTECTED)
-.coder_session
-.coder_state.json
-Review_Report.md
-current_review.diff
-current_arbitration.diff
+.sdlc_runs/
 .sdlc/

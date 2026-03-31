@@ -59,7 +59,7 @@ else:
 INNER_EOF
 
 cat << 'INNER_EOF' > scripts/spawn_reviewer.py
-with open("Review_Report.md", "w") as f:
+with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
 INNER_EOF
 

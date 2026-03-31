@@ -55,6 +55,7 @@ def main():
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--out-file", default="Review_Report.md", help="Path to write the review report")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
+    parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
@@ -81,13 +82,13 @@ def main():
     if args.override_diff_file:
         diff_file = args.override_diff_file
     else:
-        diff_file = "current_review.diff"
+        diff_file = os.path.join(args.run_dir, "current_review.diff")
 
     if not args.override_diff_file:
         diff_cmd = f"git diff {args.diff_target} --no-color > {diff_file}"
         subprocess.run(diff_cmd, shell=True)
             
-        history_cmd = f"git log -n {history_depth} -p {args.diff_target} > recent_history.diff"
+        history_cmd = f"git log -n {history_depth} -p {args.diff_target} > {os.path.join(args.run_dir, 'recent_history.diff')}"
         subprocess.run(history_cmd, shell=True)
         
     guardrail_violation = check_guardrails(workdir, pr_content, [os.path.join(workdir, diff_file)])

@@ -224,6 +224,12 @@ def main():
         os.chdir(args.workdir)
         branch_res = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
         branch_output = branch_res.stdout.strip()
+        if "/" in branch_output:
+            parent_dir_name = branch_output.split('/')[0]
+            job_dir_rel = os.path.join('.sdlc_runs', parent_dir_name)
+            if os.path.exists(os.path.join(args.workdir, job_dir_rel)):
+                subprocess.run(["git", "add", "-f", job_dir_rel], check=False)
+
         if branch_output in ["master", "main"]:
             print("Cannot quarantine master/main branch.")
             sys.exit(1)
@@ -447,7 +453,7 @@ def main():
                     print(f"State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     try:
-                        proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], start_new_session=True)
+                        proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                         try:
                             proc.wait(timeout=MAX_RUNTIME)
                         except subprocess.TimeoutExpired:
@@ -476,7 +482,7 @@ def main():
                             except Exception: pass # Reaper safety check: process already reaped or pgid not found
                         if not dirty_acknowledged:
                             try:
-                                proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir], start_new_session=True)
+                                proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                                 try:
                                     proc.wait(timeout=MAX_RUNTIME)
                                 except subprocess.TimeoutExpired:
@@ -492,12 +498,12 @@ def main():
                                 state_5_trigger = True
                                 break
                             continue
-                    review_artifact = "Review_Report.md"
+                    review_artifact = os.path.join(job_dir_rel, "Review_Report.md")
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     print(f"State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename}. Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact], start_new_session=True)
+                    proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", job_dir_rel], start_new_session=True)
                     proc.wait()
                     if os.path.exists(review_report_path):
                         with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
@@ -509,7 +515,7 @@ def main():
                         subprocess.run(["git", "reset", "--hard", "HEAD"])
                         subprocess.run(["git", "clean", "-fd"])
                         safe_git_checkout("master")
-                        merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                        merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path, "--run-dir", job_dir_rel])
                         if merge_result.returncode == 0:
                             subprocess.run(["git", "branch", "-D", branch_name], check=True)
                             set_pr_status(current_pr, "closed")
@@ -525,11 +531,11 @@ def main():
                         rejection_count += 1
                         notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                         if rejection_count < 5:
-                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir], start_new_session=True)
+                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                             proc.wait()
                             continue
                         else:
-                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", job_dir_rel], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                             out, err = proc.communicate()
                             class _ArbRes: pass # Reaper safety check: process already reaped or pgid not found
                             arbitrator_result = _ArbRes()
@@ -538,7 +544,7 @@ def main():
                                 subprocess.run(["git", "reset", "--hard", "HEAD"])
                                 subprocess.run(["git", "clean", "-fd"])
                                 safe_git_checkout("master")
-                                merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                                merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path, "--run-dir", job_dir_rel])
                                 if merge_result.returncode == 0:
                                     subprocess.run(["git", "branch", "-D", branch_name], check=True)
                                     set_pr_status(current_pr, "closed")

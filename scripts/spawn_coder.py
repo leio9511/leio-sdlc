@@ -19,7 +19,7 @@ def send_feedback(session_key, message):
     invoke_agent(message, session_key=session_key, role='coder')
     print(f"Sent feedback to session {session_key}")
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id):
-    session_file = os.path.join(workdir, ".coder_session")
+    session_file = os.path.join(workdir, args.run_dir, ".coder_session")
     session_key = f"sdlc_coder_{pr_id}"
     try:
         with open(feedback_file, "r") as f:
@@ -47,6 +47,7 @@ def main():
     parser.add_argument("--system-alert", required=False, help="System alert string (e.g. git status)")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--global-dir", required=False, help="Global directory for playbooks")
+    parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
     workdir = os.path.abspath(args.workdir)
@@ -104,7 +105,7 @@ def main():
             prd_content=prd_content
         )
         
-        session_file = os.path.join(workdir, ".coder_session")
+        session_file = os.path.join(workdir, args.run_dir, ".coder_session")
         session_key = f"sdlc_coder_{pr_id}"
         
         if args.system_alert:
