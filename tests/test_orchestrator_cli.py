@@ -21,13 +21,15 @@ class TestOrchestratorCLI(unittest.TestCase):
     @patch("subprocess.run")
     def test_notify_channel_parsing(self, mock_run):
         import orchestrator
-        orchestrator.notify_channel("slack:channel:C12345", "Test message")
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            orchestrator.notify_channel("slack:channel:C12345", "Test message")
         mock_run.assert_called_with(["openclaw", "message", "send", "--channel", "slack", "-t", "channel:C12345", "-m", "🤖 [SDLC Engine] Test message"], check=False)
 
     @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test"])
     @patch("os.path.exists")
     @patch("subprocess.run")
-    def test_prd_guardrail_untracked(self, mock_run, mock_exists):
+    @patch("orchestrator.parse_affected_projects", return_value=[])
+    def test_prd_guardrail_untracked(self, mock_parse, mock_run, mock_exists):
         # We need to test the PRD guardrail.
         import orchestrator
         import subprocess
@@ -59,7 +61,8 @@ class TestOrchestratorCLI(unittest.TestCase):
     @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test"])
     @patch("os.path.exists")
     @patch("subprocess.run")
-    def test_prd_guardrail_modified(self, mock_run, mock_exists):
+    @patch("orchestrator.parse_affected_projects", return_value=[])
+    def test_prd_guardrail_modified(self, mock_parse, mock_run, mock_exists):
         import orchestrator
         import subprocess
 
@@ -95,7 +98,8 @@ class TestOrchestratorCLI(unittest.TestCase):
     @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep"])
     @patch("os.path.exists")
     @patch("subprocess.run")
-    def test_prd_guardrail_clean(self, mock_run, mock_exists):
+    @patch("orchestrator.parse_affected_projects", return_value=[])
+    def test_prd_guardrail_clean(self, mock_parse, mock_run, mock_exists):
         import orchestrator
         import subprocess
 

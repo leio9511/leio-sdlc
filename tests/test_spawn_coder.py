@@ -22,7 +22,7 @@ class TestSpawnCoder(unittest.TestCase):
         mock_run.return_value = mock_result
 
         key = spawn_coder.openclaw_agent_call("sdlc_coder_PR_001", "test task")
-        
+
         self.assertEqual(key, "sdlc_coder_PR_001")
         mock_run.assert_called_once()
         cmd = mock_run.call_args[0][0]
@@ -42,12 +42,12 @@ class TestSpawnCoder(unittest.TestCase):
     @patch('spawn_coder.build_prompt')
     def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_call, mock_exists):
         mock_build.return_value = "Mocked feedback prompt"
-        
+
         m_open = mock_open(read_data="Fix the bugs.")
         with patch('builtins.open', m_open):
             mock_exists.return_value = True
             is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", "feedback.txt", "task string", "PR_001")
-            
+
             self.assertTrue(is_existing)
             self.assertEqual(key, "sdlc_coder_PR_001")
             mock_call.assert_called_once()
@@ -61,21 +61,22 @@ class TestSpawnCoder(unittest.TestCase):
     @patch('spawn_coder.build_prompt')
     def test_playbook_injection(self, mock_build, mock_exists, mock_agent_call, mock_run):
         mock_build.return_value = "--- CODER PLAYBOOK ---\nplaybook content\nstrictly forbidden from manually editing the markdown file's `status` field"
-        
+    
         # Mocking for the main block
         mock_exists.side_effect = lambda p: True if "playbook" in p or "PR" in p or "PRD" in p else False
-        
+    
         # We need to simulate the sys.argv and call main()
         test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--workdir", "/tmp"]
-        with patch.object(sys, 'argv', test_args):
-            # Also mock git branch check
-            mock_run.return_value.stdout = "feature/test"
-            mock_run.return_value.returncode = 0
-            
-            m_open = mock_open(read_data="playbook content")
-            with patch('builtins.open', m_open):
-                spawn_coder.main()
-            
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            with patch.object(sys, 'argv', test_args):
+                # Also mock git branch check
+                mock_run.return_value.stdout = "feature/test"
+                mock_run.return_value.returncode = 0
+        
+                m_open = mock_open(read_data="playbook content")
+                with patch('builtins.open', m_open):
+                    spawn_coder.main()
+
             # Verify openclaw_agent_call was called with task_string containing playbook
             self.assertTrue(mock_agent_call.called)
             task_string = mock_agent_call.call_args[0][1]

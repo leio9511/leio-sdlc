@@ -18,20 +18,21 @@ class TestNotificationParsing(unittest.TestCase):
             ("C112233", None, "C112233"),
             ("custom:provider:user:123", "custom", "provider:user:123"),
         ]
+    
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            for routing_key, expected_channel, expected_target in test_cases:
+                mock_run.reset_mock()
+                notify_channel(routing_key, "test message")
+        
+                # Extract the actual command passed to subprocess.run
+                called_cmd = mock_run.call_args[0][0]
 
-        for routing_key, expected_channel, expected_target in test_cases:
-            mock_run.reset_mock()
-            notify_channel(routing_key, "test message")
-            
-            # Extract the actual command passed to subprocess.run
-            called_cmd = mock_run.call_args[0][0]
-            
             if expected_channel:
                 self.assertIn("--channel", called_cmd)
                 self.assertEqual(called_cmd[called_cmd.index("--channel") + 1], expected_channel)
             else:
                 self.assertNotIn("--channel", called_cmd)
-            
+
             self.assertIn("-t", called_cmd)
             self.assertEqual(called_cmd[called_cmd.index("-t") + 1], expected_target)
             self.assertIn("-m", called_cmd)

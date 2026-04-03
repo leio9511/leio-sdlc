@@ -56,7 +56,7 @@ class TestScaffolding(unittest.TestCase):
         # Check that the inherited .sdlc_guardrail contains something from the source
         with open(os.path.join(self.mock_workdir, ".sdlc_guardrail"), "r") as f:
             content = f.read()
-            self.assertIn("orchestrator.py", content)
+            self.assertIn(".sdlc_runs/", content)
 
 if __name__ == "__main__":
     unittest.main()

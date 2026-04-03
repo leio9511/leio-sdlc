@@ -42,7 +42,7 @@ class TestOrchestratorLock(unittest.TestCase):
         stdout1, stderr1 = proc1.communicate()
         
         self.assertEqual(proc2.returncode, 1)
-        self.assertIn("[ACTION REQUIRED FOR MANAGER]: Another SDLC pipeline is currently running in this workspace. Concurrent execution is physically blocked by the OS lock. Do NOT retry immediately. Wait for the existing Orchestrator process to finish.", output)
+        self.assertIn("[FATAL] Another SDLC pipeline is currently running. Concurrent execution is blocked.", output)
 
 if __name__ == "__main__":
     unittest.main()

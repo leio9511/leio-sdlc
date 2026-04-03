@@ -278,25 +278,15 @@ def main():
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     workdir = os.path.abspath(args.workdir)
+    dlog(f"Workdir: {workdir}")
     from git_utils import check_git_boundary
     check_git_boundary(workdir)
     initialize_sandbox(workdir)
     global_dir = os.path.dirname(RUNTIME_DIR) if not args.global_dir else os.path.abspath(args.global_dir)
     os.chdir(workdir)
 
-    if args.test_sleep:
-        lock_path = os.path.join(workdir, ".sdlc_repo.lock")
-        with open(lock_path, "w") as f: f.write("locked")
-        time.sleep(2)
-        sys.exit(0)
-
-    affected_projects = parse_affected_projects(args.prd_file)
-    if affected_projects:
-        global_locks, global_fds = acquire_global_locks(affected_projects, workdir)
-    else:
-        global_locks, global_fds = [], []
-
     validate_prd_is_committed(args.prd_file, workdir)
+    dlog("Checking branch guardrail...")
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
         if not os.path.exists(".git"):
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
@@ -308,6 +298,12 @@ def main():
             print(HandoffPrompter.get_prompt("invalid_git_boundary"))
             sys.exit(1)
 
+    affected_projects = parse_affected_projects(args.prd_file)
+    if affected_projects:
+        global_locks, global_fds = acquire_global_locks(affected_projects, workdir)
+    else:
+        global_locks, global_fds = [], []
+
     try:
         lock_path = os.path.join(workdir, ".sdlc_repo.lock")
         lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
@@ -317,6 +313,10 @@ def main():
         print(HandoffPrompter.get_prompt("pipeline_locked"))
         sys.exit(1)
 
+    if args.test_sleep:
+        time.sleep(2)
+        sys.exit(0)
+
     status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
     if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
     if status_output.strip():
@@ -325,35 +325,34 @@ def main():
         sys.exit(1)
 
     effective_channel = args.channel or os.environ.get("OPENCLAW_SESSION_KEY") or os.environ.get("OPENCLAW_CHANNEL_ID")
-    if not effective_channel:
+    if not effective_channel and os.environ.get("SDLC_TEST_MODE") != "true":
         print("[FATAL] Missing channel parameter.")
         print(HandoffPrompter.get_prompt("missing_channel"))
         sys.exit(1)
 
     # --- IGNITION GUARDRAIL ---
-    cmd_handshake = ["openclaw", "message", "send"]
-    if ":" in effective_channel:
-        parts = effective_channel.split(":")
-        if len(parts) >= 2:
-            cmd_handshake.extend(["--channel", parts[0]])
-            cmd_handshake.extend(["-t", ":".join(parts[1:])])
-    else:
-        cmd_handshake.extend(["-t", effective_channel])
-    
-    msg = format_notification("sdlc_handshake", {})
-    cmd_handshake.extend(["-m", msg])
-    
-    if os.environ.get("SDLC_TEST_MODE") != "true":
-        res = subprocess.run(cmd_handshake, capture_output=True, text=True)
-        if res.returncode != 0:
-            print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
-            if res.stderr: print(res.stderr.strip(), file=sys.stderr)
-            print(HandoffPrompter.get_prompt("missing_channel"))
-            sys.exit(1)
+    if effective_channel:
+        cmd_handshake = ["openclaw", "message", "send"]
+        if ":" in effective_channel:
+            parts = effective_channel.split(":")
+            if len(parts) >= 2:
+                cmd_handshake.extend(["--channel", parts[0]])
+                cmd_handshake.extend(["-t", ":".join(parts[1:])])
+        else:
+            cmd_handshake.extend(["-t", effective_channel])
+        
+        msg = format_notification("sdlc_handshake", {})
+        cmd_handshake.extend(["-m", msg])
+        
+        if os.environ.get("SDLC_TEST_MODE") != "true":
+            res = subprocess.run(cmd_handshake, capture_output=True, text=True)
+            if res.returncode != 0:
+                print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
+                if res.stderr: print(res.stderr.strip(), file=sys.stderr)
+                print(HandoffPrompter.get_prompt("missing_channel"))
+                sys.exit(1)
         else:
             print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
-    else:
-        print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
         if "invalid" in effective_channel:
             print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
             print(HandoffPrompter.get_prompt("missing_channel"))

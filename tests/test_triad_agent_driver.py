@@ -5,7 +5,16 @@ import sys
 import tempfile
 import shutil
 
+# Correct paths before any other imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
+# Try to find pm-skill scripts directory
+WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+PM_SKILL_SCRIPTS = os.path.join(WORKSPACE_ROOT, 'skills/pm-skill/scripts')
+if os.path.exists(PM_SKILL_SCRIPTS):
+    sys.path.insert(0, PM_SKILL_SCRIPTS)
+else:
+    # Fallback to relative if somehow root is different
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'skills/pm-skill/scripts')))
 
 from agent_driver import build_prompt
 
@@ -144,7 +153,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         args, kwargs = mock_invoke_agent.call_args
         self.assertEqual(kwargs.get("role"), "manager")
 
-    @patch('pm.invoke_agent')
+    @patch('agent_driver.invoke_agent')
     def test_pm_payload_injection(self, mock_invoke_agent):
         import pm
         

@@ -4,7 +4,15 @@ import tempfile
 import time
 import fcntl
 
-def test_cleanup_quarantine():
+import pytest
+
+@pytest.fixture
+def clean_cwd():
+    orig_cwd = os.getcwd()
+    yield
+    os.chdir(orig_cwd)
+
+def test_cleanup_quarantine(clean_cwd):
     with tempfile.TemporaryDirectory() as td:
         os.chdir(td)
         subprocess.run(["git", "init"], check=True)
@@ -63,7 +71,7 @@ def test_cleanup_quarantine():
         assert not os.path.exists(dummy_lock_2)
         assert not os.path.exists(".sdlc_lock_manifest.json")
 
-def test_cleanup_lock_blocked():
+def test_cleanup_lock_blocked(clean_cwd):
     with tempfile.TemporaryDirectory() as td:
         os.chdir(td)
         lock_path = os.path.join(td, ".sdlc_repo.lock")
