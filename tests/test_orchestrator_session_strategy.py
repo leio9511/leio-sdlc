@@ -31,10 +31,10 @@ def test_missing_workdir():
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
 @patch('fcntl.flock')
-@patch('os.rename')
+@patch('shutil.copytree')
 @patch('orchestrator.open')
 @patch('git_utils.check_git_boundary')
-def test_always_strategy(mock_check_git, mock_open, mock_rename, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def test_always_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
@@ -68,10 +68,10 @@ def test_always_strategy(mock_check_git, mock_open, mock_rename, mock_flock, moc
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
 @patch('fcntl.flock')
-@patch('os.rename')
+@patch('shutil.copytree')
 @patch('orchestrator.open')
 @patch('git_utils.check_git_boundary')
-def test_per_pr_strategy(mock_check_git, mock_open, mock_rename, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def test_per_pr_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
@@ -103,10 +103,10 @@ def test_per_pr_strategy(mock_check_git, mock_open, mock_rename, mock_flock, moc
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
 @patch('fcntl.flock')
-@patch('os.rename')
+@patch('shutil.copytree')
 @patch('orchestrator.open')
 @patch('git_utils.check_git_boundary')
-def test_on_escalation_strategy(mock_check_git, mock_open, mock_rename, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def test_on_escalation_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator

@@ -17,27 +17,33 @@ class TestMasterBranchGuardrail(unittest.TestCase):
             cmd = args[0]
             if isinstance(cmd, list) and cmd == ["git", "branch", "--show-current"]:
                 return MagicMock(stdout="feature/test-branch\n")
+            if isinstance(cmd, list) and cmd == ["git", "rev-parse", "--show-toplevel"]:
+                class Ret:
+                    stdout = os.path.abspath(".")
+                return Ret()
             return MagicMock()
-            
+
         mock_run.side_effect = mock_subprocess_run
-        
+
         env = os.environ.copy()
         if "SDLC_BYPASS_BRANCH_CHECK" in env:
             del env["SDLC_BYPASS_BRANCH_CHECK"]
 
         with patch.dict(os.environ, env):
-            with patch('sys.stdout', new_callable=MagicMock) as mock_stdout:
-                with patch('sys.exit') as mock_exit:
-                    mock_exit.side_effect = SystemExit(1)
-                    with self.assertRaises(SystemExit) as cm:
-                        orchestrator.main()
-                        
-                    self.assertEqual(cm.exception.code, 1)
-                    
-                    # Check the print output
-                    print_calls = mock_stdout.write.call_args_list
-                    output_str = "".join([call[0][0] for call in print_calls])
-                    self.assertIn("[FATAL] Orchestrator must be started from the master branch to prevent nested branch creation.", output_str)
+            test_args = ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"]
+            with patch.object(sys, 'argv', test_args):
+                with patch('sys.stdout', new_callable=MagicMock) as mock_stdout:
+                    with patch('sys.exit') as mock_exit:
+                        mock_exit.side_effect = SystemExit(1)
+                        with self.assertRaises(SystemExit) as cm:
+                            orchestrator.main()
+        
+                        self.assertEqual(cm.exception.code, 1)
+        
+                        # Check the print output
+                        print_calls = mock_stdout.write.call_args_list
+                        output_str = "".join([call[0][0] for call in print_calls])
+                        self.assertIn("Orchestrator must be started from the master", output_str)
 
     @patch('scripts.orchestrator.subprocess.run')
     @patch('utils.singleton_lock.acquire_lock')
@@ -48,11 +54,15 @@ class TestMasterBranchGuardrail(unittest.TestCase):
                 return MagicMock(stdout="master\n")
             if isinstance(cmd, list) and cmd == ["git", "status", "--porcelain"]:
                 return MagicMock(stdout="")
+            if isinstance(cmd, list) and cmd == ["git", "rev-parse", "--show-toplevel"]:
+                class Ret:
+                    stdout = os.path.abspath(".")
+                return Ret()
             return MagicMock(returncode=0)
-            
+
         mock_run.side_effect = mock_subprocess_run
         mock_acquire_lock.side_effect = ConcurrentExecutionError("Simulated lock error to stop execution gracefully after branch check")
-        
+
         env = os.environ.copy()
         if "SDLC_BYPASS_BRANCH_CHECK" in env:
             del env["SDLC_BYPASS_BRANCH_CHECK"]
@@ -66,7 +76,7 @@ class TestMasterBranchGuardrail(unittest.TestCase):
                         mock_exit.side_effect = SystemExit(1)
                         with self.assertRaises(SystemExit) as cm:
                             orchestrator.main()
-                        
+
                         # It should exit due to ConcurrentExecutionError (which prints "[FATAL] Another SDLC pipeline is currently running..."), NOT the branch check.
                         print_calls = mock_stdout.write.call_args_list
                         output_str = "".join([call[0][0] for call in print_calls])
