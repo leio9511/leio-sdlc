@@ -1,38 +1,53 @@
 import sys
 import os
 import unittest
-from unittest.mock import patch, MagicMock
-import io
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
-
-import orchestrator
+import subprocess
 
 class TestDebugCLI(unittest.TestCase):
-    def test_debug_flag_parsing(self):
-        # Test that --debug is parsed correctly
-        test_args = ["orchestrator.py", "--workdir", ".", "--prd-file", "dummy.md", "--debug"]
-        with patch.object(sys, 'argv', test_args):
-            # We don't want to run the whole main, just test parser
-            import argparse
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--workdir", required=True)
-            parser.add_argument("--prd-file", required=True)
-            parser.add_argument("--debug", action="store_true")
-            args = parser.parse_args(test_args[1:])
-            self.assertTrue(args.debug)
+    def setUp(self):
+        self.orchestrator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts", "orchestrator.py"))
 
-    def test_no_debug_flag_parsing(self):
-        # Test that debug is False by default
-        test_args = ["orchestrator.py", "--workdir", ".", "--prd-file", "dummy.md"]
-        with patch.object(sys, 'argv', test_args):
-            import argparse
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--workdir", required=True)
-            parser.add_argument("--prd-file", required=True)
-            parser.add_argument("--debug", action="store_true")
-            args = parser.parse_args(test_args[1:])
-            self.assertFalse(args.debug)
+    def test_debug_flag_produces_trace_output(self):
+        # We expect a debug print (like "DEBUG: Workdir:") if --debug is enabled.
+        # We also pass --enable-exec-from-workspace to bypass the directory check.
+        cmd = [
+            sys.executable, self.orchestrator_path, 
+            "--workdir", ".", 
+            "--prd-file", "missing.md",
+            "--enable-exec-from-workspace",
+            "--debug"
+        ]
+        
+        env = os.environ.copy()
+        if "SDLC_BYPASS_BRANCH_CHECK" in env:
+            del env["SDLC_BYPASS_BRANCH_CHECK"]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        
+        # It should NOT complain about unrecognized arguments.
+        self.assertNotIn("unrecognized arguments: --debug", result.stderr)
+        
+        # It should produce the debug dlog trace.
+        combined_output = result.stdout + result.stderr
+        self.assertIn("DEBUG:", combined_output)
+
+    def test_no_debug_flag_is_silent(self):
+        # Without --debug, the dlog trace should be silent.
+        cmd = [
+            sys.executable, self.orchestrator_path, 
+            "--workdir", ".", 
+            "--prd-file", "missing.md",
+            "--enable-exec-from-workspace"
+        ]
+        
+        env = os.environ.copy()
+        if "SDLC_BYPASS_BRANCH_CHECK" in env:
+            del env["SDLC_BYPASS_BRANCH_CHECK"]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        
+        combined_output = result.stdout + result.stderr
+        self.assertNotIn("DEBUG:", combined_output)
 
 if __name__ == "__main__":
     unittest.main()

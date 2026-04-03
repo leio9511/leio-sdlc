@@ -212,6 +212,9 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     args = parser.parse_args()
 
+    # Store debug mode in the application's configuration state
+    os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
+
     def dlog(msg):
         if args.debug:
             print(f"DEBUG: {msg}")
