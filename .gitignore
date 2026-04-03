@@ -41,3 +41,4 @@ tests/planner_sandbox_*
 .tmp/
 .test_tmp/
 audit_prompt.txt
+.sdlc_runs/
