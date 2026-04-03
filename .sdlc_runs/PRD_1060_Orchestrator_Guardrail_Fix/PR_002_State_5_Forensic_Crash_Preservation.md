@@ -1,4 +1,4 @@
-status: open
+status: in_progress
 
 # PR-002: State 5 Forensic Crash Preservation
 
