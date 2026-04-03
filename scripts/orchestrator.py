@@ -25,6 +25,20 @@ MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
 import json
 
+def dlog(msg):
+    if os.environ.get("SDLC_DEBUG_MODE") == "1":
+        print(f"DEBUG: {msg}")
+
+def drun(cmd, **kwargs):
+    if os.environ.get("SDLC_DEBUG_MODE") == "1":
+        print(f"DEBUG [Subprocess]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+    return subprocess.run(cmd, **kwargs)
+
+def dpopen(cmd, **kwargs):
+    if os.environ.get("SDLC_DEBUG_MODE") == "1":
+        print(f"DEBUG [Subprocess Popen]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+    return subprocess.Popen(cmd, **kwargs)
+
 def parse_affected_projects(prd_file):
     if not os.path.exists(prd_file):
         return []
@@ -120,10 +134,10 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
         cmd.extend(["-m", msg])
         
         if os.environ.get("SDLC_TEST_MODE") == "true":
-            print(f"DEBUG [notify_channel]: {' '.join(cmd)}")
+            dlog(f"[notify_channel]: {' '.join(cmd)}")
             return
             
-        subprocess.run(cmd, check=False)
+        drun(cmd, check=False)
 
 import json
 
@@ -132,17 +146,17 @@ def validate_prd_is_committed(prd_file, workdir):
     prd_path_abs = os.path.abspath(prd_file)
     if os.path.exists(prd_path_abs):
         try:
-            subprocess.run(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
+            drun(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
             print(f"[SDLC Framework] PRD file '{prd_file}' is untracked. Auto-committing for ingestion.")
-            subprocess.run(["git", "add", prd_path_abs], check=True, cwd=workdir)
-            subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD"], check=True, cwd=workdir)
+            drun(["git", "add", prd_path_abs], check=True, cwd=workdir)
+            drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD"], check=True, cwd=workdir)
 
-        status_out = subprocess.run(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
+        status_out = drun(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
             print(f"[SDLC Framework] PRD file '{prd_file}' has uncommitted changes. Auto-committing.")
-            subprocess.run(["git", "add", prd_path_abs], check=True, cwd=workdir)
-            subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD changes"], check=True, cwd=workdir)
+            drun(["git", "add", prd_path_abs], check=True, cwd=workdir)
+            drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD changes"], check=True, cwd=workdir)
 
 def parse_review_verdict(content):
     """
@@ -167,7 +181,7 @@ def trigger_github_sync(workdir, effective_channel, pr_id):
     if os.path.exists(sync_script):
         notify_channel(effective_channel, "Synchronizing code to GitHub...", "github_sync_start", {"pr_id": pr_id})
         try:
-            res = subprocess.run([sys.executable, sync_script, "--project-dir", workdir], capture_output=True, text=True, timeout=120)
+            res = drun([sys.executable, sync_script, "--project-dir", workdir], capture_output=True, text=True, timeout=120)
             if res.returncode == 0:
                 notify_channel(effective_channel, "GitHub sync complete.", "github_sync_complete", {"pr_id": pr_id})
             else:
@@ -215,10 +229,6 @@ def main():
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
 
-    def dlog(msg):
-        if args.debug:
-            print(f"DEBUG: {msg}")
-
     if args.cleanup:
         # 1. Concurrency Guard (Crucial)
         lock_path = os.path.join(args.workdir, ".sdlc_repo.lock")
@@ -231,23 +241,23 @@ def main():
         
         # 2-7. Quarantine logic: Stage, WIP commit, rename, checkout master
         os.chdir(args.workdir)
-        branch_res = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
+        branch_res = drun(["git", "branch", "--show-current"], capture_output=True, text=True)
         branch_output = branch_res.stdout.strip()
         if "/" in branch_output:
             parent_dir_name = branch_output.split('/')[0]
             job_dir_rel = os.path.join('.sdlc_runs', parent_dir_name)
             if os.path.exists(os.path.join(args.workdir, job_dir_rel)):
-                subprocess.run(["git", "add", "-f", job_dir_rel], check=False)
+                drun(["git", "add", "-f", job_dir_rel], check=False)
 
         if branch_output in ["master", "main"]:
             print("Cannot quarantine master/main branch.")
             sys.exit(1)
             
-        subprocess.run(["git", "add", "-A"], check=False)
-        subprocess.run(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+        drun(["git", "add", "-A"], check=False)
+        drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
         timestamp = int(time.time())
-        subprocess.run(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
-        subprocess.run(["git", "checkout", "master"], check=False)
+        drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
+        drun(["git", "checkout", "master"], check=False)
         
         # 8. Targeted Artifact Obliteration (os.remove for daemon locks)
         for lockfile in [".coder_session", ".sdlc_repo.lock"]:
@@ -295,7 +305,7 @@ def main():
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
             print(HandoffPrompter.get_prompt("invalid_git_boundary"))
             sys.exit(1)
-        branch_output = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
+        branch_output = drun(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
         if branch_output not in ["master", "main"]:
             print(f"[FATAL] Orchestrator must be started from the master or main branch. Current: {branch_output}")
             print(HandoffPrompter.get_prompt("invalid_git_boundary"))
@@ -320,8 +330,8 @@ def main():
         time.sleep(2)
         sys.exit(0)
 
-    status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
-    if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
+    status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+    if status_output.strip(): dlog(f"Dirty status detected: {repr(status_output)}")
     if status_output.strip():
         print("[FATAL] Dirty Git Workspace detected!")
         print(HandoffPrompter.get_prompt("dirty_workspace"))
@@ -348,7 +358,7 @@ def main():
         cmd_handshake.extend(["-m", msg])
         
         if os.environ.get("SDLC_TEST_MODE") != "true":
-            res = subprocess.run(cmd_handshake, capture_output=True, text=True)
+            res = drun(cmd_handshake, capture_output=True, text=True)
             if res.returncode != 0:
                 print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
                 if res.stderr: print(res.stderr.strip(), file=sys.stderr)
@@ -380,7 +390,7 @@ def main():
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
-            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], start_new_session=True)
+            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], start_new_session=True)
             proc.wait()
             if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -422,7 +432,7 @@ def main():
                         current_pr = md_file
                         break
             if not current_pr:
-                result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "get_next_pr.py"), "--workdir", workdir, "--job-dir", job_dir], capture_output=True, text=True)
+                result = drun([sys.executable, os.path.join(RUNTIME_DIR, "get_next_pr.py"), "--workdir", workdir, "--job-dir", job_dir], capture_output=True, text=True)
                 output = result.stdout.strip()
                 if "[QUEUE_EMPTY]" in output or not output:
                     print("No open PRs found. Exiting.")
@@ -443,12 +453,12 @@ def main():
             pr_done = False
             while True:
                 if pr_done: break
-                status_result = subprocess.run(["git", "diff", "--cached", "--quiet"])
+                status_result = drun(["git", "diff", "--cached", "--quiet"])
                 if status_result.returncode != 0:
-                    subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
+                    drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
                 print(f"State 2: Checking out branch {branch_name}")
                 try:
-                    branch_check = subprocess.run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
+                    branch_check = drun(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
                     if branch_check.returncode == 0: safe_git_checkout(branch_name)
                     else: safe_git_checkout(branch_name, create=True)
                 except GitCheckoutError as e:
@@ -461,7 +471,7 @@ def main():
                     print(f"State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     try:
-                        proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
+                        proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                         try:
                             proc.wait(timeout=MAX_RUNTIME)
                         except subprocess.TimeoutExpired:
@@ -476,8 +486,8 @@ def main():
                     except subprocess.TimeoutExpired:
                         state_5_trigger = True
                         break
-                    status_output = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
-                    if status_output.strip(): print(f"DEBUG: Dirty status detected: {repr(status_output)}")
+                    status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+                    if status_output.strip(): dlog(f"Dirty status detected: {repr(status_output)}")
                     if status_output.strip():
                         coder_state_file = os.path.join(workdir, ".coder_state.json")
                         dirty_acknowledged = False
@@ -490,7 +500,7 @@ def main():
                             except Exception: pass # Reaper safety check: process already reaped or pgid not found
                         if not dirty_acknowledged:
                             try:
-                                proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
+                                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                                 try:
                                     proc.wait(timeout=MAX_RUNTIME)
                                 except subprocess.TimeoutExpired:
@@ -510,8 +520,8 @@ def main():
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     print(f"State 4: Spawning Reviewer for {current_pr}")
-                    notify_channel(effective_channel, f"Coder submitted changes for {base_filename}. Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", job_dir_rel], start_new_session=True)
+                    notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", job_dir_rel], start_new_session=True)
                     proc.wait()
                     if os.path.exists(review_report_path):
                         with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
@@ -520,12 +530,12 @@ def main():
                     # New Structured JSON Parsing logic
                     verdict = parse_review_verdict(review_content)
                     if verdict == "APPROVED":
-                        subprocess.run(["git", "reset", "--hard", "HEAD"])
-                        subprocess.run(["git", "clean", "-fd"])
+                        drun(["git", "reset", "--hard", "HEAD"])
+                        drun(["git", "clean", "-fd"])
                         safe_git_checkout("master")
-                        merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                        merge_result = drun([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
                         if merge_result.returncode == 0:
-                            subprocess.run(["git", "branch", "-D", branch_name], check=True)
+                            drun(["git", "branch", "-D", branch_name], check=True)
                             set_pr_status(current_pr, "closed")
                             notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
                             trigger_github_sync(workdir, effective_channel, base_filename)
@@ -539,22 +549,22 @@ def main():
                         rejection_count += 1
                         notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                         if rejection_count < 5:
-                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                             proc.wait()
                             continue
                         else:
-                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", job_dir_rel], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", job_dir_rel], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                             out, err = proc.communicate()
                             class _ArbRes: pass # Reaper safety check: process already reaped or pgid not found
                             arbitrator_result = _ArbRes()
                             arbitrator_result.stdout = out
                             if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
-                                subprocess.run(["git", "reset", "--hard", "HEAD"])
-                                subprocess.run(["git", "clean", "-fd"])
+                                drun(["git", "reset", "--hard", "HEAD"])
+                                drun(["git", "clean", "-fd"])
                                 safe_git_checkout("master")
-                                merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
+                                merge_result = drun([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
                                 if merge_result.returncode == 0:
-                                    subprocess.run(["git", "branch", "-D", branch_name], check=True)
+                                    drun(["git", "branch", "-D", branch_name], check=True)
                                     set_pr_status(current_pr, "closed")
                                     notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
                                     trigger_github_sync(workdir, effective_channel, base_filename)
@@ -587,15 +597,15 @@ def main():
 
                     if reset_count == 0:
                         print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
-                        subprocess.run(["git", "reset", "--hard"], check=False)
-                        subprocess.run(["git", "clean", "-fd"], check=False)
+                        drun(["git", "reset", "--hard"], check=False)
+                        drun(["git", "clean", "-fd"], check=False)
                         safe_git_checkout("master")
-                        subprocess.run(["git", "branch", "-D", branch_name], check=False)
+                        drun(["git", "branch", "-D", branch_name], check=False)
                         
                         reset_count += 1
                         continue
                     else:
-                        subprocess.run(["git", "checkout", "master"], check=False)
+                        drun(["git", "checkout", "master"], check=False)
                         
                         # In test mode, we might delete the file or branch. Just skip the slice if we can't find it.
                         if not os.path.exists(current_pr):
@@ -606,7 +616,7 @@ def main():
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                            proc = subprocess.Popen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], start_new_session=True)
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before
