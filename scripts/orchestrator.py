@@ -79,8 +79,9 @@ def set_pr_status(pr_file, new_status):
     updated = re.sub(r'^status:\s*\S+', f'status: {new_status}', content, count=1, flags=re.MULTILINE)
     with open(pr_file, 'w', encoding='utf-8') as f:
         f.write(updated)
-    subprocess.run(["git", "add", pr_file], check=False)
-    subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
+    # PRD 1060: PR status updates are now untracked artifacts to prevent pollution
+    # subprocess.run(["git", "add", pr_file], check=False)
+    # subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
 
 def get_pr_slice_depth(pr_file):
     with open(pr_file, 'r', encoding='utf-8') as f:
@@ -208,7 +209,12 @@ def main():
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass # Reaper safety check: process already reaped or pgid not found the workspace path check")
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
+    parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     args = parser.parse_args()
+
+    def dlog(msg):
+        if args.debug:
+            print(f"DEBUG: {msg}")
 
     if args.cleanup:
         # 1. Concurrency Guard (Crucial)
@@ -515,7 +521,7 @@ def main():
                         subprocess.run(["git", "reset", "--hard", "HEAD"])
                         subprocess.run(["git", "clean", "-fd"])
                         safe_git_checkout("master")
-                        merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path, "--run-dir", job_dir_rel])
+                        merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
                         if merge_result.returncode == 0:
                             subprocess.run(["git", "branch", "-D", branch_name], check=True)
                             set_pr_status(current_pr, "closed")
@@ -544,7 +550,7 @@ def main():
                                 subprocess.run(["git", "reset", "--hard", "HEAD"])
                                 subprocess.run(["git", "clean", "-fd"])
                                 safe_git_checkout("master")
-                                merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path, "--run-dir", job_dir_rel])
+                                merge_result = subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
                                 if merge_result.returncode == 0:
                                     subprocess.run(["git", "branch", "-D", branch_name], check=True)
                                     set_pr_status(current_pr, "closed")
@@ -565,11 +571,17 @@ def main():
                 if state_5_trigger:
                     if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
 
-                    # Forensic Quarantine: Force-add .sdlc_runs/<PR_Name>/ before reset
-                    if os.path.exists(os.path.join(workdir, job_dir_rel)):
-                        print(f"State 5: Archiving forensic artifacts to toxic branch: {job_dir_rel}")
-                        subprocess.run(["git", "add", "-f", job_dir_rel], check=False)
-                        subprocess.run(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 STATE 5 ESCALATION FORENSIC SNAPSHOT"], check=False)
+                    # PRD 1060: Forensic Quarantine: Use shutil.copytree instead of git tracking
+                    job_dir_abs = os.path.join(workdir, job_dir_rel)
+                    if os.path.exists(job_dir_abs):
+                        import shutil
+                        timestamp = int(time.time())
+                        crashed_dir = f"{job_dir_abs}_crashed_{timestamp}"
+                        print(f"State 5: Archiving forensic artifacts to snapshot: {crashed_dir}")
+                        try:
+                            shutil.copytree(job_dir_abs, crashed_dir, dirs_exist_ok=True)
+                        except FileNotFoundError:
+                            pass
 
                     if reset_count == 0:
                         print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")

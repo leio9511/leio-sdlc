@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import pytest
+import time
 from unittest.mock import patch, MagicMock
 
 # Assuming orchestrator is importable or we can test it using subprocess / module import
@@ -23,50 +24,41 @@ def test_missing_workdir():
     assert result.returncode != 0
     assert "the following arguments are required: --workdir" in result.stderr
 
-# We need to test the logic of teardown_coder_session.
-# Let's mock the main loop and verify the calls.
 @patch('orchestrator.teardown_coder_session')
 @patch('orchestrator.subprocess.run')
 @patch('orchestrator.safe_git_checkout')
 @patch('orchestrator.glob.glob')
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
+@patch('fcntl.flock')
+@patch('os.rename')
 @patch('orchestrator.open')
-def test_always_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, mock_safe_git_checkout, mock_subprocess_run, mock_teardown):
+@patch('git_utils.check_git_boundary')
+def test_always_strategy(mock_check_git, mock_open, mock_rename, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
     
-    # Setup mocks
     mock_exists.return_value = True
-    mock_glob.side_effect = [
-        ["dummy_pr.md"], # For checking if has_md
-        ["dummy_pr.md"], # For the main loop
-    ]
-    
+    mock_glob.return_value = ["dummy_pr.md"]
     mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
     
-    # We want it to run one loop and then exit. Let's make coder_result fail to trigger state 5, then exit.
-    def mock_run(*args, **kwargs):
+    def mock_run_impl(*args, **kwargs):
+        if "status" in args[0] and "--porcelain" in args[0]:
+            return MagicMock(stdout="", returncode=0)
+        if "rev-parse" in args[0] and "--abbrev-ref" in args[0]:
+            return MagicMock(stdout="master\n", returncode=0)
         if "spawn_coder.py" in args[0]:
-            mock_run.coder_calls += 1
-            if mock_run.coder_calls > 1:
-                sys.exit(0) # Stop the loop
-            return MagicMock(returncode=1) # Fail, triggers State 5
+            return MagicMock(returncode=1) # Fail once to trigger State 5 path
         return MagicMock(returncode=0)
-        
-    mock_run.coder_calls = 0
-    mock_subprocess_run.side_effect = mock_run
+    mock_run.side_effect = mock_run_impl
     
-    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'always', '--max-runs', '1']):
+    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'always', '--max-prs-to-process', '1']):
         try:
             orchestrator.main()
         except SystemExit:
             pass
             
-    # Under 'always' it should be called inside the retry loop (before spawn_coder.py)
-    # and maybe conditionally in State 5 if on-escalation (but we chose 'always', so State 5 won't call it).
-    # Wait, the prompt said "on-escalation: Call teardown_coder_session(workdir) upon entering State 5". Does that mean ONLY on escalation?
-    # Yes, our code does: `if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)` inside State 5.
-    # So for 'always', it's called in State 3.
     mock_teardown.assert_called_with(os.path.abspath("."))
     
 @patch('orchestrator.teardown_coder_session')
@@ -75,19 +67,28 @@ def test_always_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, 
 @patch('orchestrator.glob.glob')
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
+@patch('fcntl.flock')
+@patch('os.rename')
 @patch('orchestrator.open')
-def test_per_pr_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, mock_safe_git_checkout, mock_subprocess_run, mock_teardown):
+@patch('git_utils.check_git_boundary')
+def test_per_pr_strategy(mock_check_git, mock_open, mock_rename, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
     
     mock_exists.return_value = True
-    mock_glob.side_effect = [
-        ["dummy_pr.md"],
-        ["dummy_pr.md"],
-    ]
-    
+    mock_glob.return_value = ["dummy_pr.md"]
     mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
     
-    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'per-pr', '--max-runs', '1']):
+    def mock_run_impl(*args, **kwargs):
+        if "status" in args[0] and "--porcelain" in args[0]:
+            return MagicMock(stdout="", returncode=0)
+        if "rev-parse" in args[0] and "--abbrev-ref" in args[0]:
+            return MagicMock(stdout="master\n", returncode=0)
+        return MagicMock(returncode=0)
+    mock_run.side_effect = mock_run_impl
+
+    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'per-pr', '--max-prs-to-process', '1']):
         try:
             orchestrator.main()
         except SystemExit:
@@ -101,26 +102,31 @@ def test_per_pr_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, 
 @patch('orchestrator.glob.glob')
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
+@patch('fcntl.flock')
+@patch('os.rename')
 @patch('orchestrator.open')
-def test_on_escalation_strategy(mock_open, mock_set_pr_status, mock_exists, mock_glob, mock_safe_git_checkout, mock_subprocess_run, mock_teardown):
+@patch('git_utils.check_git_boundary')
+def test_on_escalation_strategy(mock_check_git, mock_open, mock_rename, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
     
     mock_exists.return_value = True
-    mock_glob.side_effect = [
-        ["dummy_pr.md"],
-        ["dummy_pr.md"],
-    ]
-    
+    mock_glob.return_value = ["dummy_pr.md"]
     mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
     
-    def mock_run(*args, **kwargs):
+    def mock_run_impl(*args, **kwargs):
+        if "status" in args[0] and "--porcelain" in args[0]:
+            return MagicMock(stdout="", returncode=0)
+        if "rev-parse" in args[0] and "--abbrev-ref" in args[0]:
+            return MagicMock(stdout="master\n", returncode=0)
         if "spawn_coder.py" in args[0]:
             return MagicMock(returncode=1) # Fail to trigger escalation
         return MagicMock(returncode=0)
         
-    mock_subprocess_run.side_effect = mock_run
+    mock_run.side_effect = mock_run_impl
     
-    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--coder-session-strategy', 'on-escalation', '--max-runs', '1']):
+    with patch('sys.argv', ['orchestrator.py', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'on-escalation', '--max-prs-to-process', '1']):
         try:
             orchestrator.main()
         except SystemExit:
