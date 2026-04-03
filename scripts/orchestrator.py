@@ -30,9 +30,17 @@ def dlog(msg):
         print(f"DEBUG: {msg}")
 
 def drun(cmd, **kwargs):
-    if os.environ.get("SDLC_DEBUG_MODE") == "1":
+    debug = os.environ.get("SDLC_DEBUG_MODE") == "1"
+    if debug:
         print(f"DEBUG [Subprocess]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
-    return subprocess.run(cmd, **kwargs)
+    res = subprocess.run(cmd, **kwargs)
+    if debug:
+        print(f"DEBUG [Subprocess Return]: {res.returncode}")
+        if hasattr(res, 'stdout') and isinstance(res.stdout, str) and res.stdout.strip():
+            print(f"DEBUG [Subprocess Stdout]: {res.stdout.strip()}")
+        if hasattr(res, 'stderr') and isinstance(res.stderr, str) and res.stderr.strip():
+            print(f"DEBUG [Subprocess Stderr]: {res.stderr.strip()}")
+    return res
 
 def dpopen(cmd, **kwargs):
     if os.environ.get("SDLC_DEBUG_MODE") == "1":
@@ -381,12 +389,14 @@ def main():
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
         if len(md_files) > 0:
             print("State 0: Existing PRs detected. Resuming queue...")
+            dlog(f"Transitioning to State 0 for PRD {prd_filename} (resuming)")
             notify_channel(effective_channel, "Ignition: Resuming existing queue...", "sdlc_resume", {"prd_id": prd_filename})
     else:
         if args.force_replan and os.path.exists(job_dir):
             import shutil
             shutil.rmtree(job_dir)
         print("State 0: Auto-slicing PRD...")
+        dlog(f"Transitioning to State 0 for PRD {prd_filename} (auto-slicing)")
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
@@ -457,6 +467,7 @@ def main():
                 if status_result.returncode != 0:
                     drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
                 print(f"State 2: Checking out branch {branch_name}")
+                dlog(f"Transitioning to State 2: Checkout branch {branch_name} for PR {current_pr}")
                 try:
                     branch_check = drun(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
                     if branch_check.returncode == 0: safe_git_checkout(branch_name)
@@ -469,6 +480,7 @@ def main():
                 while True:
                     if args.coder_session_strategy == "always": teardown_coder_session(workdir)
                     print(f"State 3: Spawning Coder for {current_pr}")
+                    dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     try:
                         proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
@@ -520,6 +532,7 @@ def main():
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     print(f"State 4: Spawning Reviewer for {current_pr}")
+                    dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
                     proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", job_dir_rel], start_new_session=True)
                     proc.wait()
@@ -590,6 +603,7 @@ def main():
                         timestamp = int(time.time())
                         crashed_dir = f"{job_dir_abs}_crashed_{timestamp}"
                         print(f"State 5: Archiving forensic artifacts to snapshot: {crashed_dir}")
+                        dlog(f"Transitioning to State 5: Archiving crashed dir to {crashed_dir}")
                         try:
                             shutil.copytree(job_dir_abs, crashed_dir, dirs_exist_ok=True)
                         except FileNotFoundError:
@@ -597,6 +611,7 @@ def main():
 
                     if reset_count == 0:
                         print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
+                        dlog(f"State 5 Escalation: Tier 1 reset triggered. Resetting {branch_name}")
                         drun(["git", "reset", "--hard"], check=False)
                         drun(["git", "clean", "-fd"], check=False)
                         safe_git_checkout("master")

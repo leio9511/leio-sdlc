@@ -11,6 +11,11 @@ def test_notify_channel_integration(monkeypatch):
     calls = []
     def mock_run(*args, **kwargs):
         calls.append(args[0])
+        class DummyRes:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return DummyRes()
 
     monkeypatch.setattr(orchestrator.subprocess, 'run', mock_run)
     
