@@ -143,6 +143,7 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
         
         if os.environ.get("SDLC_TEST_MODE") == "true":
             dlog(f"[notify_channel]: {' '.join(cmd)}")
+            print(f"DEBUG [notify_channel]: {msg}")
             return
             
         drun(cmd, check=False)
@@ -206,17 +207,33 @@ def trigger_github_sync(workdir, effective_channel, pr_id):
 def initialize_sandbox(workdir):
     exclude_path = os.path.join(workdir, ".git", "info", "exclude")
     if os.path.exists(os.path.dirname(exclude_path)):
-        # Check if already excluded
-        already_excluded = False
+        artifacts = [
+            ".sdlc_runs/",
+            "Review_Report.md",
+            "current_review.diff",
+            "recent_history.diff",
+            "current_arbitration.diff",
+            ".coder_session",
+            ".coder_state.json",
+            "build_preflight.log",
+            ".tmp/"
+        ]
+        
+        existing_content = ""
         if os.path.exists(exclude_path):
             with open(exclude_path, "r") as f:
-                if ".sdlc_runs/" in f.read():
-                    already_excluded = True
+                existing_content = f.read()
         
-        if not already_excluded:
+        new_entries = []
+        for artifact in artifacts:
+            if artifact not in existing_content:
+                new_entries.append(artifact)
+        
+        if new_entries:
             with open(exclude_path, "a") as f:
-                f.write("\n.sdlc_runs/\n")
-            print(f"Initialized local sandbox: added .sdlc_runs/ to .git/info/exclude")
+                for entry in new_entries:
+                    f.write(f"\n{entry}\n")
+            print(f"Initialized local sandbox: added {', '.join(new_entries)} to .git/info/exclude")
 
 def main():
     parser = argparse.ArgumentParser()
