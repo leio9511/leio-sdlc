@@ -254,9 +254,7 @@ def main():
 
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
-    import logging
-    from setup_logging import setup_orchestrator_logger
-    logger = setup_orchestrator_logger(args.workdir, args.debug)
+
 
     if args.cleanup:
         # 1. Concurrency Guard (Crucial)
@@ -328,6 +326,9 @@ def main():
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     workdir = os.path.abspath(args.workdir)
+    import logging
+    from setup_logging import setup_orchestrator_logger
+    logger = setup_orchestrator_logger(workdir, args.debug)
     dlog(f"Workdir: {workdir}")
     from git_utils import check_git_boundary
     check_git_boundary(workdir)

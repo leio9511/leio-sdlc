@@ -22,6 +22,7 @@ git commit -m "init" > /dev/null 2>&1
 
 mkdir -p .sdlc_runs/dummy_prd scripts
 cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
+cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
 cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
 cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/

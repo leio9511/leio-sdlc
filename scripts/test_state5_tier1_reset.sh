@@ -29,6 +29,7 @@ INNER_EOF
     
     # Copy essential scripts
     cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
+cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
     cp "${PROJECT_ROOT}/config/prompts.json" config/
     cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
