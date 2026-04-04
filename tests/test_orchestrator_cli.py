@@ -12,6 +12,18 @@ if not hasattr(git_utils, 'check_git_boundary'):
 
 class TestOrchestratorCLI(unittest.TestCase):
     @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"])
+    def test_missing_force_replan_exits(self):
+        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+            with self.assertRaises(SystemExit) as cm:
+                import orchestrator
+                orchestrator.main()
+            self.assertNotEqual(cm.exception.code, 0)
+            
+            # verify output contains the expected fatal error string
+            output = "".join([call.args[0] for call in mock_stdout.write.call_args_list])
+            self.assertIn("[FATAL] Missing required parameter: --force-replan", output)
+
     def test_missing_workdir_exits(self):
         with self.assertRaises(SystemExit) as cm:
             import orchestrator

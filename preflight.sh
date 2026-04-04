@@ -62,6 +62,9 @@ cd "$PROJECT_DIR" || exit 1
     echo "Running Orchestrator Missing Channel Test..."
     bash scripts/test_missing_channel.sh
 
+    echo "Running Orchestrator Missing Force-Replan Test..."
+    bash scripts/test_missing_force_replan.sh
+
     echo "Running Orchestrator GitHub Sync Test..."
     bash scripts/test_github_sync_integration.sh
 
