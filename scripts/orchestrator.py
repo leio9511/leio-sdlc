@@ -273,8 +273,6 @@ def main():
         if "/" in branch_output:
             parent_dir_name = branch_output.split('/')[0]
             job_dir_rel = os.path.join('.sdlc_runs', parent_dir_name)
-            if os.path.exists(os.path.join(args.workdir, job_dir_rel)):
-                drun(["git", "add", "-f", job_dir_rel], check=False)
 
         if branch_output in ["master", "main"]:
             print("Cannot quarantine master/main branch.")
