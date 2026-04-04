@@ -32,7 +32,7 @@ class TestMasterBranchGuardrail(unittest.TestCase):
             del env["SDLC_BYPASS_BRANCH_CHECK"]
 
         with patch.dict(os.environ, env, clear=True):
-            test_args = ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"]
+            test_args = ["orchestrator.py", "--force-replan", "true", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"]
             with patch.object(sys, 'argv', test_args):
                 with patch('sys.stdout', new_callable=MagicMock) as mock_stdout:
                     with patch('sys.exit') as mock_exit:
@@ -69,7 +69,7 @@ class TestMasterBranchGuardrail(unittest.TestCase):
         if "SDLC_BYPASS_BRANCH_CHECK" in env:
             del env["SDLC_BYPASS_BRANCH_CHECK"]
 
-        test_args = ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"]
+        test_args = ["orchestrator.py", "--force-replan", "true", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"]
 
         with patch.dict(os.environ, env, clear=True):
             with patch.object(sys, 'argv', test_args):

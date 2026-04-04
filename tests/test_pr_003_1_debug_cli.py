@@ -12,7 +12,7 @@ class TestDebugCLI(unittest.TestCase):
         # We also pass --enable-exec-from-workspace to bypass the directory check.
         cmd = [
             sys.executable, self.orchestrator_path, 
-            "--workdir", ".", 
+            "--force-replan", "true", "--workdir", ".", 
             "--prd-file", "missing.md",
             "--enable-exec-from-workspace",
             "--debug"
@@ -35,7 +35,7 @@ class TestDebugCLI(unittest.TestCase):
         # Without --debug, the dlog trace should be silent.
         cmd = [
             sys.executable, self.orchestrator_path, 
-            "--workdir", ".", 
+            "--force-replan", "true", "--workdir", ".", 
             "--prd-file", "missing.md",
             "--enable-exec-from-workspace"
         ]
