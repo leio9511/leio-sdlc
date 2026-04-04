@@ -463,9 +463,6 @@ def main():
             pr_done = False
             while True:
                 if pr_done: break
-                status_result = drun(["git", "diff", "--cached", "--quiet"])
-                if status_result.returncode != 0:
-                    drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(planner): auto-generated PR contracts"], check=True)
                 print(f"State 2: Checking out branch {branch_name}")
                 dlog(f"Transitioning to State 2: Checkout branch {branch_name} for PR {current_pr}")
                 try:

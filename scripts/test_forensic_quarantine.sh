@@ -127,7 +127,7 @@ echo "✅ --cleanup forensic quarantine verified."
 # 4. Verify forensic tracking during State 5 Escalation
 echo "Testing State 5 Escalation forensic quarantine..."
 # We already ran the orchestrator earlier, check its log
-if ! grep -q "State 5: Archiving forensic artifacts to toxic branch" orchestrator.log; then
+if ! grep -q "State 5: Archiving forensic artifacts to snapshot:" orchestrator.log; then
     echo "❌ Orchestrator did not log forensic archiving in State 5."
     exit 1
 fi
