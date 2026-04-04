@@ -1,6 +1,6 @@
 #!/bin/bash
 # test_runtime_boundary_blocked.sh
-# Executes orchestrator.py WITHOUT --enable-exec-from-workspace.
+# Executes orchestrator.py --force-replan true WITHOUT --enable-exec-from-workspace.
 # Must verify exit code is 1 and error message is correct.
 
 SCRIPT_DIR=$(dirname "$0")

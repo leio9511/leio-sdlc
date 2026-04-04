@@ -81,7 +81,7 @@ echo "DEBUG: git status before orchestrator"
 git status
 # Run Orchestrator
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
-SDLC_BYPASS_BRANCH_CHECK=1 python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --channel "valid:id" --workdir "$(pwd)" --global-dir "$PROJECT_ROOT" --prd-file dummy_prd.md --max-prs-to-process 2 --coder-session-strategy always > orchestrator.log 2>&1 || true
+SDLC_BYPASS_BRANCH_CHECK=1 python3 scripts/orchestrator.py --force-replan false --enable-exec-from-workspace --channel "valid:id" --channel "valid:id" --workdir "$(pwd)" --global-dir "$PROJECT_ROOT" --prd-file dummy_prd.md --max-prs-to-process 2 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
 # Assertions
 echo "--- Orchestrator Log ---"

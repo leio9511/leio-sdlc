@@ -241,7 +241,7 @@ def main():
     parser.add_argument("--prd-file", required=True)
     parser.add_argument("--max-prs-to-process", type=int, default=50)
     parser.add_argument("--coder-session-strategy", default="on-escalation", choices=["always", "per-pr", "on-escalation"])
-    parser.add_argument("--force-replan", action="store_true")
+    parser.add_argument("--force-replan", choices=["true", "false"], default=None, help="只有明确的知道是要继续同一个prd的执行，保留原有的pr，继续完成未完成的pr，才把force-replan设成false。如果明确的是要重新执行一个prd，比如在prd更新之后，或者在prd的sdlc执行已经被明确的完全revert之后，就应该把force-replan设成true。如果不确定应该是true还是false，应该停下来征求boss的意见。")
     parser.add_argument("--channel", help="Notification channel")
     parser.add_argument("--global-dir", help="Global workspace path")
     parser.add_argument("--test-sleep", action="store_true")
@@ -308,6 +308,14 @@ def main():
                 print(f"[Warning] Failed to clean up manifest locks: {e}")
 
         sys.exit(0)
+
+    if not args.test_sleep and getattr(args, "force_replan", None) is None:
+        print("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.")
+        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        sys.exit(1)
+
+    if getattr(args, "force_replan", None) is not None:
+        args.force_replan = (args.force_replan == "true")
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:
         print("[FATAL] Security Violation: This skill is executing from a restricted source directory. For your safety, execution is blocked unless authorized via --enable-exec-from-workspace.")

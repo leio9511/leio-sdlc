@@ -1,6 +1,6 @@
 #!/bin/bash
 # test_runtime_boundary_allowed.sh
-# Executes orchestrator.py WITH --enable-exec-from-workspace.
+# Executes orchestrator.py --force-replan true WITH --enable-exec-from-workspace.
 # Must bypass path check and not print the security violation error.
 
 SCRIPT_DIR=$(dirname "$0")

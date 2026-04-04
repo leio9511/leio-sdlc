@@ -42,7 +42,7 @@ export SDLC_TEST_MODE=true
 
 # Run orchestrator
 set +e
-OUTPUT=$(python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$TEST_DIR" --prd-file "dummy.md" --max-runs 1 2>&1)
+OUTPUT=$(python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$TEST_DIR" --prd-file "dummy.md" --max-runs 1 2>&1)
 set -e
 
 if echo "$OUTPUT" | grep -q "HIJACKED_CODER"; then

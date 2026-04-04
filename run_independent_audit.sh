@@ -14,7 +14,7 @@ If this design fails or misses edge cases, the entire CI/CD pipeline breaks.
 
 STEPS:
 1. Thoroughly analyze PRD-1021 v3.
-2. Cross-reference it against the current orchestrator.py and spawn_coder.py logic.
+2. Cross-reference it against the current orchestrator.py --force-replan true and spawn_coder.py logic.
 3. Perform a devastatingly critical analysis. Look for:
    - Hidden Git lock conflicts or race conditions during concurrent runs.
    - Path resolution issues (e.g., orchestrator vs sandbox paths).
@@ -25,7 +25,7 @@ DELIVERABLE: Output a detailed "Architectural Audit Report". Do not hold back. B
 --- PRD-1021 v3 ---
 $PRD_CONTENT
 
---- orchestrator.py ---
+--- orchestrator.py --force-replan true ---
 $ORCH_CONTENT
 
 --- spawn_coder.py ---

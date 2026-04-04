@@ -82,7 +82,7 @@ export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
 git add -A && git commit -m "clean state" > /dev/null 2>&1
 
 # This run will fail and trigger State 5
-python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --global-dir "$PROJECT_ROOT" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --global-dir "$PROJECT_ROOT" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
 echo "--- Orchestrator Log ---"
 cat orchestrator.log
@@ -108,7 +108,7 @@ echo "✅ git clean -fd safety verified."
 echo "Testing --cleanup forensic quarantine..."
 git checkout -b "dummy_prd/feature" > /dev/null 2>&1
 echo "dirty" > .sdlc_runs/dummy_prd/crash_artifact.txt
-python3 scripts/orchestrator.py --cleanup --workdir "$(pwd)" --prd-file dummy_prd.md > cleanup.log 2>&1
+python3 scripts/orchestrator.py --force-replan true --cleanup --workdir "$(pwd)" --prd-file dummy_prd.md > cleanup.log 2>&1
 
 echo "Checking quarantined branch..."
 QUARANTINE_BRANCH=$(git branch --list "dummy_prd/feature_crashed_*" | head -n 1 | sed 's/[* ]//g')

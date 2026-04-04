@@ -89,7 +89,7 @@ INNER_EOF
 chmod +x ~/.openclaw/skills/leio-github-sync/scripts/sync.py
 
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
-SDLC_TEST_MODE=true python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_happy.log 2>&1 || true
+SDLC_TEST_MODE=true python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_happy.log 2>&1 || true
 
 if ! grep -q "Synchronizing code to GitHub..." orchestrator_happy.log; then
     echo "Happy path failed: Did not log 'Synchronizing code to GitHub...'"
@@ -149,7 +149,7 @@ INNER_EOF
 chmod +x ~/.openclaw/skills/leio-github-sync/scripts/sync.py
 
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
-SDLC_TEST_MODE=true python3 scripts/orchestrator.py --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_fail.log 2>&1 || true
+SDLC_TEST_MODE=true python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_fail.log 2>&1 || true
 
 if ! grep -q "Synchronizing code to GitHub..." orchestrator_fail.log; then
     echo "Failure path failed: Did not log 'Synchronizing code to GitHub...'"
