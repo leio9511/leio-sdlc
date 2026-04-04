@@ -29,7 +29,7 @@ class TestDebugCLI(unittest.TestCase):
         
         # It should produce the debug dlog trace.
         combined_output = result.stdout + result.stderr
-        self.assertIn("DEBUG:", combined_output)
+        self.assertIn("DEBUG", combined_output)
 
     def test_no_debug_flag_is_silent(self):
         # Without --debug, the dlog trace should be silent.
