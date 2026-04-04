@@ -38,6 +38,8 @@ The Orchestrator, PM, and Auditor MUST remain three distinct, independent tools 
 - [ ] When fully deployed to `~/.openclaw/skills/`, executing `pm.py` or `prd_auditor.py` from any directory successfully loads the driver and config without relative import crashes.
 
 ## 5. Framework Modifications (框架修改声明)
+- `skills/leio-auditor/SKILL.md` (modified)
+- `skills/pm-skill/SKILL.md` (modified)
 - `skills/leio-auditor/scripts/prd_auditor.sh` (deleted)
 - `skills/leio-auditor/scripts/prd_auditor.py` (created)
 - `skills/pm-skill/scripts/pm.py` (modified)
