@@ -9,11 +9,14 @@ def format_notification(event_type: str, context: dict) -> str:
         if len(parts) >= 2:
             prd_match = f"prd-{parts[1]}"
             
+    import re
     pr_match = pr_id
-    if pr_id.lower().startswith("pr"):
-        parts = pr_id.split('_')
-        if len(parts) >= 2:
-            pr_match = f"pr-{parts[1]}"
+    # Extract PR prefix (case-insensitive) followed by underscores and digits/underscores
+    match = re.search(r'^(?i:pr_)([\d_]+)', pr_id)
+    if match:
+        # Align regex comment with PRD-1063 for clarity
+        extracted = match.group(1).rstrip('_')
+        pr_match = f"pr-{extracted.replace('_', '-')}"
 
     if event_type == "sdlc_resume":
         return f"🚀 1. [{prd_match}] SDLC 恢复执行..."
@@ -28,7 +31,7 @@ def format_notification(event_type: str, context: dict) -> str:
         branch = context.get('branch', 'unknown')
         return f"🔄 [{pr_match}] 切换分支：{branch}"
     elif event_type == "coder_start":
-        return f"👨‍💻 4. [{pr_match}] Coder 运行中..."
+        return f"👨💻 4. [{pr_match}] Coder 运行中..."
     elif event_type == "review_start":
         return f"🧐 5. [{pr_match}] Coder 结束，Review 中..."
     elif event_type == "review_result":

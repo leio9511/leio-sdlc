@@ -1,3 +1,4 @@
+import re
 #!/usr/bin/env python3
 import argparse
 import tempfile
@@ -9,15 +10,16 @@ import time
 from pathlib import Path
 def extract_pr_id(pr_file_path):
     basename = os.path.basename(pr_file_path)
-    if basename.startswith("PR_"):
-        parts = basename.split("_")
-        if len(parts) >= 2:
-            return f"PR_{parts[1]}"
+    # Match PR prefix followed by digits and underscores (e.g. PR_003_1)
+    match = re.search(r'^(PR_[\d_]+)', basename, re.IGNORECASE)
+    if match:
+        return match.group(1).rstrip('_')
     return basename.split(".")[0]
 def openclaw_agent_call(session_key, message, workdir='.'):
     cmd = [
         "openclaw",
         "agent",
+        "--local",
         "--session-id",
         session_key,
         "--message",

@@ -12,6 +12,8 @@ class TestSpawnCoder(unittest.TestCase):
     def test_extract_pr_id(self):
         self.assertEqual(spawn_coder.extract_pr_id("docs/PR_001_Test.md"), "PR_001")
         self.assertEqual(spawn_coder.extract_pr_id("PR_123_Something.md"), "PR_123")
+        self.assertEqual(spawn_coder.extract_pr_id("PR_003_1_Fix.md"), "PR_003_1")
+        self.assertEqual(spawn_coder.extract_pr_id("PR_003_1_2_Something.md"), "PR_003_1_2")
         self.assertEqual(spawn_coder.extract_pr_id("NoPrefix.md"), "NoPrefix")
 
     @patch('spawn_coder.subprocess.run')
@@ -26,8 +28,8 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertEqual(key, "sdlc_coder_PR_001")
         mock_run.assert_called_once()
         cmd = mock_run.call_args[0][0]
-        self.assertEqual(cmd[:5], ["openclaw", "agent", "--session-id", "sdlc_coder_PR_001", "--message"])
-        self.assertEqual(cmd[5], "test task")
+        self.assertEqual(cmd[:6], ["openclaw", "agent", "--local", "--session-id", "sdlc_coder_PR_001", "--message"])
+        self.assertEqual(cmd[6], "test task")
         for arg in cmd:
             self.assertNotIn("sessions_spawn", arg)
             self.assertNotIn("sessions_send", arg)

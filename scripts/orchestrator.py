@@ -479,20 +479,22 @@ def main():
                     print(f"State 3: Spawning Coder for {current_pr}")
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                     try:
-                        proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
-                        try:
-                            proc.wait(timeout=MAX_RUNTIME)
-                        except subprocess.TimeoutExpired:
-                            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                            raise
-                        class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
-                        coder_result = _CoderRes()
-                        coder_result.returncode = proc.returncode
-                        if coder_result.returncode != 0:
-                            state_5_trigger = True
-                            break
+                        proc.wait(timeout=MAX_RUNTIME)
                     except subprocess.TimeoutExpired:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                        try:
+                            proc.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                            proc.wait()
+                        state_5_trigger = True
+                        break
+                    class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
+                    coder_result = _CoderRes()
+                    coder_result.returncode = proc.returncode
+                    if coder_result.returncode != 0:
                         state_5_trigger = True
                         break
                     status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
@@ -508,20 +510,22 @@ def main():
                                     if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
                             except Exception: pass # Reaper safety check: process already reaped or pgid not found
                         if not dirty_acknowledged:
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
                             try:
-                                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
-                                try:
-                                    proc.wait(timeout=MAX_RUNTIME)
-                                except subprocess.TimeoutExpired:
-                                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                                    raise
-                                class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
-                                coder_result = _CoderRes()
-                                coder_result.returncode = proc.returncode
-                                if coder_result.returncode != 0:
-                                    state_5_trigger = True
-                                    break
+                                proc.wait(timeout=MAX_RUNTIME)
                             except subprocess.TimeoutExpired:
+                                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                                try:
+                                    proc.wait(timeout=10)
+                                except subprocess.TimeoutExpired:
+                                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                                    proc.wait()
+                                state_5_trigger = True
+                                break
+                            class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
+                            coder_result = _CoderRes()
+                            coder_result.returncode = proc.returncode
+                            if coder_result.returncode != 0:
                                 state_5_trigger = True
                                 break
                             continue

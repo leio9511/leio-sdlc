@@ -19,7 +19,7 @@ def test_format_slicing_end():
 
 def test_format_coder_start():
     res = format_notification("coder_start", {"pr_id": "PR_001_test.md"})
-    assert res == "👨‍💻 4. [pr-001] Coder 运行中..."
+    assert res == "👨💻 4. [pr-001] Coder 运行中..."
 
 def test_format_review_start():
     res = format_notification("review_start", {"pr_id": "PR_001_test.md"})
@@ -28,3 +28,11 @@ def test_format_review_start():
 def test_format_review_result():
     res = format_notification("review_result", {"pr_id": "PR_001_test.md", "result": "LGTM"})
     assert res == "📝 6. [pr-001] Review 结果：LGTM"
+
+def test_format_coder_start_microsliced():
+    res = format_notification("coder_start", {"pr_id": "PR_003_1_Fix.md"})
+    assert res == "👨💻 4. [pr-003-1] Coder 运行中..."
+
+def test_format_coder_start_microsliced_complex():
+    res = format_notification("coder_start", {"pr_id": "PR_003_1_2_Fix_Something.md"})
+    assert res == "👨💻 4. [pr-003-1-2] Coder 运行中..."
