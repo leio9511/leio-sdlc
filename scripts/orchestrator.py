@@ -26,25 +26,26 @@ MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 import json
 
 def dlog(msg):
-    if os.environ.get("SDLC_DEBUG_MODE") == "1":
-        print(f"DEBUG: {msg}")
+    import logging
+    logger = logging.getLogger("sdlc_orchestrator")
+    logger.debug(msg)
 
 def drun(cmd, **kwargs):
-    debug = os.environ.get("SDLC_DEBUG_MODE") == "1"
-    if debug:
-        print(f"DEBUG [Subprocess]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+    import logging
+    logger = logging.getLogger("sdlc_orchestrator")
+    logger.debug(f"DEBUG [Subprocess]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     res = subprocess.run(cmd, **kwargs)
-    if debug:
-        print(f"DEBUG [Subprocess Return]: {res.returncode}")
-        if hasattr(res, 'stdout') and isinstance(res.stdout, str) and res.stdout.strip():
-            print(f"DEBUG [Subprocess Stdout]: {res.stdout.strip()}")
-        if hasattr(res, 'stderr') and isinstance(res.stderr, str) and res.stderr.strip():
-            print(f"DEBUG [Subprocess Stderr]: {res.stderr.strip()}")
+    logger.debug(f"DEBUG [Subprocess Return]: {res.returncode}")
+    if hasattr(res, 'stdout') and isinstance(res.stdout, str) and res.stdout.strip():
+        logger.debug(f"DEBUG [Subprocess Stdout]: {res.stdout.strip()}")
+    if hasattr(res, 'stderr') and isinstance(res.stderr, str) and res.stderr.strip():
+        logger.debug(f"DEBUG [Subprocess Stderr]: {res.stderr.strip()}")
     return res
 
 def dpopen(cmd, **kwargs):
-    if os.environ.get("SDLC_DEBUG_MODE") == "1":
-        print(f"DEBUG [Subprocess Popen]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+    import logging
+    logger = logging.getLogger("sdlc_orchestrator")
+    logger.debug(f"DEBUG [Subprocess Popen]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     return subprocess.Popen(cmd, **kwargs)
 
 def parse_affected_projects(prd_file):
@@ -253,6 +254,9 @@ def main():
 
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
+    import logging
+    from setup_logging import setup_orchestrator_logger
+    logger = setup_orchestrator_logger(args.workdir, args.debug)
 
     if args.cleanup:
         # 1. Concurrency Guard (Crucial)
@@ -413,14 +417,14 @@ def main():
     if os.path.exists(job_dir) and not args.force_replan:
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
         if len(md_files) > 0:
-            print("State 0: Existing PRs detected. Resuming queue...")
+            logger.info("State 0: Existing PRs detected. Resuming queue...")
             dlog(f"Transitioning to State 0 for PRD {prd_filename} (resuming)")
             notify_channel(effective_channel, "Ignition: Resuming existing queue...", "sdlc_resume", {"prd_id": prd_filename})
     else:
         if args.force_replan and os.path.exists(job_dir):
             import shutil
             shutil.rmtree(job_dir)
-        print("State 0: Auto-slicing PRD...")
+        logger.info("State 0: Auto-slicing PRD...")
         dlog(f"Transitioning to State 0 for PRD {prd_filename} (auto-slicing)")
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
@@ -460,15 +464,21 @@ def main():
             md_files = glob.glob(os.path.join(job_dir, "*.md"))
             md_files.sort()
             current_pr = None
+            logger.debug(f"Scanning job_dir: {job_dir}")
+            logger.debug(f"Found md_files: {md_files}")
             for md_file in md_files:
                 with open(md_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if re.search(r'^status:\s*in_progress', content, re.MULTILINE):
+                    file_content = f.read()
+                    first_50 = file_content[:50].replace('\n', '\\n')
+                    match = re.search(r'^status:\s*in_progress', file_content, re.MULTILINE)
+                    logger.debug(f"Scanning {md_file}: start='{first_50}', in_progress={bool(match)}")
+                    if match:
                         current_pr = md_file
                         break
             if not current_pr:
                 result = drun([sys.executable, os.path.join(RUNTIME_DIR, "get_next_pr.py"), "--workdir", workdir, "--job-dir", job_dir], capture_output=True, text=True)
                 output = result.stdout.strip()
+                logger.debug(f"get_next_pr.py exit_code={result.returncode}, output='{output}'")
                 if "[QUEUE_EMPTY]" in output or not output:
                     print("No open PRs found. Exiting.")
                     print(HandoffPrompter.get_prompt("happy_path"))
@@ -488,7 +498,7 @@ def main():
             pr_done = False
             while True:
                 if pr_done: break
-                print(f"State 2: Checking out branch {branch_name}")
+                logger.info(f"State 2: Checking out branch {branch_name}")
                 dlog(f"Transitioning to State 2: Checkout branch {branch_name} for PR {current_pr}")
                 try:
                     branch_check = drun(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"])
@@ -501,7 +511,7 @@ def main():
                 state_5_trigger = False
                 while True:
                     if args.coder_session_strategy == "always": teardown_coder_session(workdir)
-                    print(f"State 3: Spawning Coder for {current_pr}")
+                    logger.info(f"State 3: Spawning Coder for {current_pr}")
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
@@ -557,7 +567,7 @@ def main():
                     review_artifact = os.path.join(job_dir_rel, "Review_Report.md")
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
-                    print(f"State 4: Spawning Reviewer for {current_pr}")
+                    logger.info(f"State 4: Spawning Reviewer for {current_pr}")
                     dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
                     proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", job_dir_rel], start_new_session=True)
@@ -628,7 +638,7 @@ def main():
                         import shutil
                         timestamp = int(time.time())
                         crashed_dir = f"{job_dir_abs}_crashed_{timestamp}"
-                        print(f"State 5: Archiving forensic artifacts to snapshot: {crashed_dir}")
+                        logger.info(f"State 5: Archiving forensic artifacts to snapshot: {crashed_dir}")
                         dlog(f"Transitioning to State 5: Archiving crashed dir to {crashed_dir}")
                         try:
                             shutil.copytree(job_dir_abs, crashed_dir, dirs_exist_ok=True)
