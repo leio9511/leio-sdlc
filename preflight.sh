@@ -78,6 +78,12 @@ cd "$PROJECT_DIR" || exit 1
 
     echo "Running Cleanup Quarantine Test..."
     python3 tests/test_cleanup_flag.py
+    echo "Running PR-004 Rollback Tests..."
+    python3 tests/test_pr_004_rollback.py
+    echo "Running Deploy Backup Tests..."
+    python3 tests/test_deploy_backup.py
+    echo "Running Kit Deploy Tests..."
+    python3 tests/test_kit_deploy.py
 ) > "$LOG_FILE" 2>&1
 # ---------------------------------------------
 
