@@ -1,6 +1,6 @@
 #!/bin/bash
 export SDLC_TEST_MODE=true
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SANDBOX_DIR=$(mktemp -d)
 mkdir -p "$SANDBOX_DIR/bin"
 cat << 'INNER_EOF' > "$SANDBOX_DIR/bin/openclaw"

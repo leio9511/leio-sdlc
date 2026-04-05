@@ -4,7 +4,7 @@ set -e
 
 # scripts/test_state5_tier1_reset.sh - Test for PR-002
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 function setup_sandbox() {
     sandbox_dir=$(mktemp -d)

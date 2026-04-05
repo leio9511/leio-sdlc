@@ -7,6 +7,11 @@
 PROJECT_DIR=$(dirname "$0")
 TMP_TEST_LOG=$(mktemp)
 
+RUN_E2E=0
+if [[ "$1" == "--e2e-test" ]]; then
+    RUN_E2E=1
+fi
+
 echo "[$(date '+%H:%M:%S')] Starting Smart Preflight Checks..."
 
 cd "$PROJECT_DIR" || exit 1
@@ -37,16 +42,21 @@ run_test() {
     ((TOTAL_PASSED++))
 }
 
+run_e2e_test() {
+    local cmd="$1"
+    local desc="$2"
+    
+    if ! eval "$cmd" > /dev/null 2>&1; then
+        echo "[E2E WARNING] $desc failed. Continuing."
+    else
+        ((TOTAL_PASSED++))
+    fi
+}
+
 shopt -s nullglob
 
 # 1. Bash Tests Discovery
-# To maintain hermetic execution, we filter out heavy/flaky E2E tests and mocks.
 for f in scripts/test_*.sh; do
-    case "$(basename "$f")" in
-        test_agent_driver_gemini.sh|test_blue_green_deploy.sh|test_cuj_*.sh|test_e2e_*.sh|test_ignition_guardrail.sh|test_kanban_runner.sh|test_secure_prompt.sh|test_state5_tier1_reset.sh|test_triad_planner.sh|test_git_boundary.sh|test_forensic_quarantine.sh|test_preflight_guardrails.sh|test_reviewer_artifact_guardrail.sh)
-            continue
-            ;;
-    esac
     run_test "bash $f" "Bash Test: $f"
 done
 
@@ -68,6 +78,13 @@ if [ -f "package.json" ] && grep -q '"test"' package.json; then
 else
     for f in scripts/test_*.js; do
         run_test "node $f" "Node.js Test: $f"
+    done
+fi
+
+# 4. E2E Tests
+if [ $RUN_E2E -eq 1 ]; then
+    for f in scripts/e2e/e2e_test_*.sh; do
+        run_e2e_test "bash $f" "$(basename "$f")"
     done
 fi
 

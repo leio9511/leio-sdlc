@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SANDBOX_DIR=$(mktemp -d)
 
 cd "$SANDBOX_DIR"

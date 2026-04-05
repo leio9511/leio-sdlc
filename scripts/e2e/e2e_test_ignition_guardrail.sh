@@ -3,7 +3,7 @@ set -e
 
 # test_ignition_guardrail.sh - Verify that the orchestrator enforces the Initial Handshake
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TEST_DIR=$(mktemp -d)
 cd "$TEST_DIR"
 

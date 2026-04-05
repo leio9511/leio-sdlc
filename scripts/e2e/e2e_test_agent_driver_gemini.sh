@@ -14,7 +14,7 @@ echo "Running Isolated E2E Test for Gemini Driver"
 echo "Model: $TEST_MODEL"
 echo "==========================================="
 
-PROJECT_DIR=$(dirname $(dirname $(realpath $0)))
+PROJECT_DIR=$(dirname $(dirname $(dirname $(realpath $0))))
 
 # Create a temporary python test script to invoke agent_driver
 TEST_SCRIPT=$(mktemp)
