@@ -77,9 +77,6 @@ def main():
     with open(file_path, "w") as f:
         f.write(content)
 
-    import subprocess
-    subprocess.run(["git", "add", "-f", file_path], check=True)
-
     print(f"[PR_CREATED] {file_path}")
 
 if __name__ == "__main__":

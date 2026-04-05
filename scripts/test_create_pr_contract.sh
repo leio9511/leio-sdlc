@@ -8,6 +8,11 @@ rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
+# Initialize a git repo to test tracking
+cd "$WORK_DIR"
+git init > /dev/null 2>&1
+cd - > /dev/null 2>&1
+
 TEST_DIR="$WORK_DIR/test_queue_dir"
 mkdir -p "$TEST_DIR"
 
@@ -54,5 +59,19 @@ OUTPUT6=$(python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$TEST_DIR" --t
 echo "$OUTPUT6" | grep -q "\[PR_CREATED\]" || { echo "❌ Expected [PR_CREATED] output with --project"; exit 1; }
 FILE6=$(echo "$OUTPUT6" | awk '{print $2}')
 if [[ "$FILE6" != *"/PR_004_Project_PR.md" ]]; then echo "❌ Wrong filename for project test: $FILE6"; exit 1; fi
+
+# Check Git tracking (Ensure NO git add was performed)
+cd "$WORK_DIR"
+UNTRACKED=$(git ls-files --others --exclude-standard)
+if ! echo "$UNTRACKED" | grep -q "test_queue_dir/PR_001_First_PR.md"; then
+  echo "❌ Error: PR_001_First_PR.md is not untracked. It was likely staged by the script."
+  exit 1
+fi
+STAGED=$(git ls-files --cached)
+if echo "$STAGED" | grep -q "test_queue_dir/PR_001_First_PR.md"; then
+  echo "❌ Error: PR_001_First_PR.md was staged in git index."
+  exit 1
+fi
+cd - > /dev/null 2>&1
 
 echo "✅ test_create_pr_contract.sh PASSED"
