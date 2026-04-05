@@ -95,6 +95,7 @@ def build_prompt(role, **kwargs):
     # but that will always find leio-sdlc/config/prompts.json first if agent_driver is shared.
     
     # To support dual source, let's check sys.argv[0] directory first
+
     caller_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
     local_config_path = os.path.join(caller_dir, "..", "config", "prompts.json")
     
