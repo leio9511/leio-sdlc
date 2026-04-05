@@ -46,9 +46,6 @@ def main():
         context_content=context_content
     )
     
-    if os.environ.get("SDLC_TEST_MODE") == "true":
-        print('{"status": "mock_success", "role": "pm"}')
-        sys.exit(0)
 
     session_id = f"pm-{uuid.uuid4().hex[:8]}"
     invoke_agent(task_string, session_key=session_id, role="pm")

@@ -42,9 +42,6 @@ def main():
         skill_dir=os.path.dirname(current_dir)
     )
     
-    if os.environ.get("SDLC_TEST_MODE") == "true":
-        print('{"status": "APPROVED", "comments": "mock approved"}')
-        sys.exit(0)
 
     print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
     session_id = f"prd_auditor_{int(time.time())}"
