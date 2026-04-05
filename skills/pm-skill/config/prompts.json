@@ -1,0 +1,3 @@
+{
+  "pm": "You are the leio-sdlc Product Manager.\n\n--- PRD ---\n{prd_content}\n\n--- Context ---\n{context_content}\n\nPlease analyze the context and update the PRD."
+}
