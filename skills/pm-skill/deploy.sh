@@ -1,48 +1,56 @@
 #!/bin/bash
-# ==========================================
-# BOOTSTRAP: DEPLOYMENT SCRIPT (v0.0.1)
-# ==========================================
-# Promotes pm-skill from workspace to runtime.
+set -e
+SLUG="pm-skill"
+HOME_DIR="${HOME_MOCK:-$HOME}"
+OPENCLAW_DIR="$HOME_DIR/.openclaw"
+SKILLS_DIR="$OPENCLAW_DIR/skills"
+RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+PROD_DIR="$SKILLS_DIR/$SLUG"
 
-DEV_DIR="/root/.openclaw/workspace/projects/pm-skill"
-PROD_DIR="/root/.openclaw/skills/pm-skill"
-
-RUN_TESTS=false
-DRY_RUN=false
-
+NO_RESTART=false
 for arg in "$@"; do
     case $arg in
-        --preflight)
-        RUN_TESTS=true
-        DRY_RUN=true
+        --no-restart)
+        NO_RESTART=true
         shift
         ;;
     esac
 done
 
-echo "[$(date '+%H:%M:%S')] Starting deployment flow: $DEV_DIR -> $PROD_DIR"
+echo "Deploying $SLUG..."
+mkdir -p "$SKILLS_DIR"
+mkdir -p "$RELEASES_DIR"
+RELEASE_ID=$(date +"%Y%m%d_%H%M%S")
 
-# 1. Optional Safety Check (Only runs if --preflight is passed)
-if [ "$RUN_TESTS" = true ]; then
-    echo "🧪 Running Preflight Preflight Checks..."
-    bash "$DEV_DIR/preflight.sh"
-    if [ $? -ne 0 ]; then
-        echo "❌ PREFLIGHT FAILED: CUJ test suite failed."
-        exit 1
+if [ -e "$PROD_DIR" ]; then
+    if [ -L "$PROD_DIR" ]; then
+        rm -f "$PROD_DIR"
+    else
+        tar -czf "$RELEASES_DIR/backup_${RELEASE_ID}.tar.gz" -C "$SKILLS_DIR" "$SLUG"
     fi
-    echo "✅ PREFLIGHT PASSED."
-else
-    echo "⚠️ Skipping Preflight Checks (run with --preflight to enable)"
 fi
 
-if [ "$DRY_RUN" = true ]; then
-    echo "🛑 Dry run (--preflight) active. Exiting before actual deployment."
-    exit 0
+TMP_DIR="$SKILLS_DIR/.tmp_$SLUG"
+OLD_DIR="$SKILLS_DIR/.old_$SLUG"
+rm -rf "$TMP_DIR" "$OLD_DIR"
+mkdir -p "$TMP_DIR"
+
+# Stage the skill directory
+rsync -a --exclude=.git --exclude=__pycache__ skills/$SLUG/ "$TMP_DIR/"
+
+# Package dependencies from monorepo root
+mkdir -p "$TMP_DIR/scripts"
+cp scripts/agent_driver.py "$TMP_DIR/scripts/"
+
+if [ -e "$PROD_DIR" ]; then
+    mv "$PROD_DIR" "$OLD_DIR"
 fi
+mv -T "$TMP_DIR" "$PROD_DIR"
+rm -rf "$OLD_DIR"
 
-# 2. Sync Files
-bash "$DEV_DIR/scripts/build_release.sh" || exit 1
-mkdir -p "$PROD_DIR"
-cp -r "$DEV_DIR/dist/"* "$PROD_DIR/"
+ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
 
-echo "✅ DEPLOYMENT SUCCESS: pm-skill v0.0.1 is now live."
+echo "✅ $SLUG deployed."
+if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
+    openclaw gateway restart || true
+fi

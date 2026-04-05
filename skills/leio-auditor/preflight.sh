@@ -13,8 +13,8 @@ if ! command -v openclaw &> /dev/null; then
 fi
 
 # Check script health
-if [ ! -f "$PROJECT_DIR/scripts/prd_auditor.sh" ]; then
-    echo "❌ FAILED: scripts/prd_auditor.sh is missing."
+if [ ! -f "$PROJECT_DIR/scripts/prd_auditor.py" ]; then
+    echo "❌ FAILED: scripts/prd_auditor.py is missing."
     exit 1
 fi
 

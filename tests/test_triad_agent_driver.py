@@ -8,7 +8,7 @@ import shutil
 # Correct paths before any other imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
 # Try to find pm-skill scripts directory
-WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PM_SKILL_SCRIPTS = os.path.join(WORKSPACE_ROOT, 'skills/pm-skill/scripts')
 if os.path.exists(PM_SKILL_SCRIPTS):
     sys.path.insert(0, PM_SKILL_SCRIPTS)

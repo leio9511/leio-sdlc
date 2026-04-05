@@ -1,106 +1,56 @@
 #!/bin/bash
 set -e
+SLUG="leio-auditor"
+HOME_DIR="${HOME_MOCK:-$HOME}"
+OPENCLAW_DIR="$HOME_DIR/.openclaw"
+SKILLS_DIR="$OPENCLAW_DIR/skills"
+RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+PROD_DIR="$SKILLS_DIR/$SLUG"
 
-# ==========================================
-# BOOTSTRAP: DEPLOYMENT SCRIPT (leio-auditor)
-# ==========================================
-# Hard Copy (Physical Sync) with Atomic Renaming
+NO_RESTART=false
+for arg in "$@"; do
+    case $arg in
+        --no-restart)
+        NO_RESTART=true
+        shift
+        ;;
+    esac
+done
 
-perform_hard_copy_deployment() {
-    local SLUG=$(basename "$PWD")
-    local HOME_DIR="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_DIR="$HOME_DIR/.openclaw"
-    local SKILLS_DIR="$OPENCLAW_DIR/skills"
-    local RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
-    local PROD_DIR="$SKILLS_DIR/$SLUG"
+echo "Deploying $SLUG..."
+mkdir -p "$SKILLS_DIR"
+mkdir -p "$RELEASES_DIR"
+RELEASE_ID=$(date +"%Y%m%d_%H%M%S")
 
-    local RUN_TESTS=false
-    local DRY_RUN=false
-
-    for arg in "$@"; do
-        case $arg in
-            --preflight)
-            RUN_TESTS=true
-            DRY_RUN=true
-            shift
-            ;;
-        esac
-    done
-
-    echo "[$(date '+%H:%M:%S')] Starting hard-copy deployment flow for $SLUG"
-
-    if [ "$RUN_TESTS" = true ]; then
-        echo "🧪 Running Preflight Checks..."
-        bash "preflight.sh"
-        if [ $? -ne 0 ]; then
-            echo "❌ PREFLIGHT FAILED: check failed."
-            exit 1
-        fi
-        echo "✅ PREFLIGHT PASSED."
-    fi
-
-    if [ "$DRY_RUN" = true ]; then
-        echo "🛑 Dry run (--preflight) active. Exiting before actual deployment."
-        exit 0
-    fi
-
-    # 1. Build release
-    mkdir -p dist
-    cp -r SKILL.md scripts/ dist/
-
-    mkdir -p "$SKILLS_DIR"
-    mkdir -p "$RELEASES_DIR"
-
-    local RELEASE_ID=$(date +"%Y%m%d_%H%M%S")
-
-    # 1. Backup Existing
-    if [ -e "$PROD_DIR" ]; then
-        echo "📦 Backing up existing installation..."
-        if [ -L "$PROD_DIR" ]; then
-            echo "⚠️ Target is a symlink, removing it instead of backing up."
-            rm -f "$PROD_DIR"
-        else
-            tar -czf "$RELEASES_DIR/backup_${RELEASE_ID}.tar.gz" -C "$SKILLS_DIR" "$SLUG"
-        fi
-    fi
-
-    # 2. Stage New Code
-    echo "🚀 Staging new release..."
-    local TMP_DIR="$SKILLS_DIR/.tmp_$SLUG"
-    local OLD_DIR="$SKILLS_DIR/.old_$SLUG"
-
-    rm -rf "$TMP_DIR"
-    rm -rf "$OLD_DIR"
-    mkdir -p "$TMP_DIR"
-
-    if [ -d "dist" ] && [ "$(ls -A dist 2>/dev/null)" ]; then
-        cp -a dist/* "$TMP_DIR/"
+if [ -e "$PROD_DIR" ]; then
+    if [ -L "$PROD_DIR" ]; then
+        rm -f "$PROD_DIR"
     else
-        rsync -a --exclude=.git --exclude=dist --exclude=node_modules . "$TMP_DIR/"
+        tar -czf "$RELEASES_DIR/backup_${RELEASE_ID}.tar.gz" -C "$SKILLS_DIR" "$SLUG"
     fi
+fi
 
-    # 3. Atomic Swap
-    echo "🔄 Performing atomic directory swap (hard copy)..."
-    if [ -e "$PROD_DIR" ]; then
-        mv "$PROD_DIR" "$OLD_DIR"
-    fi
-    mv -T "$TMP_DIR" "$PROD_DIR"
-    rm -rf "$OLD_DIR"
+TMP_DIR="$SKILLS_DIR/.tmp_$SLUG"
+OLD_DIR="$SKILLS_DIR/.old_$SLUG"
+rm -rf "$TMP_DIR" "$OLD_DIR"
+mkdir -p "$TMP_DIR"
 
-    # 4. Auto-Cleanup
-    echo "🧹 Pruning old backups..."
-    ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
+# Stage the skill directory
+rsync -a --exclude=.git --exclude=__pycache__ skills/$SLUG/ "$TMP_DIR/"
 
-    echo "✅ DEPLOYMENT SUCCESS: $SLUG is now live via hard-copy swap."
+# Package dependencies from monorepo root
+mkdir -p "$TMP_DIR/scripts"
+cp scripts/agent_driver.py "$TMP_DIR/scripts/"
 
-    # 5. GitHub Auto-Sync (PRD-035)
-    # Skipping sync for new projects until remote is set up
+if [ -e "$PROD_DIR" ]; then
+    mv "$PROD_DIR" "$OLD_DIR"
+fi
+mv -T "$TMP_DIR" "$PROD_DIR"
+rm -rf "$OLD_DIR"
 
-    # 6. Gateway Reload (MUST BE THE FINAL STEP)
-    if [ -z "$HOME_MOCK" ]; then
-        echo "🔄 Restarting OpenClaw gateway..."
-        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
-    fi
-}
+ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
 
-perform_hard_copy_deployment "$@"
+echo "✅ $SLUG deployed."
+if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
+    openclaw gateway restart || true
+fi

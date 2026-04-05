@@ -24,6 +24,10 @@ perform_hard_copy_deployment() {
             DRY_RUN=true
             shift
             ;;
+            --no-restart)
+            NO_RESTART=true
+            shift
+            ;;
         esac
     done
 
@@ -111,7 +115,7 @@ perform_hard_copy_deployment() {
     fi
 
     # 7. Gateway Reload (MUST BE THE FINAL STEP)
-    if [ -z "$HOME_MOCK" ]; then
+    if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
         echo "🔄 Restarting OpenClaw gateway..."
         openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
     fi

@@ -83,37 +83,33 @@ def invoke_agent(task_string, session_key=None, role=None):
     return None
 
 def build_prompt(role, **kwargs):
-    # Try local skill config first if we are inside a skill
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Heuristic: if we are in a deployed skill directory, scripts/ is one level down
-    # Or if we are in the monorepo, we might be running from skills/<skill_name>/scripts/
-    # The safest is to let the caller pass config_path or we infer it.
-    
-    # For now, let's look for config/prompts.json relative to the caller's directory.
-    # Actually, simpler: search up the tree from the current file for config/prompts.json
-    # but that will always find leio-sdlc/config/prompts.json first if agent_driver is shared.
-    
-    # To support dual source, let's check sys.argv[0] directory first
-
-    caller_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-    local_config_path = os.path.join(caller_dir, "..", "config", "prompts.json")
+    # Support dual-source prompt loading
+    import inspect
+    caller_frame = inspect.currentframe().f_back
+    caller_file = caller_frame.f_globals.get('__file__') if caller_frame else sys.argv[0]
+    caller_dir = os.path.dirname(os.path.abspath(caller_file))
+    local_config_path = os.path.normpath(os.path.join(caller_dir, "..", "config", "prompts.json"))
     
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     global_config_path = os.path.join(base_dir, "config", "prompts.json")
     
-    template = ""
+    print(f""); template = ""
     if os.path.exists(local_config_path):
         with open(local_config_path, "r") as f:
-            prompts = json.load(f)
-            template = prompts.get(role, "")
-            
-    if not template and os.path.exists(global_config_path):
+            try:
+                prompts = json.load(f)
+                template = prompts.get(role, "")
+            except Exception:
+                pass
+                
+    if not template and os.path.exists(global_config_path) and global_config_path != local_config_path:
         with open(global_config_path, "r") as f:
-            prompts = json.load(f)
-            template = prompts.get(role, "")
-            
+            try:
+                prompts = json.load(f)
+                template = prompts.get(role, "")
+            except Exception:
+                pass
+                
     for k, v in kwargs.items():
         template = template.replace(f"{{{k}}}", str(v))
     return template
-
