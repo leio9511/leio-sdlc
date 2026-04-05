@@ -16,6 +16,11 @@ If it doesn't exist, use the fallback: `/root/.openclaw/workspace/TEMPLATES/PRD.
 
 You MUST adhere to the exact structure, headers, and format defined in that template. DO NOT hallucinate your own structure.
 
+## Invocation (Command Template)
+To generate or update a PRD, use the `exec` tool to run the following python command:
+
+`python3 ~/.openclaw/skills/pm-skill/pm.py --prd <path_to_prd.md> --context "<context_description>"`
+
 ## Framework Modification Declaration (CRITICAL)
 If the user's request involves modifying any protected SDLC Framework scripts (e.g., `orchestrator.py`, `spawn_planner.py`, `merge_code.py`), you MUST add a new section to the PRD called `## Framework Modifications`. 
 In this section, explicitly list the exact absolute or relative paths of all framework scripts that the Coder is allowed to modify. This is required to pass the Reviewer's anti-tamper guardrail.

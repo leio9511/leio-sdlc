@@ -5,10 +5,7 @@ bash deploy.sh --no-restart
 
 for skill_deploy_script in skills/*/deploy.sh; do
     if [ -f "$skill_deploy_script" ]; then
-        (
-            cd "$(dirname "$skill_deploy_script")"
-            bash "$(basename "$skill_deploy_script")" --no-restart
-        )
+        bash "$skill_deploy_script" --no-restart
     fi
 done
 
