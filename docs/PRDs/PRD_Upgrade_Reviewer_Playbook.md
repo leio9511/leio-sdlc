@@ -1,6 +1,6 @@
 ---
 Affected_Projects: [leio-sdlc]
-status: open
+status: closed
 ---
 
 # PRD: Upgrade_Reviewer_Playbook

@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1074] Upgrade Reviewer Playbook**: Integrated IADF-ADE 7 Key Focus Areas and structured findings into the SDLC Reviewer template using a Zero-Blast-Radius approach.
 - [x] **[ISSUE-1013] Planner Tech Lead Upgrade**: Upgraded Planner persona to Architect, integrated Target Working Set & TDD Blueprint blackbox testing logic into PR templates, preventing explicit file path hallucination.
 - [x] **[ISSUE-1050] PRD-1050 v9: Universal Agent Adaptation**: Natively support Gemini via openclaw CLI, implement agent_driver abstraction, JIT filesystem guardrails, and isolated integration tests (removed network calls from preflight).
 - [x] **[ISSUE-1052] SDLC Init and Isolated Runs**: Successfully implemented `.sdlc_runs` artifact isolation, `.gitignore` guardrail fixes, and forensic quarantine tracking (State 5 `git add -f`).
