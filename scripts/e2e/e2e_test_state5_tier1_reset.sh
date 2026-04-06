@@ -48,9 +48,12 @@ function run_test() {
     # Create a dummy PRD
     echo "dummy prd" > docs/PRDs/TestProject.md
     
-    # Create a PR in docs/PRs/TestProject/
-    mkdir -p docs/PRs/TestProject
-    cat << 'INNER_EOF' > docs/PRs/TestProject/PR_001_Test.md
+    export MOCK_GLOBAL_DIR=$(mktemp -d)
+    # Create a PR in the global run dir
+    PROJECT_NAME=$(basename "$sandbox_dir")
+    RUN_DIR="$MOCK_GLOBAL_DIR/.sdlc_runs/$PROJECT_NAME/TestProject"
+    mkdir -p "$RUN_DIR"
+    cat << 'INNER_EOF' > "$RUN_DIR/PR_001_Test.md"
 status: open
 slice_depth: 0
 INNER_EOF
@@ -59,7 +62,9 @@ INNER_EOF
     cat << 'INNER_EOF' > scripts/spawn_coder.py
 import sys, subprocess, os
 # Simulate a coder that leaves the workspace dirty but fails
-with open("dirty_file.txt", "w") as f:
+if not os.path.exists("run_once.txt"):
+    with open("run_once.txt", "w") as f: f.write("1")
+    with open("dirty_file.txt", "w") as f:
     f.write("I am dirty")
 sys.exit(1)
 INNER_EOF
@@ -86,10 +91,11 @@ INNER_EOF
     # 4. Perform Tier 1 Reset (git reset --hard, git clean -fd)
     # 5. Succeed checkout master
     
+    # Use a mock global dir
     echo "Starting orchestrator..."
     # We use a temporary log file so we don't pollute the git status of the sandbox if it checks it
     git status
-    python3 scripts/orchestrator.py --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
     mv ../orchestrator.log orchestrator.log
 
     # Assertions
@@ -119,10 +125,26 @@ INNER_EOF
 
     if [ -f "dirty_file.txt" ]; then
         echo "❌ FAILED: dirty_file.txt still exists. Clean failed."
+        cat orchestrator.log
         exit 1
     fi
 
-    echo "✅ PASS: State 5 Tier 1 Reset successfully cleaned workspace and avoided checkout error."
+    # Project basename is evaluated to the sandbox_dir name
+    PROJECT_NAME=$(basename "$sandbox_dir")
+    RUN_DIR="$MOCK_GLOBAL_DIR/.sdlc_runs/$PROJECT_NAME"
+
+    if [ ! -d "$RUN_DIR" ]; then
+        echo "❌ FAILED: Global run directory $RUN_DIR does not exist."
+        exit 1
+    fi
+
+    # Explicitly check that git info exclude does NOT contain .sdlc_runs/
+    if grep -q "\.sdlc_runs/" .git/info/exclude 2>/dev/null; then
+        echo "❌ FAILED: .git/info/exclude contains .sdlc_runs/, it should not."
+        exit 1
+    fi
+
+    echo "✅ PASS: State 5 Tier 1 Reset successfully cleaned workspace and preserved Control Plane state."
 }
 
 run_test
