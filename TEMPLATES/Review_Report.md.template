@@ -11,11 +11,9 @@
 ## Summary
 (Provide a brief summary of the changes)
 
-## Details
-(Provide detailed feedback, noting any issues or specific approvals)
-
-## Feedback & Action Items
-- (List actionable items or feedback here)
+## Structured Findings
+(List any findings in the following format. Ensure you check against the 7 Key Focus Areas: Plan Alignment, Correctness, Test Coverage, Readability, Architecture, Efficiency, Security)
+- `<Severity> | <Category> | <File> | <Issue> | <Recommendation>`
 
 ## Security & Redline Checks
 - [ ] No hardcoded secrets
