@@ -11,6 +11,7 @@ import re
 def main():
     parser = argparse.ArgumentParser(description="Spawn Planner Agent")
     parser.add_argument("--prd-file", required=True, help="Path to the PRD file")
+    parser.add_argument("--run-dir", required=False, default=None, help="Absolute path to the isolated execution directory")
     parser.add_argument("--out-dir", required=False, default=None, help="Output directory for PRs")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--slice-failed-pr", required=False, default=None, help="Path to a failed PR file to slice")
@@ -21,7 +22,9 @@ def main():
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
 
-    if args.out_dir is None:
+    if args.run_dir is not None:
+        args.out_dir = args.run_dir
+    elif args.out_dir is None:
         # Dynamically compute job directory from PRD filename
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)

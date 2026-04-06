@@ -265,7 +265,7 @@ def main():
         branch_output = branch_res.stdout.strip()
         if "/" in branch_output:
             parent_dir_name = branch_output.split('/')[0]
-            job_dir_rel = os.path.join('.sdlc_runs', parent_dir_name)
+            run_dir = os.path.join('.sdlc_runs', parent_dir_name)
 
         if branch_output in ["master", "main"]:
             print("Cannot quarantine master/main branch.")
@@ -405,7 +405,7 @@ def main():
     base_name, _ = os.path.splitext(prd_filename)
     target_project_name = os.path.basename(os.path.abspath(workdir))
     job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
-    job_dir_rel = job_dir
+    run_dir = job_dir
 
     if os.path.exists(job_dir) and not args.force_replan:
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
@@ -422,7 +422,7 @@ def main():
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
-            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir], start_new_session=True)
+            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
             proc.wait()
             if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -507,7 +507,7 @@ def main():
                     logger.info(f"State 3: Spawning Coder for {current_pr}")
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
-                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
                     try:
                         proc.wait(timeout=MAX_RUNTIME)
                     except subprocess.TimeoutExpired:
@@ -538,7 +538,7 @@ def main():
                                     if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
                             except Exception: pass # Reaper safety check: process already reaped or pgid not found
                         if not dirty_acknowledged:
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
                             try:
                                 proc.wait(timeout=MAX_RUNTIME)
                             except subprocess.TimeoutExpired:
@@ -557,13 +557,13 @@ def main():
                                 state_5_trigger = True
                                 break
                             continue
-                    review_artifact = os.path.join(job_dir_rel, "Review_Report.md")
+                    review_artifact = os.path.join(run_dir, "Review_Report.md")
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     logger.info(f"State 4: Spawning Reviewer for {current_pr}")
                     dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", job_dir_rel], start_new_session=True)
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True)
                     proc.wait()
                     if os.path.exists(review_report_path):
                         with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
@@ -591,11 +591,11 @@ def main():
                         rejection_count += 1
                         notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                         if rejection_count < 5:
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", job_dir_rel], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
                             proc.wait()
                             continue
                         else:
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", job_dir_rel], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", run_dir], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                             out, err = proc.communicate()
                             class _ArbRes: pass # Reaper safety check: process already reaped or pgid not found
                             arbitrator_result = _ArbRes()
@@ -626,7 +626,7 @@ def main():
                     if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
 
                     # PRD 1060: Forensic Quarantine: Use shutil.copytree instead of git tracking
-                    job_dir_abs = os.path.join(workdir, job_dir_rel)
+                    job_dir_abs = run_dir
                     if os.path.exists(job_dir_abs):
                         import shutil
                         timestamp = int(time.time())
@@ -660,7 +660,7 @@ def main():
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before

@@ -43,7 +43,7 @@ def main():
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
     invoke_agent(task_string, session_key=session_id, role='arbitrator')
 
-    report_path = os.path.join(workdir, args.run_dir, "arbitration_report.txt")
+    report_path = os.path.join(args.run_dir, "arbitration_report.txt")
     if os.path.exists(report_path):
         with open(report_path, "r") as f:
             content = f.read()
