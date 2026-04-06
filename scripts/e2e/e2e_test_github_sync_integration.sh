@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 export SDLC_TEST_MODE=true
-export SDLC_GLOBAL_RUN_BASE="$(pwd)/.sdlc_runs"
+
+MOCK_GLOBAL="/tmp/mock_global_github"
+export SDLC_GLOBAL_RUN_BASE="$MOCK_GLOBAL/.sdlc_runs"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -17,13 +19,14 @@ function setup_sandbox() {
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
-    mkdir -p .sdlc_runs/dummy_prd
+    RUN_DIR="$MOCK_GLOBAL/.sdlc_runs/dummy_prd"
+    mkdir -p "$RUN_DIR"
     mkdir -p docs/PRDs
     echo "# Dummy PRD" > docs/PRDs/dummy_prd.md
     
     mkdir -p scripts config
     cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
-cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
+    cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
     cp "${PROJECT_ROOT}/config/prompts.json" config/
     cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
@@ -46,15 +49,15 @@ cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
 }
 
 echo "=== Testing GitHub Sync Happy Path ==="
+rm -rf "$MOCK_GLOBAL"
 setup_sandbox
 
 # Create mock PR
-cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
+cat << 'INNER_EOF' > "$RUN_DIR/PR_001_Test.md"
 status: open
 slice_depth: 0
 # PR-001
 INNER_EOF
-git add . && git commit -m "mock PR" >/dev/null
 
 cat << 'INNER_EOF' > scripts/spawn_coder.py
 import sys, os
@@ -62,9 +65,9 @@ os.system("echo 'changes' > dummy.txt")
 os.system("git add . && git commit -m 'changes' >/dev/null 2>&1")
 sys.exit(0)
 INNER_EOF
-cat << 'INNER_EOF' > scripts/spawn_reviewer.py
+cat << INNER_EOF > scripts/spawn_reviewer.py
 import sys, os
-with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
+with open("$RUN_DIR/Review_Report.md", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "Looks good"}\n```')
 sys.exit(0)
 INNER_EOF
@@ -90,7 +93,8 @@ INNER_EOF
 chmod +x ~/.openclaw/skills/leio-github-sync/scripts/sync.py
 
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
-SDLC_TEST_MODE=true python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_happy.log 2>&1 || true
+export SDLC_GLOBAL_RUN_BASE="$MOCK_GLOBAL/.sdlc_runs"
+SDLC_TEST_MODE=true python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL" --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_happy.log 2>&1 || true
 
 if ! grep -q "Synchronizing code to GitHub..." orchestrator_happy.log; then
     echo "Happy path failed: Did not log 'Synchronizing code to GitHub...'"
@@ -107,15 +111,15 @@ echo "✅ Happy path passed."
 
 
 echo "=== Testing GitHub Sync Failure Path ==="
+rm -rf "$MOCK_GLOBAL"
 setup_sandbox
 
 # Create mock PR
-cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
+cat << 'INNER_EOF' > "$RUN_DIR/PR_001_Test.md"
 status: open
 slice_depth: 0
 # PR-001
 INNER_EOF
-git add . && git commit -m "mock PR" >/dev/null
 
 cat << 'INNER_EOF' > scripts/spawn_coder.py
 import sys, os
@@ -123,9 +127,9 @@ os.system("echo 'changes' > dummy.txt")
 os.system("git add . && git commit -m 'changes' >/dev/null 2>&1")
 sys.exit(0)
 INNER_EOF
-cat << 'INNER_EOF' > scripts/spawn_reviewer.py
+cat << INNER_EOF > scripts/spawn_reviewer.py
 import sys, os
-with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
+with open("$RUN_DIR/Review_Report.md", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "Looks good"}\n```')
 sys.exit(0)
 INNER_EOF
@@ -150,7 +154,8 @@ INNER_EOF
 chmod +x ~/.openclaw/skills/leio-github-sync/scripts/sync.py
 
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
-SDLC_TEST_MODE=true python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_fail.log 2>&1 || true
+export SDLC_GLOBAL_RUN_BASE="$MOCK_GLOBAL/.sdlc_runs"
+SDLC_TEST_MODE=true python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL" --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator_fail.log 2>&1 || true
 
 if ! grep -q "Synchronizing code to GitHub..." orchestrator_fail.log; then
     echo "Failure path failed: Did not log 'Synchronizing code to GitHub...'"

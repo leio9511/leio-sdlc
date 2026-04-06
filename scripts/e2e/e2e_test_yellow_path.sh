@@ -19,6 +19,11 @@ git config user.name "E2E Test"
 git config user.email "e2e@example.com"
 git commit --allow-empty -m "init"
 
+MOCK_GLOBAL="/tmp/mock_global_yellow"
+RUN_DIR="$MOCK_GLOBAL/.sdlc_runs/dummy_prd"
+export SDLC_GLOBAL_RUN_BASE="$MOCK_GLOBAL/.sdlc_runs"
+mkdir -p "$RUN_DIR"
+
 # 2. 挂载依赖（软链接）
 ln -s ../../scripts scripts
 ln -s ../../playbooks playbooks
@@ -32,8 +37,8 @@ Implement a hello world script.
 EOF
 
 # Pre-create a stub PR so Manager skips Planner
-mkdir -p .sdlc_runs/dummy_prd
-cat << 'EOF' > .sdlc_runs/dummy_prd/PR_001_Stub.md
+mkdir -p "$RUN_DIR"
+cat << EOF > "$RUN_DIR/PR_001_Stub.md"
 # PR: 001
 Implement a hello world script that prints "Hello, SDLC!"
 EOF
@@ -57,7 +62,7 @@ EOF
 chmod +x scripts/spawn_coder.py
 
 # Stub Reviewer (to force Yellow Path)
-cat << 'EOF' > scripts/spawn_reviewer.py
+cat << EOF > scripts/spawn_reviewer.py
 #!/usr/bin/env python3
 import sys
 import os
@@ -66,18 +71,18 @@ state_file = ".test_state_reviewer"
 # 2nd run: APPROVED
 if not os.path.exists(state_file):
     with open(state_file, "w") as f: f.write("1")
-    with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
+    with open("$RUN_DIR/Review_Report.md", "w") as f:
         f.write('{"status": "ACTION_REQUIRED", "comments": "Missing test coverage."}')
     sys.exit(0)
 else:
-    with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
+    with open("$RUN_DIR/Review_Report.md", "w") as f:
         f.write('{"status": "APPROVED", "comments": "Good job."}')
     sys.exit(0)
 EOF
 chmod +x scripts/spawn_reviewer.py
 
 # 4. 准备 Manager Prompt
-MANAGER_PROMPT="You are the leio-sdlc Manager executing a System Test. A PRD exists at \`docs/PRDs/dummy_prd.md\` and its PR contract is already in \`.sdlc_runs/dummy_prd/PR_001_Stub.md\`. I have provided an initial \`hello.py\`. Begin immediately at the Review phase. You MUST execute the reviewer script. If you encounter an [ACTION_REQUIRED], you MUST follow the SKILL.md rules and call Command Template 2b: run \`spawn_coder.py --workdir . --feedback-file .sdlc_runs/dummy_prd/Review_Report.md\` to fix the code, then run \`spawn_reviewer.py --workdir .\` again. The max revisions is MAX_REVISIONS=3. Continue until you get an APPROVED status in JSON and then perform Merge."
+MANAGER_PROMPT="You are the leio-sdlc Manager executing a System Test. A PRD exists at \`docs/PRDs/dummy_prd.md\` and its PR contract is already in \`$RUN_DIR/PR_001_Stub.md\`. I have provided an initial \`hello.py\`. Begin immediately at the Review phase. You MUST execute the reviewer script. If you encounter an [ACTION_REQUIRED], you MUST follow the SKILL.md rules and call Command Template 2b: run \`spawn_coder.py --workdir . --feedback-file $RUN_DIR/Review_Report.md --run-dir $RUN_DIR --global-dir $MOCK_GLOBAL\` to fix the code, then run \`spawn_reviewer.py --workdir . --run-dir $RUN_DIR --global-dir $MOCK_GLOBAL\` again. The max revisions is MAX_REVISIONS=3. Continue until you get an APPROVED status in JSON and then perform Merge."
 
 # 5. 执行测试
 export SDLC_TEST_MODE=true

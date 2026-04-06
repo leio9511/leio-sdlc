@@ -9,6 +9,8 @@ cd "$TEMP_DIR"
 
 # Paths
 SPAWN_REVIEWER="/root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_reviewer.py"
+MOCK_GLOBAL="/tmp/mock_global_reviewer"
+RUN_DIR="$MOCK_GLOBAL/.sdlc_runs/dummy_prd"
 mkdir -p "$TEMP_DIR/TEMPLATES"
 touch "$TEMP_DIR/TEMPLATES/Review_Report.md.template"
 
@@ -17,7 +19,7 @@ echo "mock diff" > diff.txt
 
 # We need to mock openclaw binary
 mkdir -p "$TEMP_DIR/bin"
-mkdir -p "$TEMP_DIR/.sdlc_runs/dummy_prd"
+mkdir -p "$RUN_DIR"
 export PATH="$TEMP_DIR/bin:$PATH"
 
 echo "=== T1: Agent misses artifact (Fail-Fast) ==="
@@ -29,7 +31,7 @@ exit 0
 EOF
 chmod +x "$TEMP_DIR/bin/openclaw"
 
-if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir .sdlc_runs/dummy_prd --out-file .sdlc_runs/dummy_prd/Review_Report.md --global-dir /root/.openclaw/workspace/projects/leio-sdlc 2>stderr.log; then
+if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/Review_Report.md" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
     echo "❌ T1 Failed: python script should have exited with 1"
     exit 1
 fi
@@ -44,16 +46,16 @@ fi
 
 echo "=== T2: Agent creates artifact ==="
 # Mock openclaw to create the file
-cat << 'EOF' > "$TEMP_DIR/bin/openclaw"
+cat << EOF > "$TEMP_DIR/bin/openclaw"
 #!/bin/bash
 echo "Agent executed and wrote file"
 # We parse the workdir from args? No, the working directory is already lock to workdir.
-touch .sdlc_runs/dummy_prd/Review_Report.md
+touch "$RUN_DIR/Review_Report.md"
 exit 0
 EOF
 chmod +x "$TEMP_DIR/bin/openclaw"
 
-if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir .sdlc_runs/dummy_prd --out-file .sdlc_runs/dummy_prd/Review_Report.md --global-dir /root/.openclaw/workspace/projects/leio-sdlc; then
+if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/Review_Report.md" --global-dir "$MOCK_GLOBAL"; then
     echo "❌ T2 Failed: python script should have exited with 0"
     exit 1
 fi
