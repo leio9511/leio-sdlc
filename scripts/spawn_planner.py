@@ -84,7 +84,7 @@ def main():
         with open(os.path.join(global_dir, "TEMPLATES", "PR_Contract.md.template"), "r") as tf:
             template_content = tf.read()
     except FileNotFoundError:
-        template_content = "status: open\n\n# PR-[ID]: [Title]\n\n## 1. Objective\n\n## 2. Scope & Implementation Details\n\n## 3. TDD & Acceptance Criteria\n"
+        template_content = "status: open\n\n# PR-[ID]: [Title]\n\n## 1. Objective\n\n## 2. Target Working Set & File Placement\n\n## 3. Implementation Scope\n\n## 4. TDD Blueprint & Acceptance Criteria\n"
 
     playbook_path = os.path.join(global_dir, "playbooks", "planner_playbook.md")
     playbook_content = ""
@@ -127,15 +127,15 @@ def main():
 
         if args.slice_failed_pr is not None:
             with open(os.path.join(args.out_dir, "PR_Slice_1.md"), "w") as f:
-                f.write("status: open\\n\\n# PR-001: Slice 1\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
+                f.write("status: open\n\n# PR-001: Slice 1\n\n## 1. Objective\nMock Obj\n\n## 2. Target Working Set & File Placement\nMock Set\n\n## 3. Implementation Scope\nMock Scope\n\n## 4. TDD Blueprint & Acceptance Criteria\nMock TDD\n")
             with open(os.path.join(args.out_dir, "PR_Slice_2.md"), "w") as f:
-                f.write("status: open\\n\\n# PR-002: Slice 2\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
+                f.write("status: open\n\n# PR-002: Slice 2\n\n## 1. Objective\nMock Obj\n\n## 2. Target Working Set & File Placement\nMock Set\n\n## 3. Implementation Scope\nMock Scope\n\n## 4. TDD Blueprint & Acceptance Criteria\nMock TDD\n")
             print('{"status": "mock_success", "role": "planner", "action": "sliced"}')
         else:
             with open(os.path.join(args.out_dir, "PR_A.md"), "w") as f:
-                f.write("status: open\\n\\n# PR-001: Feature A\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
+                f.write("status: open\n\n# PR-001: Feature A\n\n## 1. Objective\nMock Obj\n\n## 2. Target Working Set & File Placement\nMock Set\n\n## 3. Implementation Scope\nMock Scope\n\n## 4. TDD Blueprint & Acceptance Criteria\nMock TDD\n")
             with open(os.path.join(args.out_dir, "PR_B.md"), "w") as f:
-                f.write("status: open\\n\\n# PR-002: Feature B\\n\\n## 1. Objective\\nMock Obj\\n\\n## 2. Scope & Implementation Details\\nMock Scope\\n\\n## 3. TDD & Acceptance Criteria\\nMock TDD\\n")
+                f.write("status: open\n\n# PR-002: Feature B\n\n## 1. Objective\nMock Obj\n\n## 2. Target Working Set & File Placement\nMock Set\n\n## 3. Implementation Scope\nMock Scope\n\n## 4. TDD Blueprint & Acceptance Criteria\nMock TDD\n")
             print('{"status": "mock_success", "role": "planner"}')
             
         sys.exit(0)
