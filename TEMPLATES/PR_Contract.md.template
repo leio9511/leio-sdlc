@@ -5,9 +5,21 @@ status: open
 ## 1. Objective
 [Clearly state the functional goal of this specific PR]
 
-## 2. Scope (Functional & Implementation Freedom)
-[Describe the logical components to be built. DO NOT list exact file paths.]
-*The Coder MUST search the workspace, understand the existing code structure, and autonomously decide which files to create or modify to implement this logic.*
+## 2. Target Working Set & File Placement
+> **[CRITICAL INSTRUCTION TO CODER]** 
+> 1. **NEW FILES:** You are STRICTLY FORBIDDEN to create new files outside of the directories listed below. No orphaned files in the root directory!
+> 2. **EXISTING FILES:** You HAVE FULL FREEDOM to modify ANY existing files in the workspace necessary to make the tests pass, but you MUST prioritize the files listed here.
 
-## 3. TDD & Acceptance Criteria
-[Define the functional conditions and assertions required to pass this PR. The Coder MUST ensure all tests run GREEN before submitting.]
+### 2.1 Existing Files to Modify
+- [ ] `path/to/existing_file`
+
+### 2.2 New Files to Create
+- [ ] `path/to/new_file` (Purpose: ...)
+
+## 3. Implementation Scope (实现细节)
+[Detailed logic changes]
+
+## 4. TDD Blueprint & Acceptance Criteria (QA 测试蓝图)
+> **[Instruction to Coder]** Implement these test cases exactly in the test files specified in section 2. You must ensure the CI preflight script passes before considering this task done.
+- [ ] Test Case 1: [Test Name/Signature] (Expected: ...)
+- [ ] Test Case 2: [Test Name/Signature] (Expected: ...)
