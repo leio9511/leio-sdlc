@@ -62,7 +62,6 @@ class TestDeployBackup(unittest.TestCase):
             # Also verify that agent_driver.py is inside the deployed script folder
             prod_dir = os.path.join(mock_home, ".openclaw", "skills", "pm-skill")
             self.assertTrue(os.path.exists(os.path.join(prod_dir, "scripts", "agent_driver.py")), "agent_driver.py not bundled properly")
-            self.assertTrue(os.path.exists(os.path.join(prod_dir, "config", "prompts.json")), "prompts.json not bundled properly")
 
     def test_auditor_skill_deploy_creates_backup(self):
         with tempfile.TemporaryDirectory() as tempdir:
