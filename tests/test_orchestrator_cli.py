@@ -106,11 +106,13 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep", "--force-replan", "false"])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
-    def test_prd_guardrail_clean(self, mock_parse, mock_run, mock_exists):
+    @patch("fcntl.flock")
+    @patch("os.open", return_value=999)
+    def test_prd_guardrail_clean(self, mock_os_open, mock_flock, mock_parse, mock_run, mock_exists):
         import orchestrator
         import subprocess
 
@@ -153,7 +155,7 @@ class TestOrchestratorCLI(unittest.TestCase):
         with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
             with self.assertRaises(SystemExit) as cm:
                 orchestrator.main()
-            pass
+            self.assertEqual(cm.exception.code, 0)
 
 if __name__ == "__main__":
     unittest.main()
