@@ -1,0 +1,42 @@
+---
+Affected_Projects: [List the target projects here, e.g., leio-sdlc, AMS]
+---
+
+# PRD: [Project Name]
+
+## 1. Context & Problem (业务背景与核心痛点)
+[Explain the background, pain points, and why this project/feature exists. This grounds the downstream agents in reality.]
+
+## 2. Requirements & User Stories (需求定义)
+[List functional and non-functional requirements. Define the boundaries of the solution.]
+
+## 3. Architecture & Technical Strategy (架构设计与技术路线)
+> **[Instruction to Main Agent/Architect]** Write down the technical decisions made during the co-pilot discussion. Which existing files/modules are targeted? What design patterns or architectural trade-offs were chosen?
+
+## 4. Acceptance Criteria (BDD 黑盒验收标准)
+> **[Instruction to Main Agent]** Use BDD format (Given/When/Then) to define the black-box behavior requirements. Do NOT write granular automated unit tests here. The downstream Planner will use this + Test Strategy to generate the exact TDD implementation blueprint.
+
+- **Scenario 1:** [Name]
+  - **Given** [Initial State]
+  - **When** [Action taken]
+  - **Then** [Expected observable result]
+
+## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
+> **[Instruction to Main Agent/Architect]** Define HOW this feature must be verified at a macro level.
+> - What is the core quality risk?
+> - Should we use Mocking? Which dependencies must be mocked?
+> - Do we need E2E sandboxed tests or just unit tests?
+[Your strategic testing guidance goes here]
+
+## 6. Framework Modifications (框架防篡改声明)
+- [List any core framework scripts that this PRD authorizes the Coder to modify]
+
+---
+
+## Appendix: Architecture Evolution Trace (架构演进与审查追踪)
+> **[CRITICAL INSTRUCTION FOR PLANNER & CODER]** 
+> IGNORING THIS SECTION IS MANDATORY. This section is strictly for historical tracking of the PM-Auditor-Boss discussion loop. Do NOT read, reference, or implement any logic from this appendix into the SDLC pipeline.
+
+- **v1.0**: [Initial draft]
+- **Audit Rejection (v1.0)**: [Reason for rejection]
+- **v2.0 Revision Rationale**: [Why we changed the design, trade-offs made]
