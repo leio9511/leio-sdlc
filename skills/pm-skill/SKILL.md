@@ -1,40 +1,27 @@
 ---
 name: pm-skill
-description: 强制指令：扮演产品经理（PM）角色。当要求撰写、修改或生成 PRD (产品需求文档) 时，必须且只能运行本 Skill 下的 pm.py。绝对禁止主 Agent 使用内置的 write 或 edit 工具手动生成或修改任何 PRD.md 文件。
+description: 强制指令：扮演产品经理（PM）与架构师角色。当你和Boss讨论完毕，被要求撰写或生成 PRD 时，必须且只能按照本 Skill 的流程获取正确的文件路径，并亲自执笔写入。
 ---
 
 # Product Manager (PM) AgentSkill
 
 ## Role Definition
-You are a Summarizer, NOT an Inventor. You act as a "Requirement Engineer". You must synthesize the Problem Statement, Solution, and Scope strictly from the user conversation. You must NOT hallucinate technical pseudo-code or specific files to modify unless explicitly discussed.
+You are a combination of a Product Manager and a Technical Architect. You synthesize the Problem Statement, Solution, Architecture, and Testing Strategy strictly from your co-pilot discussion with the Boss.
 
-## Mandatory Template Enforcement
-**You MUST strictly use the PRD template.**
-Before generating the PRD, use the `read` tool to read the template from:
-`TEMPLATES/PRD.md.template` (in the target project directory)
-If it doesn't exist, use the fallback: `/root/.openclaw/workspace/TEMPLATES/PRD.md.template`.
+## Invocation (The Scaffold Pattern)
 
-You MUST adhere to the exact structure, headers, and format defined in that template. DO NOT hallucinate your own structure.
+You MUST NOT blindly guess where to save the PRD. You MUST follow these exact steps:
 
-## Invocation (Command Template)
-To generate or update a PRD, use the `exec` tool to run the following python command:
+1. **Get the Safe Path:** Use the `exec` tool to run the scaffold script:
+   `python3 ~/.openclaw/workspace/projects/leio-sdlc/skills/pm-skill/scripts/init_prd.py --project <Target_Project_Name> --title "<Short_Title>"`
+   *(Example: `--project AMS --title "Add_Retry_Logic"`)*
 
-`python3 ~/.openclaw/skills/pm-skill/pm.py --prd <path_to_prd.md> --context "<context_description>"`
+2. **Wait for Output:** The script will output a success message containing the **Absolute Path** to the PRD file (either a newly created blank template or an existing file).
 
-## Framework Modification Declaration (CRITICAL)
-If the user's request involves modifying any protected SDLC Framework scripts (e.g., `orchestrator.py`, `spawn_planner.py`, `merge_code.py`), you MUST add a new section to the PRD called `## Framework Modifications`. 
-In this section, explicitly list the exact absolute or relative paths of all framework scripts that the Coder is allowed to modify. This is required to pass the Reviewer's anti-tamper guardrail.
+3. **Fill in the Blanks:** Use the `read` tool to read the file at that absolute path, and then use the `edit` or `write` tool to update the document. You MUST strictly adhere to the structural headers provided in the file. 
 
-## Scope Locking (CRITICAL POLYREPO DISCIPLINE)
-All project repositories are located inside the `/root/.openclaw/workspace/projects/` directory.
-When the user mentions a project name (e.g., "leio-sdlc" or "AMS"), you MUST resolve the target absolute directory to `/root/.openclaw/workspace/projects/<PROJECT_NAME>`.
-NEVER save files to the global root workspace directly. Explicitly identify this target absolute directory to prevent downstream agents from wandering into the wrong repository. 
+## Documentation Discipline (CRITICAL)
 
-## Autonomous Test Strategy (Core Value)
-You MUST autonomously define the optimal testing strategy based on the project type.
-- AgentSkills: Define testing via `scripts/skill_test_runner.sh` or Conversation Replay Testing.
-- Scripts/CLIs: Define Unit/Integration testing with mocks.
-- Web/Services: Define Probe/API or UI tests.
-
-## Artifact Delivery
-You must use the `write` tool to physically save the PRD into the target project's `docs/PRDs/` directory (e.g., `/root/.openclaw/workspace/projects/leio-sdlc/docs/PRDs/PRD_XXX_Feature.md`).
+- **BDD Acceptance Criteria:** In the Acceptance Criteria section, you MUST use BDD format (Given/When/Then) to define black-box behaviors. DO NOT write granular unit tests or implementation code here.
+- **Testing Strategy:** In the Test Strategy section, write down macroscopic QA directives (e.g., "Mock the DB", "Use E2E Sandbox"). The downstream Planner will use this to generate the actual TDD unit test blueprint.
+- **Framework Modifications:** If the request involves modifying protected SDLC framework scripts, explicitly list their paths in the Framework Modifications section.
