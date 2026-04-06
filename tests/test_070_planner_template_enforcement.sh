@@ -37,13 +37,18 @@ for pr_file in "$OUT_DIR"/*.md; do
         exit 1
     fi
 
-    if ! grep -q "## 2. Scope & Implementation Details" "$pr_file"; then
-        echo "FAIL: PR file $pr_file is missing '## 2. Scope & Implementation Details'"
+    if ! grep -q "## 2. Target Working Set & File Placement" "$pr_file"; then
+        echo "FAIL: PR file $pr_file is missing '## 2. Target Working Set & File Placement'"
         exit 1
     fi
 
-    if ! grep -q "## 3. TDD & Acceptance Criteria" "$pr_file"; then
-        echo "FAIL: PR file $pr_file is missing '## 3. TDD & Acceptance Criteria'"
+    if ! grep -q "## 3. Implementation Scope" "$pr_file"; then
+        echo "FAIL: PR file $pr_file is missing '## 3. Implementation Scope'"
+        exit 1
+    fi
+
+    if ! grep -q "## 4. TDD Blueprint & Acceptance Criteria" "$pr_file"; then
+        echo "FAIL: PR file $pr_file is missing '## 4. TDD Blueprint & Acceptance Criteria'"
         exit 1
     fi
 done

@@ -13,7 +13,12 @@ if [ ! -f "$FILE" ]; then
     exit 1
 fi
 
-REQUIRED_SECTIONS=("## Goal" "## Scope" "## Acceptance Criteria (AC)" "## Anti-Patterns")
+REQUIRED_SECTIONS=(
+    "## 1. Objective" 
+    "## 2. Target Working Set & File Placement" 
+    "## 3. Implementation Scope" 
+    "## 4. TDD Blueprint & Acceptance Criteria"
+)
 
 for section in "${REQUIRED_SECTIONS[@]}"; do
     if ! grep -q "$section" "$FILE"; then

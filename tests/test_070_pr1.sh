@@ -16,10 +16,13 @@ status: open
 ## 1. Objective
 Mock Obj
 
-## 2. Scope & Implementation Details
+## 2. Target Working Set & File Placement
+Mock Working Set
+
+## 3. Implementation Scope
 Mock Scope
 
-## 3. TDD & Acceptance Criteria
+## 4. TDD Blueprint & Acceptance Criteria
 Mock TDD
 MOCK
 
@@ -65,13 +68,18 @@ if ! grep -q "## 1. Objective" "$TEMPLATE_FILE"; then
     exit 1
 fi
 
-if ! grep -q "## 2. Scope & Implementation Details" "$TEMPLATE_FILE"; then
-    echo "❌ Error: $TEMPLATE_FILE missing '## 2. Scope & Implementation Details'."
+if ! grep -q "## 2. Target Working Set & File Placement" "$TEMPLATE_FILE"; then
+    echo "❌ Error: $TEMPLATE_FILE missing '## 2. Target Working Set & File Placement'."
     exit 1
 fi
 
-if ! grep -q "## 3. TDD & Acceptance Criteria" "$TEMPLATE_FILE"; then
-    echo "❌ Error: $TEMPLATE_FILE missing '## 3. TDD & Acceptance Criteria'."
+if ! grep -q "## 3. Implementation Scope" "$TEMPLATE_FILE"; then
+    echo "❌ Error: $TEMPLATE_FILE missing '## 3. Implementation Scope'."
+    exit 1
+fi
+
+if ! grep -q "## 4. TDD Blueprint & Acceptance Criteria" "$TEMPLATE_FILE"; then
+    echo "❌ Error: $TEMPLATE_FILE missing '## 4. TDD Blueprint & Acceptance Criteria'."
     exit 1
 fi
 
