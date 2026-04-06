@@ -209,13 +209,6 @@ def initialize_sandbox(workdir):
     exclude_path = os.path.join(workdir, ".git", "info", "exclude")
     if os.path.exists(os.path.dirname(exclude_path)):
         artifacts = [
-            ".sdlc_runs/",
-            "Review_Report.md",
-            "current_review.diff",
-            "recent_history.diff",
-            "current_arbitration.diff",
-            ".coder_session",
-            ".coder_state.json",
             "build_preflight.log",
             ".tmp/"
         ]
@@ -410,8 +403,9 @@ def main():
 
     prd_filename = os.path.basename(args.prd_file)
     base_name, _ = os.path.splitext(prd_filename)
-    job_dir_rel = os.path.join(".sdlc_runs", base_name)
-    job_dir = os.path.abspath(os.path.join(workdir, job_dir_rel))
+    target_project_name = os.path.basename(os.path.abspath(workdir))
+    job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+    job_dir_rel = job_dir
 
     if os.path.exists(job_dir) and not args.force_replan:
         md_files = glob.glob(os.path.join(job_dir, "*.md"))

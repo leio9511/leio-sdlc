@@ -25,7 +25,9 @@ def main():
         # Dynamically compute job directory from PRD filename
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
-        args.out_dir = os.path.join(".sdlc_runs", base_name)
+        target_project_name = os.path.basename(os.path.abspath(args.workdir))
+        global_dir = os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        args.out_dir = os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name)
 
     os.makedirs(args.out_dir, exist_ok=True)
 

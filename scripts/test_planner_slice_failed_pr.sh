@@ -30,7 +30,7 @@ echo "# Mock PRD" > PRD.md
 echo "Running Test Scenario 1 (Regression)..."
 python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir .
 ls -lR .sdlc_runs
-if [[ ! -f ".sdlc_runs/PRD/PR_A.md" || ! -f ".sdlc_runs/PRD/PR_B.md" ]]; then
+if [[ ! -f ".sdlc_runs/test_planner_slice/PRD/PR_A.md" || ! -f ".sdlc_runs/test_planner_slice/PRD/PR_B.md" ]]; then
     echo "❌ Scenario 1 Failed: Expected mock PRs not created."
     exit 1
 fi
@@ -54,7 +54,7 @@ echo "Running Test Scenario 3 (Successful Slice)..."
 echo "# Failed PR content" > PR_001_Failed_PR.md
 python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr PR_001_Failed_PR.md
 ls -lR .sdlc_runs
-if [[ ! -f ".sdlc_runs/PRD/PR_Slice_1.md" || ! -f ".sdlc_runs/PRD/PR_Slice_2.md" ]]; then
+if [[ ! -f ".sdlc_runs/test_planner_slice/PRD/PR_Slice_1.md" || ! -f ".sdlc_runs/test_planner_slice/PRD/PR_Slice_2.md" ]]; then
     echo "❌ Scenario 3 Failed: Expected mock slice PRs not created."
     exit 1
 fi

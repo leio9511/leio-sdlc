@@ -20,8 +20,8 @@ git add .gitignore
 git commit -m "init" > /dev/null
 
 # Create .sdlc_runs/dummy/PR_001.md with in_progress status
-mkdir -p .sdlc_runs/dummy
-echo -e "status: in_progress\nslice_depth: 1" > .sdlc_runs/dummy/PR_001.md
+mkdir -p /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy
+echo -e "status: in_progress\nslice_depth: 1" > /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy/PR_001.md
 
 # Run orchestrator
 export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
@@ -29,7 +29,7 @@ export SDLC_BYPASS_BRANCH_CHECK=1
 export SDLC_TEST_MODE=true
 set +e
 # Use timeout to avoid hang if it tries to spawn something
-timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" > test_output.log 2>&1
+timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "/tmp/global_mock_$$" > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 
@@ -62,3 +62,9 @@ fi
 echo "✅ test_orchestrator_logs.sh PASSED"
 rm -rf "$SANDBOX_DIR"
 exit 0
+
+# Check that .git/info/exclude does NOT contain .sdlc_runs/
+if grep -q ".sdlc_runs/" .git/info/exclude 2>/dev/null; then
+    echo "❌ test_orchestrator_logs.sh FAILED: .git/info/exclude contains .sdlc_runs/"
+    exit 1
+fi

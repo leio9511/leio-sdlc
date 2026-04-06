@@ -20,7 +20,9 @@ echo "initial" > init.txt
 git add init.txt
 git commit -m "init" > /dev/null 2>&1
 
-mkdir -p .sdlc_runs/dummy_prd scripts
+GLOBAL_DIR="/tmp/global_mock_$$"
+mkdir -p $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd
+mkdir -p scripts
 cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
 cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
@@ -38,7 +40,7 @@ echo "*.log" >> .gitignore
 git add .gitignore scripts
 git commit -m "setup" > /dev/null 2>&1
 
-cat << 'INNER_EOF' > .sdlc_runs/dummy_prd/PR_001_Test.md
+cat << 'INNER_EOF' > $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd/PR_001_Test.md
 status: open
 slice_depth: 0
 INNER_EOF
@@ -60,9 +62,18 @@ else:
 INNER_EOF
 
 cat << 'INNER_EOF' > scripts/spawn_reviewer.py
-with open(".sdlc_runs/dummy_prd/Review_Report.md", "w") as f:
-    f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
+import sys
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--out-file', default='.sdlc_runs/dummy_prd/Review_Report.md')
+args, _ = parser.parse_known_args()
+with open(args.out_file, "w") as f:
+    f.write('''```json
+{"status": "APPROVED", "comments": "OK"}
+```
+''')
 INNER_EOF
+
 
 cat << 'INNER_EOF' > scripts/merge_code.py
 import sys
@@ -82,7 +93,7 @@ echo "DEBUG: git status before orchestrator"
 git status
 # Run Orchestrator
 export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
-SDLC_BYPASS_BRANCH_CHECK=1 python3 scripts/orchestrator.py --force-replan false --enable-exec-from-workspace --channel "valid:id" --channel "valid:id" --workdir "$(pwd)" --global-dir "$PROJECT_ROOT" --prd-file dummy_prd.md --max-prs-to-process 2 --coder-session-strategy always > orchestrator.log 2>&1 || true
+SDLC_BYPASS_BRANCH_CHECK=1 python3 scripts/orchestrator.py --force-replan false --enable-exec-from-workspace --channel "valid:id" --channel "valid:id" --workdir "$(pwd)" --global-dir "$GLOBAL_DIR" --prd-file dummy_prd.md --max-prs-to-process 2 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
 # Assertions
 echo "--- Orchestrator Log ---"

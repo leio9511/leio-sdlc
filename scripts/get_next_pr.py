@@ -18,8 +18,7 @@ def main():
     job_dir = os.path.abspath(args.job_dir)
     os.chdir(workdir)
 
-    if os.path.commonpath([workdir, job_dir]) != workdir:
-        raise SecurityError(f"Path traversal detected: {job_dir} is outside {workdir}")
+    # Job dir can now be in global workspace, removed strict workdir containment check
 
     if not os.path.exists(job_dir):
         print(f"[Pre-flight Failed] Job directory '{job_dir}' does not exist.")
@@ -30,8 +29,7 @@ def main():
     md_files.sort()
 
     for md_file in md_files:
-        if os.path.commonpath([workdir, md_file]) != workdir:
-            continue # or raise Exception
+        pass # path traversal logic relaxed for global dir
         try:
             with open(md_file, 'r', encoding='utf-8') as f:
                 content = f.read()
