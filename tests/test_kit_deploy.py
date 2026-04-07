@@ -21,10 +21,7 @@ class TestKitDeploy(unittest.TestCase):
                 f.write(f"#!/bin/bash\necho 'deploy-pm' >> {log_file}\n")
             os.chmod(os.path.join(tempdir, "skills", "pm-skill", "deploy.sh"), 0o755)
             
-            os.makedirs(os.path.join(tempdir, "skills", "leio-auditor"), exist_ok=True)
-            with open(os.path.join(tempdir, "skills", "leio-auditor", "deploy.sh"), "w") as f:
-                f.write(f"#!/bin/bash\necho 'deploy-auditor' >> {log_file}\n")
-            os.chmod(os.path.join(tempdir, "skills", "leio-auditor", "deploy.sh"), 0o755)
+            
 
             # Copy the kit deploy script to the tempdir to run it
             kit_deploy_src = os.path.join(self.project_root, "kit-deploy.sh")
@@ -50,12 +47,12 @@ class TestKitDeploy(unittest.TestCase):
             with open(log_file, "r") as f:
                 lines = f.read().strip().split("\n")
                 
-            self.assertEqual(len(lines), 4)
+            self.assertEqual(len(lines), 3)
             self.assertEqual(lines[0], "deploy-sdlc")
             # The order of pm and auditor might vary depending on glob, but both should be there
-            self.assertTrue("deploy-pm" in lines[1:3])
-            self.assertTrue("deploy-auditor" in lines[1:3])
-            self.assertEqual(lines[3], "mock-openclaw gateway restart")
+            self.assertTrue("deploy-pm" in lines[1:2])
+            
+            self.assertEqual(lines[2], "mock-openclaw gateway restart")
 
 if __name__ == '__main__':
     unittest.main()

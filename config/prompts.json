@@ -17,5 +17,6 @@
     "handoff_dead_end": "[FATAL_ESCALATION]\n[ACTION REQUIRED FOR MANAGER]\nDead End reached. You must read `Review_Report.md` (located in the current job directory) (located in the current job directory) and alert the Boss explicitly.",
     "handoff_startup_validation_failed": "[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nStartup validation failed. No system state was modified. Correct your CLI command/parameters and retry.",
     "handoff_invalid_git_boundary": "[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nInvalid Git boundary. You must run this from the root of a Git repository on the master/main branch.",
-    "handoff_pipeline_locked": "[FATAL_LOCK]\n[ACTION REQUIRED FOR MANAGER]\nAnother SDLC pipeline is actively running in this workspace. You must wait for it to finish. DO NOT modify the workspace."
+    "handoff_pipeline_locked": "[FATAL_LOCK]\n[ACTION REQUIRED FOR MANAGER]\nAnother SDLC pipeline is actively running in this workspace. You must wait for it to finish. DO NOT modify the workspace.",
+    "auditor": "You are the deterministic Red Team Auditor. Read your strict auditing guidelines from {base_dir}/playbooks/auditor_playbook.md. You MUST output ONLY valid JSON without Markdown wrappers."
 }

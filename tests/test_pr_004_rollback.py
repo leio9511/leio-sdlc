@@ -21,7 +21,7 @@ def test_independent_symmetrical_rollbacks():
         
         # Modify installed files slightly to verify rollback overwrites them
         skills_dir = os.path.join(mock_home, ".openclaw", "skills")
-        for skill in ["leio-sdlc", "pm-skill", "leio-auditor"]:
+        for skill in ["leio-sdlc", "pm-skill"]:
             skill_path = os.path.join(skills_dir, skill)
             marker = os.path.join(skill_path, "MODIFIED_MARKER")
             with open(marker, "w") as f:
@@ -31,7 +31,7 @@ def test_independent_symmetrical_rollbacks():
         scripts = [
             ("leio-sdlc", os.path.join(repo_root, "rollback.sh")),
             ("pm-skill", os.path.join(repo_root, "skills", "pm-skill", "rollback.sh")),
-            ("leio-auditor", os.path.join(repo_root, "skills", "leio-auditor", "rollback.sh"))
+            
         ]
         
         for skill_name, script_path in scripts:
@@ -50,5 +50,4 @@ def test_independent_symmetrical_rollbacks():
                 assert os.path.exists(os.path.join(skill_path, "scripts", "orchestrator.py"))
             elif skill_name == "pm-skill":
                 assert os.path.exists(os.path.join(skill_path, "scripts", "pm.py"))
-            elif skill_name == "leio-auditor":
-                assert os.path.exists(os.path.join(skill_path, "scripts", "prd_auditor.py"))
+            
