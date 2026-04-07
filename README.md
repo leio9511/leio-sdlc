@@ -41,5 +41,6 @@ Once installed globally via ClawHub, you can attach LEIO SDLC to any project rep
 
 1. Create a `PRD.md` in your project workspace.
 2. Initialize the project with `preflight.sh` (copy the template from `TEMPLATES/standard_preflight.template.sh`).
-3. Invoke the SDLC Planner to slice your PRD.
-4. Start the Manager to consume the queue and automatically build your project.
+3. Audit the PRD by running `python3 scripts/spawn_auditor.py --prd-file PRD.md --workdir . --global-dir .` (Resolve all rejections before proceeding).
+4. Invoke the SDLC Planner to slice your PRD.
+5. Start the Manager to consume the queue and automatically build your project.
