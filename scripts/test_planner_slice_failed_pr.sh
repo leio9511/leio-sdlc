@@ -69,9 +69,15 @@ echo "Running Test Scenario 4 (Successful Slice with sub-id)..."
 echo "# Failed PR content" > PR_002_1_Failed_PR.md
 python3 scripts/spawn_planner.py --prd-file PRD.md --workdir . --global-dir . --slice-failed-pr PR_002_1_Failed_PR.md
 ls -lR .sdlc_runs
-if ! grep -q -- "--insert-after 002_1" tests/task_string.log; then
-    echo "❌ Scenario 4 Failed: Missing '--insert-after 002_1' in task string."
+if ! grep -q -- "--insert-after 002" tests/task_string.log; then
+    echo "❌ Scenario 4 Failed: Missing '--insert-after 002' in task string (should be sanitized)."
     cat tests/task_string.log
+    exit 1
+fi
+if grep -q "CRITICAL INSTRUCTION FOR SLICING" tests/task_string.log; then
+    echo "✅ Scenario 4 Passed (Found explicit instruction)."
+else
+    echo "❌ Scenario 4 Failed: Missing explicit instruction."
     exit 1
 fi
 echo "✅ Scenario 4 Passed."

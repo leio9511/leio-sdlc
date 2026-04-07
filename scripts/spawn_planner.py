@@ -48,7 +48,8 @@ def main():
             failed_pr_content = f.read()
             
         failed_pr_filename = os.path.basename(args.slice_failed_pr)
-        match = re.match(r"^PR_(\d+(?:_\d+)*)_", failed_pr_filename)
+        # ONLY grab the base PR number (the first group of digits after PR_)
+        match = re.match(r"^PR_(\d+)(?:_.*)?\.md$", failed_pr_filename)
         if match:
             failed_pr_id = match.group(1)
         else:
@@ -99,6 +100,15 @@ def main():
 
     if args.slice_failed_pr is not None:
         insert_after_flag = f" --insert-after {failed_pr_id}" if failed_pr_id else ""
+        
+        # Explicit instruction per PRD
+        planner_instruction = (
+            "\n\n[CRITICAL INSTRUCTION FOR SLICING]:\n"
+            "When using the `create_pr_contract.py` tool to slice this failed PR, "
+            f"you MUST ONLY pass the base PR sequence number for `--insert-after` (e.g. `--insert-after {failed_pr_id}`). "
+            "DO NOT use nested sub-indexes like `002_1`."
+        )
+        
         task_string = build_prompt("planner_slice",
             workdir=workdir,
             playbook_content=playbook_content,
@@ -109,6 +119,7 @@ def main():
             insert_after_flag=insert_after_flag,
             template_content=template_content
         )
+        task_string += planner_instruction
     else:
         task_string = build_prompt("planner",
             workdir=workdir,
