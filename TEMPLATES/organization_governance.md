@@ -15,7 +15,7 @@ n**主 Agent 行为熔断 (Main Agent Execution Guardrail)**：
 2. **登记立项 (Issue Initialization)**：在 `.issues/` 目录下创建 `ISSUE-xxx.md` 作为追踪凭证。
 3. **契约生成 (PRD Generation via PM Skill)**：调用 PM Skill（init_prd.py）生成标准 `docs/PRDs/PRD_xxx.md` 模板。主助手作为上下文的唯一全量持有者，**必须亲自调用工具执笔撰写 PRD**。
 4. **独立审计 (Pre-Flight PRD Audit)**：对于核心架构或复杂逻辑重构，在交由引擎写代码前，必须拉起原生独立审计员 (Auditor Agent)，将 PRD 与现有源码进行对抗推演。如果被打回，必须更新 PRD 并重新 Audit，直到取得 `{"status": "APPROVED"}` 放行。
-5. **触发引擎 (Orchestrator Trigger)**：执行命令（如 `nohup python3 scripts/orchestrator.py --prd-file ... &`）触发后台引擎，随后进入静默监控。
+5. **触发引擎 (Orchestrator Trigger)**：只有在获得 Boss 的明确授权（Explicit Authorization）后，才允许执行 `python3 scripts/orchestrator.py` 触发后台引擎，严禁擅自起爆（Anti-YOLO），随后进入静默监控。
 6. **闭环善后 (Post-Flight Closure)**：拿到 Merge Commit 后，将 PRD 标为 `completed`，关闭 Issue，更新全局看板 `STATE.md`。
 7. **发布上线 (Release)**：确认无误后，Bump 版本号并 commit。由 Manager 或专门的发布 Agent 执行项目对应的 `bash deploy.sh`。对于 AgentSkill，必须确保进行硬拷贝同步及 Gateway 重启。
 
