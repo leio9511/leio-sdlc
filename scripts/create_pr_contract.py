@@ -8,8 +8,8 @@ class SecurityError(Exception):
     pass
 
 def calculate_index(job_dir, insert_after):
-    base_pattern = re.compile(r"^PR_(\d+)_.*\.md$")
     if not insert_after:
+        base_pattern = re.compile(r"^PR_(\d+)_.*\.md$")
         max_base = 0
         for f in os.listdir(job_dir):
             match = base_pattern.match(f)
@@ -17,13 +17,25 @@ def calculate_index(job_dir, insert_after):
                 max_base = max(max_base, int(match.group(1)))
         return f"{max_base + 1:03d}"
     else:
-        sub_pattern = re.compile(rf"^PR_{insert_after}_(\d+)_.*\.md$")
+        primary_number = insert_after.split('_')[0]
+        
+        primary_exists = False
+        primary_pattern1 = re.compile(rf"^PR_{primary_number}(_.*)?\.md$")
+        for f in os.listdir(job_dir):
+            if primary_pattern1.match(f):
+                primary_exists = True
+                break
+                
+        if not primary_exists:
+            raise ValueError(f"Fabricated primary PR number '{primary_number}' does not exist in job queue.")
+
+        sub_pattern = re.compile(rf"^PR_{primary_number}_(\d+)(_.*)?\.md$")
         max_sub = 0
         for f in os.listdir(job_dir):
             match = sub_pattern.match(f)
             if match:
                 max_sub = max(max_sub, int(match.group(1)))
-        return f"{insert_after}_{max_sub + 1}"
+        return f"{primary_number}_{max_sub + 1}"
 
 def main():
     parser = argparse.ArgumentParser(description="Create a PR contract file.")
