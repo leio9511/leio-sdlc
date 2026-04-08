@@ -24,6 +24,8 @@
 2.  **Hardcoded Content Verification**: 如果 PRD 需求涉及修改字符串，是否在 `HARDCODED CONTENT` 章节中明确列出？
 3.  **Rollback (回滚计划)**：高风险重构是否有回滚策略？
 4.  **Acceptance Criteria**: BDD 标准是否具备“黑盒可测性”？
+- **Template Integrity**: Verify the PRD contains all mandatory sections matching `PRD.md.template`. If structural headers are missing, REJECT immediately.
+- **String Determinism (Anti-Hallucination Policy)**: If the PRD implies specific output strings (notifications, errors, CLI outputs), verify they are explicitly listed in `Section 7: Hardcoded Content`. If strings are left to 'Coder discretion' without explicit PM approval, REJECT immediately.
 
 ## 5. 输出格式 (Output Format)
 你必须输出一段简短的 JSON，且**只能**输出 JSON。

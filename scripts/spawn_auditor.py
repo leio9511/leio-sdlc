@@ -57,6 +57,27 @@ def main():
     if not os.path.exists(prd_file_abs):
         print(f"Error: PRD file not found: {prd_file_abs}")
         sys.exit(1)
+        
+    with open(prd_file_abs, "r") as f:
+        prd_content = f.read()
+
+    # Strict Template Validation
+    required_sections = ["1. Context & Problem", "2. Requirements & User Stories", "3. Architecture & Technical Strategy", "4. Acceptance Criteria", "5. Overall Test Strategy", "6. Framework Modifications"]
+    missing_sections = []
+    for section in required_sections:
+        if section not in prd_content:
+            missing_sections.append(section)
+            
+    if missing_sections:
+        print(f"REJECTED: PRD structure does not match the mandatory template. Missing sections: {', '.join(missing_sections)}.")
+        sys.exit(0)
+        
+    # Anti-Hallucination String Policy
+    # Simple check: If PRD is missing section 7 but might need it, we reject. 
+    # For now, we strictly require Section 7 if it's a standard PRD.
+    if "7. Hardcoded Content" not in prd_content and "7. HARDCODED CONTENT" not in prd_content:
+        print("REJECTED: The PRD mentions specific text/messages but fails to list them in 'Section 7. Hardcoded Content'. Ensure Coder has no room for hallucination.")
+        sys.exit(0)
 
     base_dir = os.path.dirname(current_dir)
     task_string = build_prompt("auditor",
