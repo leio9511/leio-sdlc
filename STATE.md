@@ -6,7 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
-- [x] **[ISSUE-1081/1084] Refine Actionable JIT Prompts and Execution Guardrails**: Unified `handoff_` prompts with actionable instructions, added `--enable-exec-from-workspace` bypass explicitly to entry points (`spawn_auditor.py`, `init_prd.py`), and enforced mandatory notification channel handshakes.
+- [x] **[ISSUE-1065/1082/1086] Formalize PRD Commit, Template Validation & Auditor Downgrade**: Decoupled auto-commit from orchestrator, implemented `commit_state.py` as the sole explicit state gateway. Downgraded Auditor from independent AgentSkill to internal native script to physically eradicate Reward Hacking bypasses.
 - [x] **[ISSUE-1079/1080] Path Resolution Guardrails**: Implemented mandatory `{workdir}/` prefixing for native tools and added Context_Workdir to PRD templates to solve CWD drift.
 - [x] **[ISSUE-1085] Fix Planner Path Traversal Defense Deadlock**: Refined path security in `create_pr_contract.py` to allow PRs to be legally sliced into isolated external `job_dir` paths without throwing SecurityError.
 - [x] **[ISSUE-1077] Anti-YOLO Guardrail Hardening**: Auditor Playbook 2.0 and structural enhancements to prevent Catch-22 deadlocks in PR slicing and reviewer scopes.
