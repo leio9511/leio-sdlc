@@ -4,9 +4,15 @@ import os
 import sys
 
 def main():
+    if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__):
+        if "--enable-exec-from-workspace" not in sys.argv:
+            print("[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nStartup validation failed (likely executing from the wrong directory). You MUST execute the script using its absolute installed path (e.g., `python3 ~/.openclaw/skills/pm-skill/scripts/init_prd.py ...`) OR explicitly append the `--enable-exec-from-workspace` flag if testing locally.")
+            sys.exit(1)
+
     parser = argparse.ArgumentParser(description="Initialize a new PRD based on the template.")
     parser.add_argument("--project", required=True, help="Target project name (e.g., leio-sdlc, AMS)")
     parser.add_argument("--title", required=True, help="Short title for the PRD (used in filename)")
+    parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
 
     workspace_root = "/root/.openclaw/workspace"

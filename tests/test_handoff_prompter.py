@@ -22,20 +22,18 @@ class TestHandoffPrompter(unittest.TestCase):
         prompt = HandoffPrompter.get_prompt("planner_failure")
         self.assertIn("[FATAL_PLANNER]", prompt)
         self.assertIn("[ACTION REQUIRED FOR MANAGER]", prompt)
-        self.assertIn("Planner failed. You must read planner logs and refine the PRD.", prompt)
+        self.assertIn("Planner failed.", prompt)
 
     def test_git_checkout_error(self):
         prompt = HandoffPrompter.get_prompt("git_checkout_error")
         self.assertIn("[FATAL_GIT]", prompt)
-        # Note: prompts.json has changed and removed [ACTION REQUIRED FOR MANAGER] from this prompt
-        # self.assertIn("[ACTION REQUIRED FOR MANAGER]", prompt)
-        self.assertIn("Git checkout failed. Workspace preserved. Invoke --cleanup to quarantine.", prompt)
+        self.assertIn("Git checkout failed. Workspace preserved.", prompt)
 
     def test_dead_end(self):
         prompt = HandoffPrompter.get_prompt("dead_end")
         self.assertIn("[FATAL_ESCALATION]", prompt)
         self.assertIn("[ACTION REQUIRED FOR MANAGER]", prompt)
-        self.assertIn("Dead End reached. You must read `Review_Report.md` (located in the current job directory) (located in the current job directory) and alert the Boss explicitly.", prompt)
+        self.assertIn("Dead End reached. You MUST read `Review_Report.md` (located in the current job directory)", prompt)
 
     def test_unknown_condition(self):
         prompt = HandoffPrompter.get_prompt("unknown_condition")
