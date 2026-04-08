@@ -1,5 +1,6 @@
 ---
 Affected_Projects: [leio-sdlc]
+Status: Completed
 ---
 
 # PRD: ISSUE-1077 Anti-YOLO Guardrail Hardening
