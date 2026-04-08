@@ -31,6 +31,10 @@ if ! grep -q "GIT COMMIT REJECTED" commit.log; then
     echo "❌ FAILED: Rejection message not found."
     exit 1
 fi
+if ! grep -q "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py" commit.log; then
+    echo "❌ FAILED: Missing commit_state.py instruction in pre-commit hook output."
+    exit 1
+fi
 echo "✅ PASSED: Raw commit rejected as expected."
 
 # 4. Test: Override flag should succeed

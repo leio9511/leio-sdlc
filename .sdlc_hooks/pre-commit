@@ -26,10 +26,8 @@ echo "==============================================================="
 echo "❌ GIT COMMIT REJECTED ON PROTECTED BRANCH: $CURRENT_BRANCH"
 echo "==============================================================="
 echo "Role Awakening: As a Manager, you should NEVER commit directly!"
-echo "Please run orchestrator.py to perform changes via the SDLC pipeline."
-echo ""
-echo "Emergency Override: If you absolutely must commit directly, use:"
-echo "git -c sdlc.override=true commit -m \"...\""
+echo "Please use the official gateway to baseline your state/PRD before pipeline ignition:"
+echo "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path_to_files>"
 echo "==============================================================="
 
 exit 1

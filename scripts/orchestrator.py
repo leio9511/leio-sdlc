@@ -135,15 +135,13 @@ def validate_prd_is_committed(prd_file, workdir):
         try:
             drun(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
-            print(f"[SDLC Framework] PRD file '{prd_file}' is untracked. Auto-committing for ingestion.")
-            drun(["git", "add", prd_path_abs], check=True, cwd=workdir)
-            drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD"], check=True, cwd=workdir)
+            print("[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path>")
+            sys.exit(1)
 
         status_out = drun(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
-            print(f"[SDLC Framework] PRD file '{prd_file}' has uncommitted changes. Auto-committing.")
-            drun(["git", "add", prd_path_abs], check=True, cwd=workdir)
-            drun(["git", "-c", "sdlc.runtime=1", "commit", "-m", "docs(prd): auto-commit PRD changes"], check=True, cwd=workdir)
+            print("[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path>")
+            sys.exit(1)
 
 def parse_review_verdict(content):
     """
