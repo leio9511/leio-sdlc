@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1079/1080] Path Resolution Guardrails**: Implemented mandatory `{workdir}/` prefixing for native tools and added Context_Workdir to PRD templates to solve CWD drift.
 - [x] **[ISSUE-1085] Fix Planner Path Traversal Defense Deadlock**: Refined path security in `create_pr_contract.py` to allow PRs to be legally sliced into isolated external `job_dir` paths without throwing SecurityError.
 - [x] **[ISSUE-1077] Anti-YOLO Guardrail Hardening**: Auditor Playbook 2.0 and structural enhancements to prevent Catch-22 deadlocks in PR slicing and reviewer scopes.
 - [x] **[ISSUE-1074] Upgrade Reviewer Playbook**: Integrated IADF-ADE 7 Key Focus Areas and structured findings into the SDLC Reviewer template using a Zero-Blast-Radius approach.
