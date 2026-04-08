@@ -290,6 +290,14 @@ def main():
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
 
+    # SDLC_TEST_MODE Leakage Guardrail
+    if os.environ.get("SDLC_TEST_MODE") == "true":
+        if args.enable_exec_from_workspace:
+            print("[WARNING] Running Orchestrator in TEST MODE with mocked LLMs. Production safety checks are bypassed.")
+        else:
+            print(HandoffPrompter.get_prompt("test_mode_leakage"))
+            sys.exit(1)
+
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     workdir = os.path.abspath(args.workdir)
     import logging
