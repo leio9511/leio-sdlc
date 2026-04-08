@@ -38,7 +38,7 @@
 
 ## 🚀 Active Milestones & Next in Queue
 
-- **[ISSUE-1008] PRD-080: leio-manager AgentSkill**: Deterministic artifact lifecycle management CLI to replace LLM state tracking. [TODO]
+- [x] **[ISSUE-1071] Automated Test Discovery in Preflight**: Refactored `preflight.sh` to dynamically discover and execute all bash (`scripts/test_*.sh`) and python (`tests/test_*.py`) tests instead of hardcoding them.
 - **M3: End-to-End Orchestrator Autonomy (State 0 to State 6)** [IN PROGRESS]
   - [ ] **[ISSUE-055] Global Control Tower**: A dashboard/snapshot tool to track the engine's real-time state.
 
