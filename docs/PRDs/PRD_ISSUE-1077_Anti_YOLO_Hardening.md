@@ -13,6 +13,10 @@ The SDLC process is vulnerable to "YOLO" loops where the Main Agent auto-correct
 3.  **Hardcoded Content Mandate**: Add a new section to the PRD template to enforce pixel-perfect copying of string literals.
 4.  **PM Skill Guardrail**: The `pm-skill/SKILL.md` must be updated with an explicit circuit-breaker instruction.
 5.  **Strict Anti-Slicing Directive**: The Planner must NOT slice the functional code and its unit tests into separate atomic PRs. They must be handled as a single cohesive unit to avoid Reviewer deadlocks.
+6.  **Pipeline Robustness Upgrades**: Resolve the infinite slicing loop caused by the combination of rigid `Target Working Set` constraints and aggressive escalation rules.
+    - Fix the Planner prompt to allow returning a single PR when a task is an indivisible TDD unit.
+    - Relax the Reviewer prompt to permit modifications to auxiliary/test files outside the strict Target Working Set as long as CI passes.
+    - Modify the Orchestrator to allow 3 retries (with revision feedback) before triggering the Planner split (escalation).
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 -   **`scripts/agent_driver.py`**: Extract the `notify_channel` function from `orchestrator.py` and place it here. Ensure `format_notification` is imported or handled properly if used by `notify_channel`.
@@ -20,7 +24,8 @@ The SDLC process is vulnerable to "YOLO" loops where the Main Agent auto-correct
 -   **`scripts/spawn_auditor.py`**: Add `--channel` argument parsing (using standard `argparse` best practices, ensuring it doesn't break when called via other means). Add a fail-fast handshake if `--channel` is missing. Use `agent_driver.notify_channel` for Slack messages. Output `[ACTION REQUIRED FOR MANAGER]` JIT prompt injections to stdout upon completion or failure.
 -   **`skills/pm-skill/TEMPLATES/PRD.md.template`**: Add a `## 7. HARDCODED CONTENT (CODER MUST COPY EXACTLY)` section.
 -   **`skills/pm-skill/SKILL.md`**: Append the `End of Task & Circuit Breaker` guardrail section. (Note: Modifying this is safe because it is a local internal replica within the `leio-sdlc` repository. It does not violate cross-project boundaries).
--   **`config/prompts.json`**: Update the "auditor" prompt to explicitly specify the PRD file path to fix prompt blindness.
+-   **`config/prompts.json`**: Update the "auditor" prompt to explicitly specify the PRD file path to fix prompt blindness. Update "planner_slice" to stop forcing at least 2 micro-PRs, allowing it to output a single PR or refine the current contract if splitting breaks atomicity. Update "reviewer" to relax the Target Working Set boundaries.
+-   **`scripts/orchestrator.py`**: Import `notify_channel` from `agent_driver.py` and remove the local definition. Increase the escalation `reset_count` limit from 1 to 3, giving the Coder more chances to fix tests before triggering the `planner_slice` logic.
 -   **Deployment Strategy**: Changes made to `skills/pm-skill/SKILL.md` within the workspace source will be synchronized to the global runtime skill directory post-merge via the `kit-deploy.sh` pipeline, mitigating any path isolation risks.
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
@@ -40,6 +45,10 @@ The SDLC process is vulnerable to "YOLO" loops where the Main Agent auto-correct
     -   **Given** The SDLC pipeline completes
     -   **Then** `skills/pm-skill/TEMPLATES/PRD.md.template` contains the exact Hardcoded Content block for PRDs.
     -   **And** `skills/pm-skill/SKILL.md` contains the exact Circuit Breaker block.
+-   **Scenario 5: Escalation Robustness**
+    -   **Given** The orchestrator triggers the state 5 escalation block
+    -   **When** The retry counter is evaluated
+    -   **Then** It should allow up to 3 resets (reset_count < 3) before shifting to `spawn_planner.py --slice-failed-pr`.
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 -   **Unit Tests for `spawn_auditor.py`**: MUST use `@patch("agent_driver.notify_channel")` to intercept and assert channel calls. **DO NOT** use `subprocess.run` to execute the script in a black box or inject test-only environment variables (`os.environ.get("SDLC_TEST_MODE")`) into production code.
@@ -86,7 +95,22 @@ Once you have written and saved the PRD file, your active role as PM is **100% C
 - **On APPROVE**: `[ACTION REQUIRED FOR MANAGER] The Auditor APPROVED the PRD. Notify the Boss of the successful audit, then you MUST immediately halt all further operations and WAIT for explicit authorization to deploy.`
 
 **4. Content for `config/prompts.json`:**
-(Replace the value of the `"auditor"` key with the following exact string. Do NOT miss the `{prd_file}` interpolation logic.)
+
+*(Update "auditor" key)*:
 ```json
 "You are the deterministic Red Team Auditor. Read your strict auditing guidelines from {base_dir}/playbooks/auditor_playbook.md. The PRD you must audit is located at {prd_file}. You MUST use the `read` tool to read this PRD file before generating your verdict. You MUST output ONLY valid JSON without Markdown wrappers."
+```
+
+*(Update "planner_slice" key - Replace the end of the prompt to stop forcing 2 PRs)*:
+Find the sentence: `You MUST generate at least 2 Micro-PRs for this feature. Ensure you define a Target Working Set for each sliced Micro-PR. Start now.`
+Replace it EXACTLY with:
+```json
+"You are encouraged to refine the scope or architecture of the failed PR. If the feature can be safely divided into smaller TDD-compliant steps, generate 2 or more Micro-PRs. If the feature is an indivisible atomic unit (like extracting a shared function and updating its tests), you MAY output exactly 1 refined Micro-PR. Ensure you define a Target Working Set for each PR. Start now."
+```
+
+*(Update "reviewer" key - Relax the strict Working Set rule)*:
+Find the sentence: `All security checks, redlines, and logic validations MUST be strictly applied ONLY to this file.`
+Add this sentence immediately after it:
+```json
+"You MUST NOT reject the PR solely because the Coder modified auxiliary/test files outside the Target Working Set, provided those modifications are logically required to make the CI pipeline pass and do not introduce Scope Creep."
 ```
