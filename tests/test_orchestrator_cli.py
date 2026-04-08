@@ -158,12 +158,16 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 0)
 
-    @patch("agent_driver.notify_channel")
-    def test_orchestrator_uses_shared_notify_channel(self, mock_notify):
+    def test_orchestrator_uses_shared_notify_channel(self):
         import orchestrator
-        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
-            orchestrator.notify_channel("slack:channel:C12345", "Test message")
-        mock_notify.assert_called_with("slack:channel:C12345", "Test message")
+        import agent_driver
+        self.assertIs(orchestrator.notify_channel, agent_driver.notify_channel)
+
+    def test_orchestrator_escalation_limit_increased(self):
+        import orchestrator
+        import inspect
+        source = inspect.getsource(orchestrator.main)
+        self.assertIn("if reset_count < 3:", source)
 
 if __name__ == "__main__":
     unittest.main()

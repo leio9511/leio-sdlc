@@ -615,7 +615,7 @@ def main():
                         except FileNotFoundError:
                             pass
 
-                    if reset_count == 0:
+                    if reset_count < 3:
                         print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
                         dlog(f"State 5 Escalation: Tier 1 reset triggered. Resetting {branch_name}")
                         drun(["git", "reset", "--hard"], check=False)
