@@ -159,3 +159,10 @@ class TestOrchestratorCLI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    @patch("agent_driver.notify_channel")
+    def test_orchestrator_uses_shared_notify_channel(self, mock_notify):
+        import orchestrator
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            orchestrator.notify_channel("slack:channel:C12345", "Test message")
+        mock_notify.assert_called_with("slack:channel:C12345", "Test message")
