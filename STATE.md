@@ -1,7 +1,7 @@
 # STATE.md - leio-sdlc Development State (Kanban)
 
 - **Project**: leio-sdlc (Automated SDLC Orchestrator)
-- **Current Version**: 0.8.2
+- **Current Version**: 0.8.3
 - **Status**: [SDLC Hardening] - Implementing native notifications, fail-fast git hygiene, and deterministic state tracking.
 - **Active Branch**: `master`
 
