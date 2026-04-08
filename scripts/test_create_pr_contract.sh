@@ -27,6 +27,29 @@ if python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$TEST_DIR" --title "F
   exit 1
 fi
 
+# Test Case 1: External job dir (outside workdir)
+EXTERNAL_JOB_DIR="$(pwd)/.external_job_dir"
+rm -rf "$EXTERNAL_JOB_DIR"
+mkdir -p "$EXTERNAL_JOB_DIR"
+OUTPUT_EXT=$(python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$EXTERNAL_JOB_DIR" --title "External PR" --content-file "$CONTENT_FILE")
+echo "$OUTPUT_EXT" | grep -q "\[PR_CREATED\]" || { echo "❌ Expected [PR_CREATED] output for external job dir"; exit 1; }
+EXT_FILE=$(echo "$OUTPUT_EXT" | awk '{print $2}')
+if [[ ! -f "$EXT_FILE" ]]; then echo "❌ External PR file not created: $EXT_FILE"; exit 1; fi
+rm -rf "$EXTERNAL_JOB_DIR"
+
+# Test Case 2: Malicious path traversal
+MALICIOUS_FILE_DIR="$(pwd)/.malicious_dir"
+mkdir -p "$MALICIOUS_FILE_DIR"
+MALICIOUS_CONTENT_FILE="$MALICIOUS_FILE_DIR/malicious.txt"
+echo "malicious" > "$MALICIOUS_CONTENT_FILE"
+# Try to escape using a file that is neither in workdir nor job_dir
+if python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$TEST_DIR" --title "Fail Traversal" --content-file "$MALICIOUS_CONTENT_FILE" 2>/dev/null; then
+  echo "❌ Expected failure for path traversal, but it succeeded."
+  rm -rf "$MALICIOUS_FILE_DIR"
+  exit 1
+fi
+rm -rf "$MALICIOUS_FILE_DIR"
+
 # Positive 1: First PR
 OUTPUT1=$(python3 "$SCRIPT_PATH" --workdir "$WORK_DIR" --job-dir "$TEST_DIR" --title "First PR" --content-file "$CONTENT_FILE")
 echo "$OUTPUT1" | grep -q "\[PR_CREATED\]" || { echo "❌ Expected [PR_CREATED] output"; exit 1; }
