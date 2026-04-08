@@ -16,8 +16,14 @@ def main():
     parser = argparse.ArgumentParser(description="Spawn an Auditor agent.")
     parser.add_argument("--prd-file", required=True, help="Path to the PRD file")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
+    parser.add_argument("--channel", required=False, help="Notification channel")
     
     args = parser.parse_args()
+    
+    if not args.channel:
+        print("[ACTION REQUIRED FOR MANAGER] [FATAL] Channel handshake failed. You MUST provide a valid --channel parameter (e.g., slack:#XXXX) and retry.")
+        sys.exit(1)
+
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
 
@@ -41,14 +47,40 @@ def main():
         with open("tests/auditor_task_string.log", "w") as f:
             f.write(task_string)
         if "REJECT" in os.environ.get("MOCK_AUDIT_RESULT", ""):
-            print('{"status": "REJECTED", "comments": "Mock rejected"}')
+            output = '{"status": "REJECTED", "comments": "Mock rejected"}'
         else:
-            print('{"status": "APPROVED", "comments": "Mock approved"}')
-        sys.exit(0)
+            output = '{"status": "APPROVED", "comments": "Mock approved"}'
+        print(output)
+    else:
+        print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
+        session_id = f"prd_auditor_{int(time.time())}"
+        _, output = invoke_agent(task_string, session_key=session_id, role="auditor", return_output=True)
 
-    print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
-    session_id = f"prd_auditor_{int(time.time())}"
-    invoke_agent(task_string, session_key=session_id, role="auditor")
+    status = "UNKNOWN"
+    if '{"status": "APPROVED"' in output or '"status":"APPROVED"' in output or '"status": "APPROVED"' in output:
+        status = "APPROVED"
+    elif '{"status": "REJECTED"' in output or '"status":"REJECTED"' in output or '"status": "REJECTED"' in output:
+        status = "REJECTED"
+
+    import json
+    try:
+        # Try to parse exact json
+        import re
+        json_match = re.search(r'```json\s*(\{.*?\})\s*```', output, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'(\{.*?\})', output, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group(1).strip())
+            status = data.get("status", status)
+    except Exception:
+        pass
+
+    if status == "APPROVED":
+        agent_driver.notify_channel(args.channel, "Auditor APPROVED the PRD.", "auditor_approved", {"prd_file": args.prd_file})
+        print("[ACTION REQUIRED FOR MANAGER] The Auditor APPROVED the PRD. Notify the Boss of the successful audit, then you MUST immediately halt all further operations and WAIT for explicit authorization to deploy.")
+    else:
+        agent_driver.notify_channel(args.channel, "Auditor REJECTED the PRD.", "auditor_rejected", {"prd_file": args.prd_file})
+        print("[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD. Report the rejection reasons to the Boss, then you MUST immediately halt all further operations and WAIT for explicit instructions.")
 
 if __name__ == "__main__":
     main()

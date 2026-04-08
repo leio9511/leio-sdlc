@@ -56,7 +56,7 @@ def resolve_cmd(cmd_name):
         
     return cmd_name
 
-def invoke_agent(task_string, session_key=None, role=None):
+def invoke_agent(task_string, session_key=None, role=None, return_output=False):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
     Supports dynamic path resolution and isolated E2E testing integration.
@@ -99,6 +99,8 @@ def invoke_agent(task_string, session_key=None, role=None):
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
                 print(result.stdout)
+                if return_output:
+                    return session_key, result.stdout
                 return session_key
             else:
                 if attempt < 2:

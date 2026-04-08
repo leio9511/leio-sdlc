@@ -40,3 +40,8 @@ Affected_Projects: [List the target projects here, e.g., leio-sdlc, AMS]
 - **v1.0**: [Initial draft]
 - **Audit Rejection (v1.0)**: [Reason for rejection]
 - **v2.0 Revision Rationale**: [Why we changed the design, trade-offs made]
+
+---
+
+## 7. HARDCODED CONTENT (CODER MUST COPY EXACTLY)
+> [CRITICAL INSTRUCTION TO CODER] For any modifications involving specific string literals (e.g., SKILL.md content, Playbook rules, JIT prompts, error messages), you MUST NOT generate them yourself. You are required to copy the exact content provided below in this section.
