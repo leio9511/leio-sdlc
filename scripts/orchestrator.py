@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent, build_prompt, notify_channel
 proc = None
 import glob
 import subprocess
@@ -125,29 +125,6 @@ def teardown_coder_session(workdir):
             os.remove(session_file)
         except OSError:
             pass # Reaper safety check: process already reaped or pgid not found
-
-def notify_channel(effective_channel, msg, event_type=None, context=None):
-    if event_type:
-        msg = format_notification(event_type, context or {})
-    else:
-        msg = f"🤖 [SDLC Engine] {msg}"
-    if effective_channel:
-        cmd = ["openclaw", "message", "send"]
-        if ":" in effective_channel:
-            parts = effective_channel.split(":")
-            if len(parts) >= 2:
-                cmd.extend(["--channel", parts[0]])
-                cmd.extend(["-t", ":".join(parts[1:])])
-        else:
-            cmd.extend(["-t", effective_channel])
-        cmd.extend(["-m", msg])
-        
-        if os.environ.get("SDLC_TEST_MODE") == "true":
-            dlog(f"[notify_channel]: {' '.join(cmd)}")
-            print(f"DEBUG [notify_channel]: {msg}")
-            return
-            
-        drun(cmd, check=False)
 
 import json
 

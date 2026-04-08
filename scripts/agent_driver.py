@@ -7,6 +7,38 @@ import sys
 import uuid
 import shutil
 
+# Dynamic module resolution for monorepo development vs production deployment
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+try:
+    from notification_formatter import format_notification
+except ImportError:
+    # If format_notification isn't easily available, fallback
+    def format_notification(event_type, context):
+        return f"[{event_type}] {context}"
+
+def notify_channel(effective_channel, msg, event_type=None, context=None):
+    if event_type:
+        msg = format_notification(event_type, context or {})
+    else:
+        msg = f"🤖 [SDLC Engine] {msg}"
+    if effective_channel:
+        cmd = ["openclaw", "message", "send"]
+        if ":" in effective_channel:
+            parts = effective_channel.split(":")
+            if len(parts) >= 2:
+                cmd.extend(["--channel", parts[0]])
+                cmd.extend(["-t", ":".join(parts[1:])])
+        else:
+            cmd.extend(["-t", effective_channel])
+        cmd.extend(["-m", msg])
+        
+        # When running in test mode, do not actually call openclaw message send
+        test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
+        if not test_mode:
+            subprocess.run(cmd, capture_output=True)
+
 def resolve_cmd(cmd_name):
     # Dynamic path resolution with $AGENT_SKILLS_DIR fallback
     cmd_path = shutil.which(cmd_name)
