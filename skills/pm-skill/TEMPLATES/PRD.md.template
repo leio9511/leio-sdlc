@@ -1,5 +1,6 @@
 ---
 Affected_Projects: [List the target projects here, e.g., leio-sdlc, AMS]
+Context_Workdir: <Project_Root>
 ---
 
 # PRD: [Project Name]
