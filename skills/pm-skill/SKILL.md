@@ -31,3 +31,4 @@ Once you have written and saved the PRD file, your active role as PM is **100% C
 1. **Trigger Auditor**: You must immediately call `spawn_auditor.py` to check your work.
 2. **Circuit Breaker (NO YOLO)**: If the Auditor returns `{"status": "REJECTED"}`, Report the rejection reasons to the Boss, then you MUST immediately halt all further operations and WAIT for explicit instructions. DO NOT ATTEMPT TO AUTO-CORRECT.
 3. **Wait for Launch**: If the Auditor returns `{"status": "APPROVED"}`, Notify the Boss of the successful audit, then you MUST immediately halt all further operations and WAIT for explicit authorization to execute.
+4. **Baseline the PRD**: You MUST NOT use manual `git commit` or `sdlc.override`. To save the PRD baseline, you MUST use the official gateway: `python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <Absolute_Path_To_PRD>`
