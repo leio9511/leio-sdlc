@@ -15,7 +15,8 @@ Currently, several shell-based test scripts (e.g., `test_planner_micro_slicing.s
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Deletion Phase**: Coder will create a script `scripts/cleanup_test_sandboxes.sh` to safely prune all legacy sandbox directories from `tests/`. 
     - **CRITICAL**: The script MUST use defensive checks before executing `rm -rf`. 
-    - **CRITICAL ANTI-MICRO-SLICING GUARDRAIL**: When writing the bash script, ensure flawless bash syntax (e.g. correct spaces around brackets `[[ ]]`). A single syntax error will cause the Reviewer to reject, which forces the Planner into an infinite micro-slicing death spiral trying to break down a simple typo into atomic sub-tasks. Code it right the first time.
+    - **CRITICAL ANTI-MICRO-SLICING GUARDRAIL**: The legacy sandboxes (`tests/planner_sandbox_*` etc.) are actually **NOT tracked in Git**. Therefore, running the cleanup script will NOT produce any Git diff. Do NOT create a separate PR just to "execute" the script, because an empty diff will cause the Reviewer to reject it and trigger infinite micro-slicing. 
+    - **Instead**, the Coder should simply write the `cleanup_test_sandboxes.sh` script and update the test scripts in the SAME PR, and verify them locally.
 - **Script Hardening**:
     - Update `scripts/test_planner_micro_slicing.sh` and `scripts/test_manager_queue_polling.sh`.
     - Implement a defensively coded `trap` pattern at the start of these scripts: `trap '[[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT`. This ensures the temporary directory is wiped upon script termination without risking undefined variable expansion.
@@ -34,7 +35,7 @@ Currently, several shell-based test scripts (e.g., `test_planner_micro_slicing.s
 - `scripts/cleanup_test_sandboxes.sh` (Create)
 - `scripts/test_planner_micro_slicing.sh`
 - `scripts/test_manager_queue_polling.sh`
-- **[AUTHORIZED DELETION ZONE]**: All files and directories matching `tests/planner_sandbox_*` and `tests/manager_sandbox_*`. These legacy ghost sandboxes were accidentally tracked in Git. The Coder is explicitly AUTHORIZED to use `git rm -r` to delete them. The Reviewer MUST NOT flag these deletions as out-of-scope blast radius violations.
+- **NOTE ON LEGACY SANDBOXES**: The legacy sandboxes are NOT tracked in Git. The Coder should NOT expect `git rm -r` to work on them, and the Reviewer should NOT expect to see their deletion in the Git diff.
 
 ## 7. Hardcoded Content (硬编码内容)
 - `trap '[[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT`
