@@ -1,4 +1,5 @@
 {
   "YELLOW_RETRY_LIMIT": 3,
-  "RED_RETRY_LIMIT": 2
+  "RED_RETRY_LIMIT": 2,
+  "GLOBAL_RUN_DIR": ""
 }

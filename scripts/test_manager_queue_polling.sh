@@ -4,11 +4,12 @@ set -e
 echo "Starting E2E Manager Queue Polling Test..."
 
 SANDBOX="$(pwd)/tests/manager_sandbox_$$"
-trap 'cd / && [[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT
+GLOBAL_MOCK="/tmp/mock_sdlc_global_$$"
+trap 'cd / && [[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX" && rm -rf "$GLOBAL_MOCK"' EXIT
 mkdir -p "$SANDBOX"
 cd "$SANDBOX"
 
-JOB_DIR=".sdlc_runs/Feature_X"
+JOB_DIR="$GLOBAL_MOCK/.sdlc_runs/Feature_X"
 mkdir -p "$JOB_DIR"
 echo "status: open" > "$JOB_DIR/PR_001_DB.md"
 echo "status: open" > "$JOB_DIR/PR_002_API.md"

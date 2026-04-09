@@ -11,7 +11,7 @@ if not hasattr(git_utils, 'check_git_boundary'):
     git_utils.check_git_boundary = MagicMock()
 
 class TestOrchestratorCLI(unittest.TestCase):
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--global-dir", "."])
     def test_missing_force_replan_exits(self):
         with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
             with self.assertRaises(SystemExit) as cm:
@@ -37,7 +37,7 @@ class TestOrchestratorCLI(unittest.TestCase):
             pass
 
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test", "--global-dir", "."])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
@@ -70,7 +70,7 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test", "--global-dir", "."])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
@@ -107,7 +107,7 @@ class TestOrchestratorCLI(unittest.TestCase):
                 orchestrator.main()
             self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep", "--force-replan", "false"])
+    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep", "--force-replan", "false", "--global-dir", "."])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])

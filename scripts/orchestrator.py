@@ -25,6 +25,36 @@ MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
 import json
 
+def load_or_merge_config(sdlc_root):
+    template_path = os.path.join(sdlc_root, "config", "sdlc_config.json.template")
+    config_path = os.path.join(sdlc_root, "config", "sdlc_config.json")
+    
+    config_template = {}
+    if os.path.exists(template_path):
+        with open(template_path, "r") as f:
+            config_template = json.load(f)
+            
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                local_config = json.load(f)
+            except json.JSONDecodeError:
+                local_config = {}
+        changed = False
+        for k, v in config_template.items():
+            if k not in local_config:
+                local_config[k] = v
+                changed = True
+        if changed:
+            with open(config_path, "w") as fw:
+                json.dump(local_config, fw, indent=4)
+        return local_config
+    else:
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as f:
+            json.dump(config_template, f, indent=4)
+        return config_template
+
 def dlog(msg):
     import logging
     logger = logging.getLogger("sdlc_orchestrator")
@@ -181,6 +211,10 @@ def trigger_github_sync(workdir, effective_channel, pr_id):
             notify_channel(effective_channel, f"GitHub sync failed: {str(e)}", "github_sync_failed", {"pr_id": pr_id, "error": str(e)})
 
 def initialize_sandbox(workdir):
+    legacy_sdlc_runs = os.path.join(workdir, '.sdlc_runs')
+    if os.path.exists(legacy_sdlc_runs):
+        print("WARNING: Found legacy .sdlc_runs in project root. Please clean it up manually.")
+    
     exclude_path = os.path.join(workdir, ".git", "info", "exclude")
     if os.path.exists(os.path.dirname(exclude_path)):
         artifacts = [
@@ -223,6 +257,20 @@ def main():
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
 
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    sdlc_root = os.path.dirname(RUNTIME_DIR)
+    config = load_or_merge_config(sdlc_root)
+    
+    resolved_global_dir = None
+    if args.global_dir:
+        resolved_global_dir = os.path.abspath(args.global_dir)
+    elif config.get("GLOBAL_RUN_DIR"):
+        resolved_global_dir = os.path.abspath(config.get("GLOBAL_RUN_DIR"))
+        
+    if not args.cleanup and not resolved_global_dir:
+        raise RuntimeError("No global run directory defined. Must provide --global-dir CLI argument or set GLOBAL_RUN_DIR in sdlc_config.json.")
+    global_dir = resolved_global_dir if resolved_global_dir else sdlc_root
+
 
     if args.cleanup:
         # 1. Concurrency Guard (Crucial)
@@ -240,7 +288,7 @@ def main():
         branch_output = branch_res.stdout.strip()
         if "/" in branch_output:
             parent_dir_name = branch_output.split('/')[0]
-            run_dir = os.path.join('.sdlc_runs', parent_dir_name)
+            run_dir = os.path.join(global_dir, '.sdlc_runs', parent_dir_name)
 
         if branch_output in ["master", "main"]:
             print("Cannot quarantine master/main branch.")
@@ -318,7 +366,6 @@ def main():
     from git_utils import check_git_boundary
     check_git_boundary(workdir)
     initialize_sandbox(workdir)
-    global_dir = os.path.dirname(RUNTIME_DIR) if not args.global_dir else os.path.abspath(args.global_dir)
     os.chdir(workdir)
 
     validate_prd_is_committed(args.prd_file, workdir)

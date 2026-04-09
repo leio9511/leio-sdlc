@@ -37,6 +37,7 @@ echo ".sdlc_repo.lock" >> .gitignore
 echo "__pycache__/" >> .gitignore
 echo "*.pyc" >> .gitignore
 echo "*.log" >> .gitignore
+echo "config/" >> .gitignore
 git add .gitignore scripts
 git commit -m "setup" > /dev/null 2>&1
 
@@ -65,7 +66,7 @@ cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import sys
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--out-file', default='.sdlc_runs/dummy_prd/Review_Report.md')
+parser.add_argument('--out-file', default='/tmp/Review_Report.md')
 args, _ = parser.parse_known_args()
 with open(args.out_file, "w") as f:
     f.write('''```json
