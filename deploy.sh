@@ -84,7 +84,7 @@ perform_hard_copy_deployment() {
     if [ -d ".dist" ] && [ "$(ls -A .dist 2>/dev/null)" ]; then
         cp -a .dist/* "$TMP_DIR/"
     else
-        rsync -a --exclude=.git --exclude=.dist --exclude=node_modules . "$TMP_DIR/"
+        rsync -a --exclude-from='.gitignore' --exclude-from='.release_ignore' . "$TMP_DIR/"
     fi
 
     # Hot Preservation (PRD-1088)
