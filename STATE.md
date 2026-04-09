@@ -1,12 +1,13 @@
 # STATE.md - leio-sdlc Development State (Kanban)
 
 - **Project**: leio-sdlc (Automated SDLC Orchestrator)
-- **Current Version**: 0.8.3
+- **Current Version**: 0.9.2
 - **Status**: [SDLC Hardening] - Implementing native notifications, fail-fast git hygiene, and deterministic state tracking.
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
-- [x] **[ISSUE-1088] Fix Test Sandbox Leakage & Auto-Cleanup**: Preflight script now automatically clears legacy test sandboxes, and defensive traps securely eradicate temporary directories regardless of CWD changes.
+- [x] **[ISSUE-1088] Fix Planner Template Adherence and Refine Coder Review Retry Logic**: Successfully implemented Four-Path Resilience (Green/Yellow/Red/Black), Scaffold-then-Fill PR generation, and Hot-Preservation for configuration during deployment.
+- [x] **[ISSUE-1071] Automated Test Discovery in Preflight**: Refactored `preflight.sh` to dynamically discover and execute all bash (`scripts/test_*.sh`) and python (`tests/test_*.py`) tests instead of hardcoding them.
 - [x] **[ISSUE-1058] Prevent SDLC_TEST_MODE Leakage in Production**: Added context-aware guardrails to `orchestrator.py` to fatally terminate if `SDLC_TEST_MODE=true` is detected in the production runtime, physically blocking hallucinated mock approvals.
 - [x] **[ISSUE-1065/1082/1086] Formalize PRD Commit, Template Validation & Auditor Downgrade**: Decoupled auto-commit from orchestrator, implemented `commit_state.py` as the sole explicit state gateway. Downgraded Auditor from independent AgentSkill to internal native script to physically eradicate Reward Hacking bypasses.
 - [x] **[ISSUE-1079/1080] Path Resolution Guardrails**: Implemented mandatory `{workdir}/` prefixing for native tools and added Context_Workdir to PRD templates to solve CWD drift.
@@ -40,11 +41,11 @@
 
 ## 🚀 Active Milestones & Next in Queue
 
-- [x] **[ISSUE-1071] Automated Test Discovery in Preflight**: Refactored `preflight.sh` to dynamically discover and execute all bash (`scripts/test_*.sh`) and python (`tests/test_*.py`) tests instead of hardcoding them.
 - **M3: End-to-End Orchestrator Autonomy (State 0 to State 6)** [IN PROGRESS]
   - [ ] **[ISSUE-055] Global Control Tower**: A dashboard/snapshot tool to track the engine's real-time state.
 
 ## 📜 History
+- **2026-04-09**: ISSUE-1088 Hierarchical Resilience implemented.
 - **2026-03-25**: Massive issue board cleanup. Synced stale resolved issues (011, 036, 037, 066, 1003, 1005, 1007, 1010) to closed state.
 - **2026-03-22**: Handbook rewritten. Issue System declared as SSOT.
 - **2026-03-17**: Engine upgraded to v0.2.6. Reward Hacking & Prompt Injection physically blocked via absolute path isolation.
