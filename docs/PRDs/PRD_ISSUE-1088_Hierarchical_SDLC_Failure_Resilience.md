@@ -16,10 +16,12 @@ Affected_Projects: [leio-sdlc]
    - **Yellow (增量修正)**: Review 失败 -> 在同一个 Coder Session 中读取 Feedback 继续修改，**严禁** Reset 代码 (重试上限 N)。
    - **Red (物理换人)**: 连续 N 次 Yellow 失败 -> 执行 `git reset --hard`，开启**全新**的 Coder Session 从零重写 (重试上限 M)。
    - **Black (任务熔断)**: 连续 M 次 Red 失败 -> 判定为任务粒度或架构问题。打回 Planner 重新切分任务（Micro-Slicing）。如果无法切分，则退出并报告 Boss。
-3. **参数化控制**：Yellow 重试限制 (N) 和 Red 重试限制 (M) 必须作为流水线可配置参数。
+3. **参数化控制与持久化**：Yellow 重试限制 (N) 和 Red 重试限制 (M) 必须作为流水线可配置参数，且在部署升级中不被覆盖。
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-- **配置优先级**: 引入 `config/sdlc_config.json`。系统读取参数的优先级为：`sdlc_config.json` > 代码硬编码 Fallback。
+- **配置优先级与持久化**: 
+  - 引入 `config/sdlc_config.json.template` 作为分发模板。
+  - 修改 `deploy.sh`：在执行原子交换前，检查生产环境是否存在 `sdlc_config.json`。若存在，则将其备份并恢复到新版本目录中（Hot-Preservation），防止 Boss 自定义的参数被升级覆盖。
 - **spawn_planner.py / create_pr_contract.py**: 引入模板 Copy 逻辑。Planner 启动前，由脚本预先生成带有 YAML 头部的文件。
 - **orchestrator.py (核心状态机重构)**:
   - 引入 `yellow_retry_limit (N)` 和 `red_retry_limit (M)` 参数。
@@ -29,57 +31,54 @@ Affected_Projects: [leio-sdlc]
   - **计数器复位**: 任务切分（Micro-Slicing）后生成的新 PR 队列，其 M 和 N 计数器完全重新开始。
 - **spawn_coder.py**: 增强 Session 管理。确保在 Yellow Path 下显式通过 `--session-id` 复用上下文。
 - **回滚预案 (Rollback Plan)**: 
-  - 依靠 `deploy.sh` 的原子备份机制。
-  - 若新状态机失控，执行 `bash scripts/rollback.sh` 恢复至上一个稳定版本。
+  - 依靠 `deploy.sh` 的原子备份机制。若新状态机失控，执行 `bash scripts/rollback.sh`。
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1: 物理模板完整性**
   - **Given** 启动一个新的 PRD 分解任务。
   - **When** Planner 完成输出。
   - **Then** 所有生成的 PR 合约文件必须 100% 包含 `status: open` 头部。
-- **Scenario 2: Yellow Path 增量开发**
+- **Scenario 2: 配置热保留 (Hot Preservation)**
+  - **Given** 已经手动修改了 `sdlc_config.json` 的 N 为 5。
+  - **When** 执行 `bash deploy.sh` 进行系统升级。
+  - **Then** 升级后的 `config/sdlc_config.json` 中的 N 依然保持为 5。
+- **Scenario 3: Yellow Path 增量开发**
   - **Given** 一个 PR 初次 Review 失败。
   - **When** 失败次数 < N。
   - **Then** 系统不执行 `git reset`，Coder 能够基于当前代码修改。
-- **Scenario 3: Red Path 物理重置**
-  - **Given** 同一个 Coder Session 连续失败 N 次。
-  - **When** 触发重试。
-  - **Then** 系统执行 `git reset --hard` 并更换全新的 Session ID。
-- **Scenario 4: Black Path 任务切分与重计**
-  - **Given** 累计更换了 M 个 Coder Session 且均告失败。
-  - **When** 触发重试。
-  - **Then** 系统调用 Planner 进行 Micro-Slicing，新 PR 的重试计数器从 0 开始。
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
-- **Mock 驱动测试**：必须编写 E2E 测试脚本，通过 Mock Reviewer 连续返回 `ACTION_REQUIRED`，验证 Orchestrator 是否能精准地在第 N 次失败时执行 Reset，在第 N+M 次失败时触发 Black Path。
-- **核心风险**：防止在 Yellow Path 下 Coder 陷入死循环。
+- **路径覆盖 E2E 测试 (`scripts/e2e/e2e_test_hierarchical_resilience.sh`)**:
+  - **Green Test**: Mock Reviewer 返回 `APPROVED`，验证 PR 成功合并。
+  - **Yellow-to-Green Test**: Mock Reviewer 先返回 `ACTION_REQUIRED`（1次），第二次返回 `APPROVED`。验证期间未发生 `git reset` 且 Session ID 保持一致。
+  - **Yellow-to-Red Test**: 模拟连续 N 次 `ACTION_REQUIRED`。验证在第 N+1 次尝试前触发了 `git reset --hard` 并生成了新的 Session ID。
+  - **Red-to-Black Test**: 模拟累计 $M \times N$ 次失败。验证系统最终调用了 `spawn_planner.py --slice-failed-pr` 触发任务熔断逻辑。
+- **配置持久化测试**: 
+  - 编写脚本模拟 `deploy.sh` 过程，断言本地配置文件在目录交换前后的内容一致性。
 
 ## 6. Framework Modifications (框架防篡改声明)
 - `scripts/orchestrator.py`
 - `scripts/spawn_planner.py`
 - `scripts/spawn_coder.py`
 - `scripts/create_pr_contract.py`
+- `deploy.sh`
 - `config/prompts.json`
-- `config/sdlc_config.json` (New File)
+- `config/sdlc_config.json.template` (New File)
 
 ## 7. Hardcoded Content (硬编码内容声明)
-为了防止 Agent 幻觉，以下核心状态字符串和消息模板必须严格遵守：
 - **参数名**: `YELLOW_RETRY_LIMIT`, `RED_RETRY_LIMIT`
 - **Fallback 默认值**: N=3, M=2
 - **PR 状态**: `status: open`, `status: in_progress`, `status: closed`, `status: superseded`
 - **Review 判定**: `APPROVED`, `ACTION_REQUIRED`
 - **路径标识**: `Green Path`, `Yellow Path`, `Red Path`, `Black Path`
 - **错误代码**: `[FATAL_ESCALATION]`, `[DEAD_END]`
-- **Planner 占位符**: `# PR-[ID]: [Title]`
 
 ---
 
 ## Appendix: Architecture Evolution Trace (架构演进与审查追踪)
-- **v1.0**: 按照 Boss 指示，确立 Green/Yellow/Red/Black 四级防御路径，并将模板生成逻辑从模型自发改为脚本物理驱动。
-- **Audit Rejection (v1.0)**: 缺少 Section 7 Hardcoded Content。
-- **v2.0 Revision Rationale**: 补全 Section 7，确保状态机核心字符串物理对齐，防止 Coder 幻觉。
-- **Audit Rejection (v2.0)**: 缺失回滚计划，参数落地点不明。
-- **v3.0 Revision Rationale**: 
-  1. 引入 `sdlc_config.json` 作为参数 SSOT，代码 Fallback 兜底。
-  2. 明确回滚预案。
-  3. 定义了精确的 $M \times N$ 总重试次数逻辑及切分后的重计机制。
+- **v1.0**: 确立分级防御路径。
+- **v2.0 Revision**: 补全 Section 7 Hardcoded Content。
+- **v3.0 Revision**: 引入配置 SSOT 与 M*N 数学逻辑，明确回滚预案。
+- **v4.0 Revision**: 
+  1. 增加了 `deploy.sh` 的 **Hot Preservation** 逻辑，解决 Boss 担心的配置覆盖问题。
+  2. 详细定义了 **四色路径覆盖测试方案**，确保逻辑可被 Mock 验证。
