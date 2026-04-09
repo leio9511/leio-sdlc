@@ -3,8 +3,8 @@ set -e
 
 echo "Starting E2E Manager Queue Polling Test..."
 
-SANDBOX="/root/.openclaw/workspace/projects/leio-sdlc/tests/manager_sandbox_$$"
-trap '[[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT
+SANDBOX="$(pwd)/tests/manager_sandbox_$$"
+trap 'cd / && [[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT
 mkdir -p "$SANDBOX"
 cd "$SANDBOX"
 

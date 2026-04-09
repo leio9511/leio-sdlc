@@ -14,6 +14,9 @@ fi
 
 echo "[$(date '+%H:%M:%S')] Starting Smart Preflight Checks..."
 
+# ISSUE-1088: Prune legacy test sandboxes
+rm -rf tests/planner_sandbox_* tests/manager_sandbox_* 2>/dev/null || true
+
 cd "$PROJECT_DIR" || exit 1
 export PYTHONPATH="$PROJECT_DIR:$PYTHONPATH"
 

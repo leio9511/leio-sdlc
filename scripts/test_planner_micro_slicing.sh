@@ -3,7 +3,8 @@ set -e
 
 echo "Running Micro-Slicing Act Test..."
 
-SANDBOX="tests/planner_sandbox_$$"
+SANDBOX="$(pwd)/tests/planner_sandbox_$$"
+trap 'cd / && [[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT
 mkdir -p "$SANDBOX/prs"
 rm -f "$SANDBOX"/prs/*.md || true
 
