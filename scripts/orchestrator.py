@@ -114,8 +114,8 @@ def get_pr_slice_depth(pr_file):
         return int(match.group(1))
     return 0
 
-def teardown_coder_session(workdir):
-    session_file = os.path.join(workdir, ".coder_session")
+def teardown_coder_session(workdir, run_dir="."):
+    session_file = os.path.join(workdir, run_dir, ".coder_session")
     if os.path.exists(session_file):
         with open(session_file, "r") as f:
             session_key = f.read().strip()
@@ -305,16 +305,15 @@ def main():
     logger = setup_orchestrator_logger(workdir, args.debug)
     dlog(f"Workdir: {workdir}")
     
-    # 1. Blast Radius Control: Scan and delete all .coder_session files
+    # 1. Blast Radius Control: Scan and delete all .coder_session files using glob
     dlog("Executing Blast Radius Control...")
-    for root, dirs, files in os.walk(workdir):
-        if ".coder_session" in files:
-            session_file_path = os.path.join(root, ".coder_session")
-            try:
-                os.remove(session_file_path)
-                dlog(f"Blast Radius Control: Removed {session_file_path}")
-            except OSError as e:
-                dlog(f"Blast Radius Control: Failed to remove {session_file_path}: {e}")
+    import glob
+    for session_file_path in glob.glob(os.path.join(workdir, "**", ".coder_session"), recursive=True):
+        try:
+            os.remove(session_file_path)
+            dlog(f"Blast Radius Control: Removed {session_file_path}")
+        except OSError as e:
+            dlog(f"Blast Radius Control: Failed to remove {session_file_path}: {e}")
                 
     from git_utils import check_git_boundary
     check_git_boundary(workdir)
@@ -492,12 +491,12 @@ def main():
                     sys.exit(1)
                 set_pr_status(current_pr, "in_progress")
 
-            if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir)
+            if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir, run_dir)
             base_filename = os.path.splitext(os.path.basename(current_pr))[0]
             parent_dir_name = os.path.basename(os.path.dirname(os.path.abspath(current_pr)))
             branch_name = f"{parent_dir_name}/{base_filename}".replace(":", "_").replace(" ", "_").replace("?", "_")
             pr_done = False
-            # Reset Resilience Counters per PR
+            # Reset Resilience Counters per PR for Red Path logic
             red_counter = 0
 
             while True:
@@ -512,11 +511,12 @@ def main():
                     print(HandoffPrompter.get_prompt("git_checkout_error"))
                     sys.exit(1)
                 
+                # State Machine Expansion: initialize retry counters
                 yellow_counter = 0
                 state_5_trigger = False
                 current_feedback_file = None
                 while True:
-                    if args.coder_session_strategy == "always": teardown_coder_session(workdir)
+                    if args.coder_session_strategy == "always": teardown_coder_session(workdir, run_dir)
                     logger.info(f"State 3: Spawning Coder for {current_pr}")
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
@@ -606,41 +606,20 @@ def main():
                             state_5_trigger = True
                             break
                     elif verdict == "ACTION_REQUIRED" or "[ACTION_REQUIRED]" in review_content:
+                        # Yellow Path logic: Keep current session ID and increment counter
                         yellow_counter += 1
                         notify_channel(effective_channel, f"Reviewer rejected changes (Yellow Path: {yellow_counter}/{yellow_retry_limit}). Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                         if yellow_counter < yellow_retry_limit:
                             current_feedback_file = review_report_path
                             continue
                         else:
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", run_dir], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                            out, err = proc.communicate()
-                            class _ArbRes: pass # Reaper safety check: process already reaped or pgid not found
-                            arbitrator_result = _ArbRes()
-                            arbitrator_result.stdout = out
-                            if "[OVERRIDE_LGTM]" in arbitrator_result.stdout:
-                                drun(["git", "reset", "--hard", "HEAD"])
-                                drun(["git", "clean", "-fd"])
-                                safe_git_checkout("master")
-                                merge_result = drun([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
-                                if merge_result.returncode == 0:
-                                    drun(["git", "branch", "-D", branch_name], check=True)
-                                    set_pr_status(current_pr, "closed")
-                                    notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
-                                    trigger_github_sync(workdir, effective_channel, base_filename)
-                                    teardown_coder_session(workdir)
-                                    pr_done = True
-                                    break
-                                else:
-                                    state_5_trigger = True
-                                    break
-                            else:
-                                state_5_trigger = True
-                                break
+                            state_5_trigger = True
+                            break
                     else:
                         state_5_trigger = True
                         break
                 if state_5_trigger:
-                    if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir)
+                    if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir, run_dir)
 
                     # PRD 1060: Forensic Quarantine: Use shutil.copytree instead of git tracking
                     job_dir_abs = run_dir
@@ -666,7 +645,7 @@ def main():
                         drun(["git", "branch", "-D", branch_name], check=False)
                         
                         # RED PATH ENFORCEMENT: Force a NEW Session ID
-                        teardown_coder_session(workdir)
+                        teardown_coder_session(workdir, run_dir)
                         
                         red_counter += 1
                         continue

@@ -38,16 +38,19 @@ def send_feedback(session_key, message, workdir='.'):
     print(f"Sent feedback to session {session_key}")
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
     session_file = os.path.join(workdir, run_dir, ".coder_session")
-    session_key = f"sdlc_coder_{pr_id}"
     try:
         with open(feedback_file, "r") as f:
             feedback_content = f.read()
         msg = build_prompt("coder_revision", feedback_content=feedback_content)
         
         if os.path.exists(session_file):
+            with open(session_file, "r") as sf:
+                session_key = sf.read().strip()
             send_feedback(session_key, msg, workdir=workdir)
             return True, session_key
         else:
+            import uuid
+            session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
             task_string += msg
             openclaw_agent_call(session_key, task_string, workdir=workdir)
             with open(session_file, "w") as f:
@@ -124,7 +127,13 @@ def main():
         )
         
         session_file = os.path.join(workdir, args.run_dir, ".coder_session")
-        session_key = f"sdlc_coder_{pr_id}"
+        
+        if os.path.exists(session_file):
+            with open(session_file, "r") as sf:
+                session_key = sf.read().strip()
+        else:
+            import uuid
+            session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
         
         if args.system_alert:
             msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
@@ -139,9 +148,12 @@ def main():
         elif args.feedback_file:
             handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id, args.run_dir)
         else:
-            openclaw_agent_call(session_key, task_string, workdir=workdir)
-            with open(session_file, "w") as f:
-                f.write(session_key)
-            print(f"Spawned new session {session_key}")
+            if not os.path.exists(session_file):
+                openclaw_agent_call(session_key, task_string, workdir=workdir)
+                with open(session_file, "w") as f:
+                    f.write(session_key)
+                print(f"Spawned new session {session_key}")
+            else:
+                openclaw_agent_call(session_key, task_string, workdir=workdir)
 if __name__ == "__main__":
     main()
