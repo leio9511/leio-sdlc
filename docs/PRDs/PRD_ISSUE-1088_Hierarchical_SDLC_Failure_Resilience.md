@@ -49,7 +49,17 @@ Affected_Projects: [leio-sdlc]
 - `scripts/create_pr_contract.py`
 - `config/prompts.json`
 
+## 7. Hardcoded Content (硬编码内容声明)
+为了防止 Agent 幻觉，以下核心状态字符串和消息模板必须严格遵守：
+- **PR 状态**: `status: open`, `status: in_progress`, `status: closed`, `status: superseded`
+- **Review 判定**: `APPROVED`, `ACTION_REQUIRED`
+- **路径标识**: `Green Path`, `Yellow Path`, `Red Path`, `Black Path`
+- **错误代码**: `[FATAL_ESCALATION]`, `[DEAD_END]`
+- **Planner 占位符**: `# PR-[ID]: [Title]`
+
 ---
 
 ## Appendix: Architecture Evolution Trace (架构演进与审查追踪)
 - **v1.0**: 按照 Boss 指示，确立 Green/Yellow/Red/Black 四级防御路径，并将模板生成逻辑从模型自发改为脚本物理驱动。
+- **Audit Rejection (v1.0)**: 缺少 Section 7 Hardcoded Content。
+- **v2.0 Revision Rationale**: 补全 Section 7，确保状态机核心字符串物理对齐，防止 Coder 幻觉。
