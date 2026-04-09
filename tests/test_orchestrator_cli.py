@@ -11,17 +11,19 @@ if not hasattr(git_utils, 'check_git_boundary'):
     git_utils.check_git_boundary = MagicMock()
 
 class TestOrchestratorCLI(unittest.TestCase):
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--global-dir", "."])
     def test_missing_force_replan_exits(self):
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
-            with self.assertRaises(SystemExit) as cm:
-                import orchestrator
-                orchestrator.main()
-            self.assertNotEqual(cm.exception.code, 0)
-            
-            # verify output contains the expected fatal error string
-            output = "".join([call.args[0] for call in mock_stdout.write.call_args_list])
-            self.assertIn("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.", output)
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            with patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--global-dir", td]):
+                with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+                    with self.assertRaises(SystemExit) as cm:
+                        import orchestrator
+                        orchestrator.main()
+                    self.assertNotEqual(cm.exception.code, 0)
+                    
+                    # verify output contains the expected fatal error string
+                    output = "".join([call.args[0] for call in mock_stdout.write.call_args_list])
+                    self.assertIn("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.", output)
 
     def test_missing_workdir_exits(self):
         with self.assertRaises(SystemExit) as cm:
@@ -37,7 +39,6 @@ class TestOrchestratorCLI(unittest.TestCase):
             pass
 
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test", "--global-dir", "."])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
@@ -45,6 +46,7 @@ class TestOrchestratorCLI(unittest.TestCase):
         # We need to test the PRD guardrail.
         import orchestrator
         import subprocess
+        import tempfile
 
         # Setup mock behavior
         def mock_exists_side_effect(path):
@@ -65,18 +67,20 @@ class TestOrchestratorCLI(unittest.TestCase):
 
         mock_run.side_effect = mock_run_side_effect
 
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
-            with self.assertRaises(SystemExit) as cm:
-                orchestrator.main()
-            self.assertEqual(cm.exception.code, 1)
+        with tempfile.TemporaryDirectory() as td:
+            with patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "untracked.md", "--channel", "test", "--global-dir", td]):
+                with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+                    with self.assertRaises(SystemExit) as cm:
+                        orchestrator.main()
+                    self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test", "--global-dir", "."])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
     def test_prd_guardrail_modified(self, mock_parse, mock_run, mock_exists):
         import orchestrator
         import subprocess
+        import tempfile
 
         def mock_exists_side_effect(path):
             if path == os.path.abspath("modified.md"):
@@ -102,12 +106,13 @@ class TestOrchestratorCLI(unittest.TestCase):
 
         mock_run.side_effect = mock_run_side_effect
 
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
-            with self.assertRaises(SystemExit) as cm:
-                orchestrator.main()
-            self.assertEqual(cm.exception.code, 1)
+        with tempfile.TemporaryDirectory() as td:
+            with patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "modified.md", "--channel", "test", "--global-dir", td]):
+                with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+                    with self.assertRaises(SystemExit) as cm:
+                        orchestrator.main()
+                    self.assertEqual(cm.exception.code, 1)
 
-    @patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep", "--force-replan", "false", "--global-dir", "."])
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
@@ -116,6 +121,7 @@ class TestOrchestratorCLI(unittest.TestCase):
     def test_prd_guardrail_clean(self, mock_os_open, mock_flock, mock_parse, mock_run, mock_exists):
         import orchestrator
         import subprocess
+        import tempfile
 
         def mock_exists_side_effect(path):
             if path == os.path.abspath("clean.md"):
@@ -153,10 +159,13 @@ class TestOrchestratorCLI(unittest.TestCase):
 
         mock_run.side_effect = mock_run_side_effect
 
-        with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
-            with self.assertRaises(SystemExit) as cm:
-                orchestrator.main()
-            self.assertEqual(cm.exception.code, 0)
+        import tempfile
+        td = tempfile.mkdtemp()
+        with patch("sys.argv", ["orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "clean.md", "--channel", "test", "--test-sleep", "--force-replan", "false", "--global-dir", td]):
+            with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+                with self.assertRaises(SystemExit) as cm:
+                    orchestrator.main()
+                self.assertEqual(cm.exception.code, 0)
 
     def test_orchestrator_uses_shared_notify_channel(self):
         import orchestrator
