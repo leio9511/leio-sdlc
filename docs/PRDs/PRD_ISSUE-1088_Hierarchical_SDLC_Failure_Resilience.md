@@ -19,10 +19,18 @@ Affected_Projects: [leio-sdlc]
 3. **参数化控制**：Yellow 重试限制 (N) 和 Red 重试限制 (M) 必须作为流水线可配置参数。
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
+- **配置优先级**: 引入 `config/sdlc_config.json`。系统读取参数的优先级为：`sdlc_config.json` > 代码硬编码 Fallback。
 - **spawn_planner.py / create_pr_contract.py**: 引入模板 Copy 逻辑。Planner 启动前，由脚本预先生成带有 YAML 头部的文件。
-- **orchestrator.py**: 核心重构。重写 State 3-4-5 的循环逻辑，引入 `yellow_retry_count` 和 `red_retry_count` 计数器，精准控制 Reset 触发时机。
+- **orchestrator.py (核心状态机重构)**:
+  - 引入 `yellow_retry_limit (N)` 和 `red_retry_limit (M)` 参数。
+  - **Yellow Path**: Review 失败时，`yellow_retry_count` 累加。若 < N，调用 `spawn_coder.py` 并传入 Feedback，保持 Session 不变，不执行 Git Reset。
+  - **Red Path**: 若 `yellow_retry_count` 达到 N，则触发 Red Path。执行 `git reset --hard`，清空当前 Coder Session，`red_retry_count` 累加，`yellow_retry_count` 清零，开启全新会话重写。
+  - **Black Path**: 若 `red_retry_count` 达到 M（即总计经历了 M * N 次 Review 失败），触发任务切分逻辑。
+  - **计数器复位**: 任务切分（Micro-Slicing）后生成的新 PR 队列，其 M 和 N 计数器完全重新开始。
 - **spawn_coder.py**: 增强 Session 管理。确保在 Yellow Path 下显式通过 `--session-id` 复用上下文。
-- **config/prompts.json**: 优化 Planner Prompt，移除“严禁修改 status”等带有干扰性的指令，改为引导式填空。
+- **回滚预案 (Rollback Plan)**: 
+  - 依靠 `deploy.sh` 的原子备份机制。
+  - 若新状态机失控，执行 `bash scripts/rollback.sh` 恢复至上一个稳定版本。
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1: 物理模板完整性**
@@ -31,12 +39,16 @@ Affected_Projects: [leio-sdlc]
   - **Then** 所有生成的 PR 合约文件必须 100% 包含 `status: open` 头部。
 - **Scenario 2: Yellow Path 增量开发**
   - **Given** 一个 PR 初次 Review 失败。
-  - **When** 进入重试循环。
-  - **Then** `git status` 应显示之前的修改依然存在，且 Coder 能够看到 Review Feedback。
+  - **When** 失败次数 < N。
+  - **Then** 系统不执行 `git reset`，Coder 能够基于当前代码修改。
 - **Scenario 3: Red Path 物理重置**
-  - **Given** 一个 PR 连续失败次数超过 N。
-  - **When** 触发下一次重试。
-  - **Then** 系统必须执行 `git reset --hard`，且 Coder 应该像一个“新员工”一样从干净的代码库开始。
+  - **Given** 同一个 Coder Session 连续失败 N 次。
+  - **When** 触发重试。
+  - **Then** 系统执行 `git reset --hard` 并更换全新的 Session ID。
+- **Scenario 4: Black Path 任务切分与重计**
+  - **Given** 累计更换了 M 个 Coder Session 且均告失败。
+  - **When** 触发重试。
+  - **Then** 系统调用 Planner 进行 Micro-Slicing，新 PR 的重试计数器从 0 开始。
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 - **Mock 驱动测试**：必须编写 E2E 测试脚本，通过 Mock Reviewer 连续返回 `ACTION_REQUIRED`，验证 Orchestrator 是否能精准地在第 N 次失败时执行 Reset，在第 N+M 次失败时触发 Black Path。
@@ -48,9 +60,12 @@ Affected_Projects: [leio-sdlc]
 - `scripts/spawn_coder.py`
 - `scripts/create_pr_contract.py`
 - `config/prompts.json`
+- `config/sdlc_config.json` (New File)
 
 ## 7. Hardcoded Content (硬编码内容声明)
 为了防止 Agent 幻觉，以下核心状态字符串和消息模板必须严格遵守：
+- **参数名**: `YELLOW_RETRY_LIMIT`, `RED_RETRY_LIMIT`
+- **Fallback 默认值**: N=3, M=2
 - **PR 状态**: `status: open`, `status: in_progress`, `status: closed`, `status: superseded`
 - **Review 判定**: `APPROVED`, `ACTION_REQUIRED`
 - **路径标识**: `Green Path`, `Yellow Path`, `Red Path`, `Black Path`
@@ -63,3 +78,8 @@ Affected_Projects: [leio-sdlc]
 - **v1.0**: 按照 Boss 指示，确立 Green/Yellow/Red/Black 四级防御路径，并将模板生成逻辑从模型自发改为脚本物理驱动。
 - **Audit Rejection (v1.0)**: 缺少 Section 7 Hardcoded Content。
 - **v2.0 Revision Rationale**: 补全 Section 7，确保状态机核心字符串物理对齐，防止 Coder 幻觉。
+- **Audit Rejection (v2.0)**: 缺失回滚计划，参数落地点不明。
+- **v3.0 Revision Rationale**: 
+  1. 引入 `sdlc_config.json` 作为参数 SSOT，代码 Fallback 兜底。
+  2. 明确回滚预案。
+  3. 定义了精确的 $M \times N$ 总重试次数逻辑及切分后的重计机制。
