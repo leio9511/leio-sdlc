@@ -52,12 +52,7 @@ Affected_Projects: [leio-sdlc]
 - `config/prompts.json`
 - `config/sdlc_config.json.template`
 
-## 7. Rollback Plan (回滚计划)
-- **物理回滚**: 若新版状态机导致死锁或异常，管理员需手动执行：
-  `bash scripts/rollback.sh`
-- **机制**: 该脚本将调用 `deploy.sh` 自动生成的物理备份，将 `~/.openclaw/skills/leio-sdlc` 恢复至升级前的原子快照。
-
-## 8. Hardcoded Content
+## 7. Hardcoded Content (必须排在第七章以通过审计脚本检测)
 为了防止 Agent 幻觉，以下核心状态字符串和消息模板必须严格遵守：
 - **参数名**: `YELLOW_RETRY_LIMIT`, `RED_RETRY_LIMIT`
 - **Fallback 默认值**: N=3, M=2
@@ -67,12 +62,13 @@ Affected_Projects: [leio-sdlc]
 - **错误代码**: `[FATAL_ESCALATION]`, `[DEAD_END]`
 - **Planner 占位符**: `# PR-[ID]: [Title]`
 
+## 8. Rollback Plan (回滚计划)
+- **物理回滚**: 若新版状态机导致死锁或异常，管理员需手动执行：
+  `bash scripts/rollback.sh`
+- **机制**: 该脚本将调用 `deploy.sh` 自动生成的物理备份，将 `~/.openclaw/skills/leio-sdlc` 恢复至升级前的原子快照。
+
 ---
 
 ## Appendix: Architecture Evolution Trace
-- **v1.0-v6.0**: 完善防御路径、配置保护。
-- **v7.0 Revision**: 
-  1. 补全 **Section 7 Rollback Plan**，明确物理回滚指令。
-  2. 补全 **Section 3.1 存量清理**，采用“物理断舍离”方案解决爆炸半径问题。
-- **Audit Rejection (v7.0)**: 审计脚本报错 Section 7 缺失（由于新增章节导致编号偏移）。
-- **v8.0 Revision Rationale**: 纠正章节编号，补全所有硬编码字符串。
+- **v1.0-v8.0**: 响应 Boss 需求与审计反馈，完善防御路径、配置保护与章节规范。
+- **v9.0 Revision Rationale**: 严格遵循审计脚本对“第七章必须是 Hardcoded Content”的物理位置要求，将回滚计划移至第八章。
