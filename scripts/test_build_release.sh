@@ -17,6 +17,7 @@ docs/
 EOF
 
 # Create dummy files
+touch .gitignore
 mkdir -p scripts docs tests
 touch SKILL.md scripts/main.py docs/PRD.md tests/test.sh
 

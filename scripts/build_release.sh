@@ -22,6 +22,6 @@ memory/
 EOF
 fi
 
-rsync -av --exclude-from='.release_ignore' --exclude="$DIST_DIR/" ./ "$DIST_DIR/"
+rsync -av --exclude-from='.gitignore' --exclude-from='.release_ignore' --exclude="$DIST_DIR/" ./ "$DIST_DIR/"
 
 echo "Build complete."
