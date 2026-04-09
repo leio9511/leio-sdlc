@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-DIST_DIR="dist"
+DIST_DIR=".dist"
 
 echo "Building release to $DIST_DIR..."
 

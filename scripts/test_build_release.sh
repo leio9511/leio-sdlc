@@ -24,23 +24,23 @@ touch SKILL.md scripts/main.py docs/PRD.md tests/test.sh
 bash "$BUILD_SCRIPT" > /dev/null
 
 # Assertions
-if [ ! -f "dist/SKILL.md" ]; then
-    echo "❌ Error: dist/SKILL.md not found!"
+if [ ! -f ".dist/SKILL.md" ]; then
+    echo "❌ Error: .dist/SKILL.md not found!"
     exit 1
 fi
 
-if [ ! -f "dist/scripts/main.py" ]; then
-    echo "❌ Error: dist/scripts/main.py not found!"
+if [ ! -f ".dist/scripts/main.py" ]; then
+    echo "❌ Error: .dist/scripts/main.py not found!"
     exit 1
 fi
 
-if [ -d "dist/docs" ] || [ -f "dist/docs/PRD.md" ]; then
-    echo "❌ Error: dist/docs/ should not exist!"
+if [ -d ".dist/docs" ] || [ -f ".dist/docs/PRD.md" ]; then
+    echo "❌ Error: .dist/docs/ should not exist!"
     exit 1
 fi
 
-if [ -d "dist/tests" ] || [ -f "dist/tests/test.sh" ]; then
-    echo "❌ Error: dist/tests/ should not exist!"
+if [ -d ".dist/tests" ] || [ -f ".dist/tests/test.sh" ]; then
+    echo "❌ Error: .dist/tests/ should not exist!"
     exit 1
 fi
 

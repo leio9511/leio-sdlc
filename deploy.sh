@@ -52,8 +52,8 @@ perform_hard_copy_deployment() {
     if [ -f "scripts/build_release.sh" ]; then
         bash "scripts/build_release.sh" || exit 1
     else
-        mkdir -p dist
-        cp -r * dist/ 2>/dev/null || true
+        mkdir -p .dist
+        cp -r * .dist/ 2>/dev/null || true
     fi
 
     mkdir -p "$SKILLS_DIR"
@@ -81,10 +81,10 @@ perform_hard_copy_deployment() {
     rm -rf "$OLD_DIR"
     mkdir -p "$TMP_DIR"
 
-    if [ -d "dist" ] && [ "$(ls -A dist 2>/dev/null)" ]; then
-        cp -a dist/* "$TMP_DIR/"
+    if [ -d ".dist" ] && [ "$(ls -A .dist 2>/dev/null)" ]; then
+        cp -a .dist/* "$TMP_DIR/"
     else
-        rsync -a --exclude=.git --exclude=dist --exclude=node_modules . "$TMP_DIR/"
+        rsync -a --exclude=.git --exclude=.dist --exclude=node_modules . "$TMP_DIR/"
     fi
 
     # 3. Atomic Swap

@@ -31,6 +31,7 @@ docs/PRs/PRD_079_SDLC_Slack_Notifications/Review_Report_2.md
 .sdlc_repo.lock
 
 # Build Artifacts
+.dist/
 dist/
 __pycache__/
 *.pyc
