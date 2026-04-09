@@ -10,60 +10,62 @@ Affected_Projects: [leio-sdlc]
 2. **重试机制单一**：无论失败原因，系统均采取“硬重置 + 丢弃会话”的策略，摧毁了 Coder 的增量工作成果。
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Scaffold-then-Fill (初始化即契约)**：参考 `init_prd.py` 逻辑。Planner 生成 PR 时，必须先调用工具生成带有标准头部的 PR 骨架文件，然后再填充具体内容。**物理上将“管理元数据（status）”与“业务内容（Objective/Scope）”解耦。**
+1. **Scaffold-then-Fill (初始化即契约)**：Planner 思考完切分方案后，第一步动作必须是调用脚本 Scaffold 出所有 PR 骨架文件，然后再逐个填充内容。
 2. **四级路径防御体系 (Four-Path Resilience)**：
    - **Green**: 直接过审合并。
    - **Yellow (增量)**: Review 失败但次数 < N -> 在原 Session 增量修改，**不准** Reset。
-   - **Red (换人)**: 连续 N 次 Yellow 失败 -> 执行 `git reset --hard` 并**物理换 Session ID**，模拟“换个新人重写”。
-   - **Black (熔断)**: 连续 M 次 Red 失败 -> 任务打回 Planner 二次切分。无法切分则向 Boss 报警。
-3. **参数化控制**：N (Yellow Limit) 和 M (Red Limit) 需在配置文件中可调，且部署不丢失。
+   - **Red (换人)**: 连续 N 次 Yellow 失败 -> 执行 `git reset --hard` 并**强制更换 Session ID**，模拟“换个新人重写”。
+   - **Black (熔断)**: 连续 M 次 Red 失败 -> 任务打回 Planner 二次切分。
+3. **参数化控制**：N 和 M 在 `config/sdlc_config.json` 中可调，且部署不丢失。
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-### 3.1 模板生成工作流 (Scaffolding Flow)
-- **旧流程**：Planner (思考) -> 生成全量 Markdown -> 调用脚本写入。
-- **新流程**：
-  1. Planner (思考切分) -> 调用 `create_pr_contract.py --title "..." --only-scaffold`。
-  2. 脚本计算 PRID，Copy 模板，注入 `status: open` 和标题，**直接在 job 目录下创建文件**。
-  3. 脚本将文件路径返回给 Planner。
-  4. Planner 使用 `edit` 填充具体章节。
-- **物理保障**：如果 Planner 试图通过 `write` 覆盖整个文件，Orchestrator 将在 State 1 进行强制检测，若缺少 `status` 头部则判定为非法 PR。
+### 3.1 状态机重构 (orchestrator.py)
+- **存量清理 (Blast Radius Control)**: 状态机启动时，强制扫描并物理删除工作区所有的 `.coder_session` 文件，彻底解决旧格式会话导致的逻辑崩溃风险。
+- **重试逻辑**: 引入 `yellow_counter` 和 `red_counter`。
+- **异常收编**: 将“超时 (Timeout)”与“仲裁失败”统一映射为 Red Path 的一次失败。
 
-### 3.2 状态机重构 (orchestrator.py)
-- 引入 `yellow_counter` 和 `red_counter`。
-- 修改 `Yellow Path`：移除 `git reset --hard` 动作。
-- 修改 `Red Path`：显式更新 `.coder_session` 里的 ID，确保下一次 `spawn_coder.py` 启动一个干净的 context。
-- 整合超时、仲裁逻辑进入 Red Path。
+### 3.2 模板生成
+- **create_pr_contract.py**: 新增 `--only-scaffold` 模式，由脚本根据 `TEMPLATES/PR_Contract.md.template` 物理创建带有标准头部的 PR 文件并返回路径。
 
-### 3.3 部署与配置保护
-- **Hot Preservation**: `deploy.sh` 升级时，优先保护 `config/sdlc_config.json` 不被 `.dist` 覆盖。
+### 3.3 部署保护
+- **Hot Preservation**: `deploy.sh` 在执行目录交换前，备份现有的 `config/sdlc_config.json` 并在交换后迁回。
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1: 物理模板强绑定**
-  - **When** Planner 完成切分。
-  - **Then** PR 文件的第一行必须是 `status: open`，且该行不是由 Planner “写”出来的，而是由初始化脚本“带”出来的。
+  - **Then** PR 文件的第一行必须是 `status: open`，Planner 无法通过 `write` 抹除初始化脚本生成的头部。
 - **Scenario 2: 会话延续性**
   - **Given** Yellow Path 触发。
-  - **Then** Coder 必须能看到上一个回合自己写的代码，严禁出现代码被清空的情况。
+  - **Then** 之前的代码修改必须保留，且 Session ID 不变。
+- **Scenario 3: 物理换人**
+  - **Given** 触发 Red Path。
+  - **Then** 必须观察到 `git reset --hard` 被执行，且后续 Coder 调用的 Session ID 发生了变更。
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
-- **E2E 压力测试**: 模拟一个 PR 连续 6 次被拒（N=3, M=2），验证系统是否经历了：3次增量修改 -> 1次物理重置 -> 3次增量修改 -> 1次任务切分。
+- **专项测试**: `scripts/e2e/e2e_test_hierarchical_resilience.sh`
+- **压力测试**: 模拟 $M \times N$ 次连续失败，验证状态机能精准按路径演进。
 
 ## 6. Framework Modifications
 - `scripts/orchestrator.py`
-- `scripts/create_pr_contract.py` (新增 --only-scaffold 模式)
-- `scripts/spawn_coder.py` (Session 生命周期管理)
-- `deploy.sh` (Hot Preservation)
-- `config/prompts.json` (移除干扰性指令)
+- `scripts/spawn_coder.py`
+- `scripts/create_pr_contract.py`
+- `deploy.sh`
+- `config/prompts.json`
+- `config/sdlc_config.json.template`
 
-## 7. Hardcoded Content
-- `YELLOW_RETRY_LIMIT` (N), `RED_RETRY_LIMIT` (M)
+## 7. Rollback Plan (回滚计划)
+- **物理回滚**: 若新版状态机导致死锁或异常，管理员需手动执行：
+  `bash scripts/rollback.sh`
+- **机制**: 该脚本将调用 `deploy.sh` 自动生成的物理备份，将 `~/.openclaw/skills/leio-sdlc` 恢复至升级前的原子快照。
+
+## 8. Hardcoded Content
+- `YELLOW_RETRY_LIMIT` (3), `RED_RETRY_LIMIT` (2)
 - `APPROVED`, `ACTION_REQUIRED`
-- `status: open`, `status: in_progress`
+- `status: open`
 
 ---
 
 ## Appendix: Architecture Evolution Trace
-- **v1.0-v5.0**: 定义路径、映射逻辑、配置保护。
-- **v6.0 Revision**: 
-  1. 响应 Boss 疑问：明确 PR 生成逻辑为“初始化脚本定名定头 -> Planner 填空”，彻底剥夺 Planner 修改 `status` 的物理机会。
-  2. 明确在“切分之前”还是“之后”：Planner 思考完切分方案后，第一步动作就是调用工具 Scaffold 出所有 PR 骨架，拿到路径后再逐个填充内容。
+- **v1.0-v6.0**: 完善防御路径、配置保护。
+- **v7.0 Revision**: 
+  1. 补全 **Section 7 Rollback Plan**，明确物理回滚指令。
+  2. 补全 **Section 3.1 存量清理**，采用“物理断舍离”方案解决爆炸半径问题。
