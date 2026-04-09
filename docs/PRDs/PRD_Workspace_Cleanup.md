@@ -38,3 +38,11 @@ The `leio-sdlc` workspace currently suffers from severe pollution, containing ov
 ```text
 rsync -av --exclude-from='.gitignore' --exclude-from='.release_ignore' --exclude="$DIST_DIR/" ./ "$DIST_DIR/"
 ```
+
+### Cleanup Script (For Coder Execution):
+**Anti-Hallucination Guard**: To execute the "Hard Cleanup", the Coder MUST strictly use the following commands. Do not invent other deletion logic.
+```bash
+# Physical cleanup of known temporary artifacts
+rm -rf .dist/ dist/ .pytest_cache/ __pycache__/ .tmp/ .sdlc_runs/
+rm -f *.diff *.log .coder_state.json .sdlc_repo.lock .sdlc_lock_manifest.json Review_Report.md pr*.md tmp_pr*.md
+```
