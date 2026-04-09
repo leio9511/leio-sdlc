@@ -9,13 +9,12 @@ The `leio-sdlc` workspace currently suffers from severe pollution, containing ov
 
 ## 2. Requirements & User Stories (需求定义)
 1. **Hard Cleanup**: Physically remove all existing temporary directories, sandbox residuals, and nested deployment folders from the `leio-sdlc` workspace.
-2. **Prevent Infinite Nesting**: Fix packaging/deployment scripts (`kit-deploy.sh`, `scripts/build_release.sh`) to explicitly exclude the `dist/` directory (and `.dist/`) from being copied into itself.
-3. **Establish Immunity**: Update `.gitignore` and `.release_ignore` to systematically block all known temporary patterns (`.sdlc_runs/`, `dist/`, `.dist/`, `__pycache__/`, `.pytest_cache/`, `.tmp/`, `*.diff`, `*.log`, `.coder_state.json`, `.sdlc_repo.lock`, `.sdlc_lock_manifest.json`, `Review_Report.md`, `pr*.md`, `tmp_pr*.md`, etc.) from being tracked by git or deployed to production.
+2. **Establish Immunity**: Update `.gitignore` and `.release_ignore` to systematically block all known temporary patterns (`.sdlc_runs/`, `dist/`, `.dist/`, `__pycache__/`, `.pytest_cache/`, `.tmp/`, `*.diff`, `*.log`, `.coder_state.json`, `.sdlc_repo.lock`, `.sdlc_lock_manifest.json`, `Review_Report.md`, `pr*.md`, `tmp_pr*.md`, etc.) from being tracked by git or deployed to production. This natively solves the infinite nesting issue via `rsync --exclude-from`.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-- **Target Files**: `.release_ignore`, `.gitignore`, `kit-deploy.sh`, `scripts/build_release.sh`.
+- **Target Files**: `.release_ignore`, `.gitignore`.
 - **Cleanup Execution**: Provide a one-off aggressive cleanup script or execute the cleanup directly via PR to reset the workspace to a pristine state.
-- **Rule Engine**: Rely on `rsync --exclude-from` and Git's native ignore mechanics to maintain future hygiene. No complex daemon needed.
+- **Rule Engine**: Rely entirely on `rsync --exclude-from` and Git's native ignore mechanics to maintain future hygiene without modifying core deployment scripts.
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1:** Running deployment does not nest `dist/`
@@ -38,8 +37,6 @@ The `leio-sdlc` workspace currently suffers from severe pollution, containing ov
 - No need to mock external dependencies; test entirely on file system boundaries.
 
 ## 6. Framework Modifications (框架防篡改声明)
-- `kit-deploy.sh`
-- `scripts/build_release.sh`
 - `.gitignore`
 - `.release_ignore`
 
