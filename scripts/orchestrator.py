@@ -304,6 +304,18 @@ def main():
     from setup_logging import setup_orchestrator_logger
     logger = setup_orchestrator_logger(workdir, args.debug)
     dlog(f"Workdir: {workdir}")
+    
+    # 1. Blast Radius Control: Scan and delete all .coder_session files
+    dlog("Executing Blast Radius Control...")
+    for root, dirs, files in os.walk(workdir):
+        if ".coder_session" in files:
+            session_file_path = os.path.join(root, ".coder_session")
+            try:
+                os.remove(session_file_path)
+                dlog(f"Blast Radius Control: Removed {session_file_path}")
+            except OSError as e:
+                dlog(f"Blast Radius Control: Failed to remove {session_file_path}: {e}")
+                
     from git_utils import check_git_boundary
     check_git_boundary(workdir)
     initialize_sandbox(workdir)
@@ -432,6 +444,20 @@ def main():
 
     try:
         loops = 0
+        
+        # Load Retry Config
+        yellow_retry_limit = 3
+        red_retry_limit = 2
+        config_path = os.path.join(global_dir, "config", "sdlc_config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+                    yellow_retry_limit = config.get("YELLOW_RETRY_LIMIT", 3)
+                    red_retry_limit = config.get("RED_RETRY_LIMIT", 2)
+            except Exception:
+                pass
+                
         while True:
             if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
                 print(f"Max runs reached. Exiting orchestrator.")
@@ -470,8 +496,10 @@ def main():
             base_filename = os.path.splitext(os.path.basename(current_pr))[0]
             parent_dir_name = os.path.basename(os.path.dirname(os.path.abspath(current_pr)))
             branch_name = f"{parent_dir_name}/{base_filename}".replace(":", "_").replace(" ", "_").replace("?", "_")
-            reset_count = 0
             pr_done = False
+            # Reset Resilience Counters per PR
+            red_counter = 0
+
             while True:
                 if pr_done: break
                 logger.info(f"State 2: Checking out branch {branch_name}")
@@ -483,7 +511,8 @@ def main():
                 except GitCheckoutError as e:
                     print(HandoffPrompter.get_prompt("git_checkout_error"))
                     sys.exit(1)
-                rejection_count = 0
+                
+                yellow_counter = 0
                 state_5_trigger = False
                 while True:
                     if args.coder_session_strategy == "always": teardown_coder_session(workdir)
@@ -571,9 +600,9 @@ def main():
                             state_5_trigger = True
                             break
                     elif verdict == "ACTION_REQUIRED" or "[ACTION_REQUIRED]" in review_content:
-                        rejection_count += 1
-                        notify_channel(effective_channel, "Reviewer rejected changes. Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
-                        if rejection_count < 5:
+                        yellow_counter += 1
+                        notify_channel(effective_channel, f"Reviewer rejected changes (Yellow Path: {yellow_counter}/{yellow_retry_limit}). Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
+                        if yellow_counter < yellow_retry_limit:
                             proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
                             proc.wait()
                             continue
@@ -621,15 +650,20 @@ def main():
                         except FileNotFoundError:
                             pass
 
-                    if reset_count < 3:
+                    if red_counter < red_retry_limit:
                         print(f"State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.")
+                        print(f"State 5 Escalation - Red Path Triggered: Hard Reset Session Cycling ({red_counter+1}/{red_retry_limit}).")
                         dlog(f"State 5 Escalation: Tier 1 reset triggered. Resetting {branch_name}")
+                        dlog(f"State 5 Escalation: Red Path reset triggered. Resetting {branch_name}")
                         drun(["git", "reset", "--hard"], check=False)
                         drun(["git", "clean", "-fd"], check=False)
                         safe_git_checkout("master")
                         drun(["git", "branch", "-D", branch_name], check=False)
                         
-                        reset_count += 1
+                        # RED PATH ENFORCEMENT: Force a NEW Session ID
+                        teardown_coder_session(workdir)
+                        
+                        red_counter += 1
                         continue
                     else:
                         drun(["git", "checkout", "master"], check=False)

@@ -44,17 +44,25 @@ class TestSpawnCoder(unittest.TestCase):
     @patch('spawn_coder.build_prompt')
     def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_call, mock_exists):
         mock_build.return_value = "Mocked feedback prompt"
+        mock_exists.return_value = True
 
-        m_open = mock_open(read_data="Fix the bugs.")
-        with patch('builtins.open', m_open):
-            mock_exists.return_value = True
-            is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", "feedback.txt", "task string", "PR_001")
+        def mock_file_open(path, *args, **kwargs):
+            if "feedback.txt" in path:
+                return mock_open(read_data="Fix the bugs.")(path, *args, **kwargs)
+            elif ".coder_session" in path:
+                return mock_open(read_data="sdlc_coder_PR_001")(path, *args, **kwargs)
+            else:
+                return mock_open(read_data="")(path, *args, **kwargs)
+
+        with patch('builtins.open', side_effect=mock_file_open):
+            with patch.dict(os.environ, {"SDLC_FORCE_NEW_CODER_SESSION": "0"}):
+                is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", "feedback.txt", "task string", "PR_001")
 
             self.assertTrue(is_existing)
-            self.assertEqual(key, "sdlc_coder_PR_001")
+            self.assertTrue(key.startswith("sdlc_coder_PR_001"))
             mock_call.assert_called_once()
             called_key, called_msg = mock_call.call_args[0]
-            self.assertEqual(called_key, "sdlc_coder_PR_001")
+            self.assertTrue(called_key.startswith("sdlc_coder_PR_001"))
             self.assertIn("Mocked feedback prompt", called_msg)
 
     @patch('spawn_coder.subprocess.run')

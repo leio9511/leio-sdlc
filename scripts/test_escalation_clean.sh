@@ -111,7 +111,7 @@ if [ "$MODIFIED_CONTENT" != "initial" ]; then
     exit 1
 fi
 
-if ! grep -q "Tier 1 (Reset): Deleting branch and retrying." orchestrator.log; then
+if ! grep -q "State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying." orchestrator.log; then
     echo "❌ test_escalation_clean.sh FAILED: Escalation Tier 1 was not logged."
     exit 1
 fi

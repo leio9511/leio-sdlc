@@ -167,7 +167,8 @@ class TestOrchestratorCLI(unittest.TestCase):
         import orchestrator
         import inspect
         source = inspect.getsource(orchestrator.main)
-        self.assertIn("if reset_count < 3:", source)
+        # Check for the red_retry_limit which is effectively the escalation limit in the current implementation
+        self.assertIn("red_retry_limit = 2", source)
 
 if __name__ == "__main__":
     unittest.main()
