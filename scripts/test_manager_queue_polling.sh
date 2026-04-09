@@ -4,6 +4,7 @@ set -e
 echo "Starting E2E Manager Queue Polling Test..."
 
 SANDBOX="/root/.openclaw/workspace/projects/leio-sdlc/tests/manager_sandbox_$$"
+trap '[[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT
 mkdir -p "$SANDBOX"
 cd "$SANDBOX"
 
@@ -51,5 +52,4 @@ for pr in PR_001_DB.md PR_002_API.md PR_003_UI.md; do
 done
 
 echo "✅ ALL MANAGER E2E MOCK TESTS PASSED!"
-rm -rf "$SANDBOX"
 exit 0

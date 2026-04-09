@@ -13,20 +13,17 @@ fi
 echo "Cleaning up legacy test sandboxes..."
 
 # Safely remove planner sandboxes
-if ls "$TARGET_DIR"/planner_sandbox_* 1> /dev/null 2>&1; then
-    echo "Removing planner_sandbox directories..."
-    rm -rf "$TARGET_DIR"/planner_sandbox_*
-else
-    echo "No planner_sandbox directories found."
-fi
-
-# Safely remove manager sandboxes
-if ls "$TARGET_DIR"/manager_sandbox_* 1> /dev/null 2>&1; then
-    echo "Removing manager_sandbox directories..."
-    rm -rf "$TARGET_DIR"/manager_sandbox_*
-else
-    echo "No manager_sandbox directories found."
-fi
+for dir in "$TARGET_DIR"/planner_sandbox_* "$TARGET_DIR"/manager_sandbox_*; do
+    if [[ -d "$dir" ]]; then
+        echo "Deleting legacy sandbox: $dir"
+        # Attempt to git rm if tracked, otherwise rm -rf
+        if git ls-files --error-unmatch "$dir" > /dev/null 2>&1; then
+            git rm -r -q "$dir"
+        else
+            rm -rf "$dir"
+        fi
+    fi
+done
 
 echo "Cleanup complete."
 exit 0
