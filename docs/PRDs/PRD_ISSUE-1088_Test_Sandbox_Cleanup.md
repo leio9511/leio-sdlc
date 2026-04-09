@@ -13,7 +13,9 @@ Currently, several shell-based test scripts (e.g., `test_planner_micro_slicing.s
 - **R2: Automated Leakage Prevention**: Modify the testing scripts to ensure they automatically delete their own sandbox directories upon completion (success or failure).
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-- **Deletion Phase**: Coder will create a script `scripts/cleanup_test_sandboxes.sh` to safely prune all legacy sandbox directories from `tests/`. This script MUST use defensive checks before executing `rm -rf`.
+- **Deletion Phase**: Coder will create a script `scripts/cleanup_test_sandboxes.sh` to safely prune all legacy sandbox directories from `tests/`. 
+    - **CRITICAL**: The script MUST use defensive checks before executing `rm -rf`. 
+    - **CRITICAL ANTI-MICRO-SLICING GUARDRAIL**: When writing the bash script, ensure flawless bash syntax (e.g. correct spaces around brackets `[[ ]]`). A single syntax error will cause the Reviewer to reject, which forces the Planner into an infinite micro-slicing death spiral trying to break down a simple typo into atomic sub-tasks. Code it right the first time.
 - **Script Hardening**:
     - Update `scripts/test_planner_micro_slicing.sh` and `scripts/test_manager_queue_polling.sh`.
     - Implement a defensively coded `trap` pattern at the start of these scripts: `trap '[[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"' EXIT`. This ensures the temporary directory is wiped upon script termination without risking undefined variable expansion.
