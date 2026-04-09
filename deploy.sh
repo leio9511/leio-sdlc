@@ -87,12 +87,28 @@ perform_hard_copy_deployment() {
         rsync -a --exclude=.git --exclude=.dist --exclude=node_modules . "$TMP_DIR/"
     fi
 
+    # Hot Preservation (PRD-1088)
+    local HOT_CONFIG=""
+    if [ -f "$PROD_DIR/config/sdlc_config.json" ]; then
+        echo "💾 Preserving existing config/sdlc_config.json..."
+        HOT_CONFIG="$RELEASES_DIR/sdlc_config_hot_${RELEASE_ID}.json"
+        cp "$PROD_DIR/config/sdlc_config.json" "$HOT_CONFIG"
+    fi
+
     # 3. Atomic Swap
     echo "🔄 Performing atomic directory swap (hard copy)..."
     if [ -e "$PROD_DIR" ]; then
         mv "$PROD_DIR" "$OLD_DIR"
     fi
     mv -T "$TMP_DIR" "$PROD_DIR"
+    
+    # Restore Hot Config (PRD-1088)
+    if [ -n "$HOT_CONFIG" ] && [ -f "$HOT_CONFIG" ]; then
+        echo "💾 Restoring config/sdlc_config.json..."
+        mkdir -p "$PROD_DIR/config"
+        mv "$HOT_CONFIG" "$PROD_DIR/config/sdlc_config.json"
+    fi
+    
     rm -rf "$OLD_DIR"
 
     # 4. Auto-Cleanup

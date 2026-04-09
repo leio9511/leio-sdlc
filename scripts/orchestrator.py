@@ -514,12 +514,18 @@ def main():
                 
                 yellow_counter = 0
                 state_5_trigger = False
+                current_feedback_file = None
                 while True:
                     if args.coder_session_strategy == "always": teardown_coder_session(workdir)
                     logger.info(f"State 3: Spawning Coder for {current_pr}")
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
-                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
+                    
+                    coder_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir]
+                    if current_feedback_file:
+                        coder_cmd.extend(["--feedback-file", current_feedback_file])
+                        
+                    proc = dpopen(coder_cmd, start_new_session=True)
                     try:
                         proc.wait(timeout=MAX_RUNTIME)
                     except subprocess.TimeoutExpired:
@@ -603,8 +609,7 @@ def main():
                         yellow_counter += 1
                         notify_channel(effective_channel, f"Reviewer rejected changes (Yellow Path: {yellow_counter}/{yellow_retry_limit}). Retrying...", "review_rejected", {"pr_id": base_filename, "summary": "Review reported ACTION_REQUIRED"})
                         if yellow_counter < yellow_retry_limit:
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--feedback-file", review_report_path, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
-                            proc.wait()
+                            current_feedback_file = review_report_path
                             continue
                         else:
                             proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_arbitrator.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--run-dir", run_dir], start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
