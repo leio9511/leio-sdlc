@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[PRD-Workspace-Cleanup] Hard Cleanup and Rsync Rule Fix**: Eradicated the infinite nesting `.dist/dist/` bug by propagating `.gitignore` natively into `build_release.sh` using `rsync --exclude-from`. Executed a physical scrub of hundreds of stale `.sdlc_runs/` sandboxes.
 - [x] **[ISSUE-1088] Fix Planner Template Adherence and Refine Coder Review Retry Logic**: Successfully implemented Four-Path Resilience (Green/Yellow/Red/Black), Scaffold-then-Fill PR generation, and Hot-Preservation for configuration during deployment.
 - [x] **[ISSUE-1071] Automated Test Discovery in Preflight**: Refactored `preflight.sh` to dynamically discover and execute all bash (`scripts/test_*.sh`) and python (`tests/test_*.py`) tests instead of hardcoding them.
 - [x] **[ISSUE-1058] Prevent SDLC_TEST_MODE Leakage in Production**: Added context-aware guardrails to `orchestrator.py` to fatally terminate if `SDLC_TEST_MODE=true` is detected in the production runtime, physically blocking hallucinated mock approvals.
