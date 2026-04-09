@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1088] Fix Test Sandbox Leakage & Auto-Cleanup**: Preflight script now automatically clears legacy test sandboxes, and defensive traps securely eradicate temporary directories regardless of CWD changes.
 - [x] **[ISSUE-1058] Prevent SDLC_TEST_MODE Leakage in Production**: Added context-aware guardrails to `orchestrator.py` to fatally terminate if `SDLC_TEST_MODE=true` is detected in the production runtime, physically blocking hallucinated mock approvals.
 - [x] **[ISSUE-1065/1082/1086] Formalize PRD Commit, Template Validation & Auditor Downgrade**: Decoupled auto-commit from orchestrator, implemented `commit_state.py` as the sole explicit state gateway. Downgraded Auditor from independent AgentSkill to internal native script to physically eradicate Reward Hacking bypasses.
 - [x] **[ISSUE-1079/1080] Path Resolution Guardrails**: Implemented mandatory `{workdir}/` prefixing for native tools and added Context_Workdir to PRD templates to solve CWD drift.
