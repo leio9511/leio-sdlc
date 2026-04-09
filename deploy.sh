@@ -43,17 +43,17 @@ perform_hard_copy_deployment() {
         echo "✅ PREFLIGHT PASSED."
     fi
 
-    if [ "$DRY_RUN" = true ]; then
-        echo "🛑 Dry run (--preflight) active. Exiting before actual deployment."
-        exit 0
-    fi
-
     # 1. Build release
     if [ -f "scripts/build_release.sh" ]; then
         bash "scripts/build_release.sh" || exit 1
     else
         mkdir -p .dist
         cp -r * .dist/ 2>/dev/null || true
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "🛑 Dry run (--preflight) active. Exiting before actual deployment."
+        exit 0
     fi
 
     mkdir -p "$SKILLS_DIR"
