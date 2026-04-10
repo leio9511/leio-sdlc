@@ -70,6 +70,8 @@ def main():
     parser.add_argument("--profile", help="Apply specific profile after base")
     parser.add_argument("--enforce-git-lock", action="store_true", help="Apply optional_hooks/pre-commit")
     
+    parser.add_argument("--check", action="store_true", help="Check compliance without making changes")
+    
     args = parser.parse_args()
     
     target_dir = os.path.abspath(args.target_dir)

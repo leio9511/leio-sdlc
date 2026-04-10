@@ -210,33 +210,7 @@ def trigger_github_sync(workdir, effective_channel, pr_id):
             print(f"[Warning] GitHub Sync failed: {str(e)}", file=sys.stderr)
             notify_channel(effective_channel, f"GitHub sync failed: {str(e)}", "github_sync_failed", {"pr_id": pr_id, "error": str(e)})
 
-def initialize_sandbox(workdir):
-    legacy_sdlc_runs = os.path.join(workdir, '.sdlc_runs')
-    if os.path.exists(legacy_sdlc_runs):
-        print("WARNING: Found legacy .sdlc_runs in project root. Please clean it up manually.")
-    
-    exclude_path = os.path.join(workdir, ".git", "info", "exclude")
-    if os.path.exists(os.path.dirname(exclude_path)):
-        artifacts = [
-            "build_preflight.log",
-            ".tmp/"
-        ]
-        
-        existing_content = ""
-        if os.path.exists(exclude_path):
-            with open(exclude_path, "r") as f:
-                existing_content = f.read()
-        
-        new_entries = []
-        for artifact in artifacts:
-            if artifact not in existing_content:
-                new_entries.append(artifact)
-        
-        if new_entries:
-            with open(exclude_path, "a") as f:
-                for entry in new_entries:
-                    f.write(f"\n{entry}\n")
-            print(f"Initialized local sandbox: added {', '.join(new_entries)} to .git/info/exclude")
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -363,7 +337,16 @@ def main():
                 
     from git_utils import check_git_boundary
     check_git_boundary(workdir)
-    initialize_sandbox(workdir)
+
+    doctor_script = os.path.join(RUNTIME_DIR, "doctor.py")
+    if os.path.exists(doctor_script):
+        dlog("Running SDLC Doctor check...")
+        res = drun([sys.executable, doctor_script, workdir, "--check"], capture_output=True, text=True)
+        if res.returncode != 0:
+            print('[FATAL] Project is not SDLC compliant. Please run "python3 ~/.openclaw/skills/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
+            print(HandoffPrompter.get_prompt("startup_validation_failed"))
+            sys.exit(1)
+
     os.chdir(workdir)
 
     validate_prd_is_committed(args.prd_file, workdir)
