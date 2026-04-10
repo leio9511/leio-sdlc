@@ -558,8 +558,10 @@ def main():
                 
                 # State Machine Expansion: initialize retry counters
                 yellow_counter = 0
+                orch_yellow_counter = 0
                 state_5_trigger = False
                 current_feedback_file = None
+                system_alert_text = None
                 while True:
                     if args.coder_session_strategy == "always": teardown_coder_session(workdir, run_dir)
                     logger.info(f"State 3: Spawning Coder for {current_pr}")
@@ -569,6 +571,9 @@ def main():
                     coder_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir]
                     if current_feedback_file:
                         coder_cmd.extend(["--feedback-file", current_feedback_file])
+                    if system_alert_text:
+                        coder_cmd.extend(["--system-alert", system_alert_text])
+                        system_alert_text = None
                         
                     proc = dpopen(coder_cmd, start_new_session=True)
                     try:
@@ -588,38 +593,31 @@ def main():
                     if coder_result.returncode != 0:
                         state_5_trigger = True
                         break
+
                     status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
-                    if status_output.strip(): dlog(f"Dirty status detected: {repr(status_output)}")
                     if status_output.strip():
-                        coder_state_file = os.path.join(workdir, ".coder_state.json")
-                        dirty_acknowledged = False
-                        if os.path.exists(coder_state_file):
-                            try:
-                                import json
-                                with open(coder_state_file, "r") as f:
-                                    state_data = json.load(f)
-                                    if state_data.get("dirty_acknowledged") is True: dirty_acknowledged = True
-                            except Exception: pass # Reaper safety check: process already reaped or pgid not found
-                        if not dirty_acknowledged:
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--system-alert", status_output.strip(), "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
-                            try:
-                                proc.wait(timeout=MAX_RUNTIME)
-                            except subprocess.TimeoutExpired:
-                                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                                try:
-                                    proc.wait(timeout=10)
-                                except subprocess.TimeoutExpired:
-                                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                                    proc.wait()
+                        dlog(f"Dirty status detected: {repr(status_output)}")
+                        orch_yellow_counter += 1
+                        if orch_yellow_counter >= yellow_retry_limit:
+                            state_5_trigger = True
+                            break
+                        system_alert_text = status_output.strip()
+                        continue
+                    
+                    preflight_script = os.path.join(workdir, "preflight.sh")
+                    if os.path.exists(preflight_script):
+                        res = drun([preflight_script], capture_output=True, text=True, cwd=workdir)
+                        if res.returncode != 0:
+                            dlog(f"Preflight failed with code {res.returncode}")
+                            orch_yellow_counter += 1
+                            if orch_yellow_counter >= yellow_retry_limit:
                                 state_5_trigger = True
                                 break
-                            class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
-                            coder_result = _CoderRes()
-                            coder_result.returncode = proc.returncode
-                            if coder_result.returncode != 0:
-                                state_5_trigger = True
-                                break
+                            system_alert_text = f"Preflight failed:\n{res.stdout}\n{res.stderr}".strip()
                             continue
+
+                    orch_yellow_counter = 0
+                    
                     review_artifact = os.path.join(run_dir, "Review_Report.md")
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
