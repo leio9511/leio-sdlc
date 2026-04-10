@@ -13,10 +13,13 @@ echo "dummy prd content" > docs/PRDs/dummy.md
 
 # Initialize Git to pass boundary check
 git init > /dev/null
-git add docs/PRDs/dummy.md
-echo "test_output.log" > .gitignore
+# Apply SDLC infrastructure
+python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
+
+echo "test_output.log" >> .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
-git add .gitignore
+echo ".tmp" >> .gitignore
+git add docs/PRDs/dummy.md .gitignore STATE.md preflight.sh
 git commit -m "init" > /dev/null
 
 # Create .sdlc_runs/dummy/PR_001.md with in_progress status
