@@ -110,8 +110,8 @@ def main():
             
         # Inject Coder Playbook (PRD_1005)
         RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
-        global_dir = os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(RUNTIME_DIR)
-        playbook_path = os.path.join(global_dir, "playbooks", "coder_playbook.md")
+        SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
+        playbook_path = os.path.join(SDLC_ROOT, "playbooks", "coder_playbook.md")
         playbook_content = ""
         if os.path.exists(playbook_path):
             with open(playbook_path, "r") as f:
