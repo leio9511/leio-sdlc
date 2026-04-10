@@ -23,7 +23,7 @@ class TestMasterBranchGuardrail(unittest.TestCase):
                 return Ret()
             if isinstance(cmd, list) and cmd == ["git", "status", "--porcelain"]:
                 return MagicMock(stdout="")
-            return MagicMock()
+            return MagicMock(returncode=0)
 
         mock_run.side_effect = mock_subprocess_run
 
