@@ -29,7 +29,7 @@ def main():
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
         target_project_name = os.path.basename(os.path.abspath(args.workdir))
-        global_dir = os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        global_dir = os.path.abspath(args.global_dir) if args.global_dir else workdir
         args.out_dir = os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name)
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -56,7 +56,7 @@ def main():
 
     # Dynamic Toolchain Addressing
     SDLC_DIR = os.path.dirname(os.path.abspath(__file__))
-    global_dir = os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(RUNTIME_DIR)
+    global_dir = os.path.abspath(args.global_dir) if args.global_dir else workdir
 
     # Scaffolding: Ensure new project has standard guardrail and ignore files
     scaffold_files = {

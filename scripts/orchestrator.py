@@ -267,9 +267,7 @@ def main():
     elif config.get("GLOBAL_RUN_DIR"):
         resolved_global_dir = os.path.abspath(config.get("GLOBAL_RUN_DIR"))
         
-    if not args.cleanup and not resolved_global_dir:
-        raise RuntimeError("No global run directory defined. Must provide --global-dir CLI argument or set GLOBAL_RUN_DIR in sdlc_config.json.")
-    global_dir = resolved_global_dir if resolved_global_dir else sdlc_root
+    global_dir = resolved_global_dir if resolved_global_dir else os.path.abspath(args.workdir)
 
 
     if args.cleanup:
