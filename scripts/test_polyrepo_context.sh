@@ -14,9 +14,11 @@ echo "Sandbox: $SANDBOX_DIR"
 
 cd "$SANDBOX_DIR"
 git init > /dev/null
+python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
 git config user.name "Test"
 git config user.email "test@example.com"
-git commit --allow-empty -m "init"
+git add .
+git commit -m "init"
 
 # Run orchestrator in a sub-process so we can kill it after checking the lock
 # We use --test-sleep to make it wait
