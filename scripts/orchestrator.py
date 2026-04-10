@@ -45,14 +45,15 @@ def load_or_merge_config(sdlc_root):
             if k not in local_config:
                 local_config[k] = v
                 changed = True
-        if changed:
+        if changed and os.environ.get("SDLC_TEST_MODE") != "true":
             with open(config_path, "w") as fw:
                 json.dump(local_config, fw, indent=4)
         return local_config
     else:
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
-        with open(config_path, "w") as f:
-            json.dump(config_template, f, indent=4)
+        if os.environ.get("SDLC_TEST_MODE") != "true":
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, "w") as f:
+                json.dump(config_template, f, indent=4)
         return config_template
 
 def dlog(msg):
@@ -145,7 +146,7 @@ def get_pr_slice_depth(pr_file):
     return 0
 
 def teardown_coder_session(workdir, run_dir="."):
-    session_file = os.path.join(workdir, run_dir, ".coder_session")
+    session_file = os.path.join(run_dir, ".coder_session")
     if os.path.exists(session_file):
         with open(session_file, "r") as f:
             session_key = f.read().strip()

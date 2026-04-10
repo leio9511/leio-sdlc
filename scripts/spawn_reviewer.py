@@ -94,7 +94,7 @@ def main():
     guardrail_violation = check_guardrails(workdir, pr_content, [os.path.join(workdir, diff_file)])
     if guardrail_violation:
         print(f"[Reviewer Guardrail] Fast-failing PR due to guardrail violation.")
-        with open(os.path.join(workdir, args.out_file), "w") as rf:
+        with open(os.path.join(args.run_dir, args.out_file), "w") as rf:
             rf.write(guardrail_violation)
         if os.environ.get("SDLC_TEST_MODE") == "true":
             print('{"status": "mock_success", "role": "reviewer_guardrail"}')
@@ -130,7 +130,7 @@ def main():
         with open("tests/tool_calls.log", "w") as tf:
             tf.write(task_string)
         # Mock LLM writing the report
-        with open(os.path.join(workdir, args.out_file), "w") as rf:
+        with open(os.path.join(args.run_dir, args.out_file), "w") as rf:
             rf.write('```json\n{"status": "APPROVED", "comments": "Mock LGTM"}\n```')
         print('{"status": "mock_success", "role": "reviewer"}')
         sys.exit(0)
@@ -139,7 +139,7 @@ def main():
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
     invoke_agent(task_string, session_key=session_id, role="reviewer")
 
-    review_report_path = os.path.join(workdir, args.out_file)
+    review_report_path = os.path.join(args.run_dir, args.out_file)
     if not os.path.exists(review_report_path):
         print(f"[FATAL] The Reviewer agent failed to generate the physical '{args.out_file}'. This is a severe process violation.", file=sys.stderr)
         sys.exit(1)

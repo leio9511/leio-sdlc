@@ -37,7 +37,7 @@ def send_feedback(session_key, message, workdir='.'):
     openclaw_agent_call(session_key, message, workdir=workdir)
     print(f"Sent feedback to session {session_key}")
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
-    session_file = os.path.join(workdir, run_dir, ".coder_session")
+    session_file = os.path.join(run_dir, ".coder_session")
     try:
         with open(feedback_file, "r") as f:
             feedback_content = f.read()
@@ -126,7 +126,7 @@ def main():
             prd_content=prd_content
         )
         
-        session_file = os.path.join(workdir, args.run_dir, ".coder_session")
+        session_file = os.path.join(args.run_dir, ".coder_session")
         
         if os.path.exists(session_file):
             with open(session_file, "r") as sf:
