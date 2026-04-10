@@ -101,14 +101,15 @@ def main():
             sys.exit(0)
         sys.exit(0)
 
-    template_path = os.path.join(os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(RUNTIME_DIR), "TEMPLATES", "Review_Report.md.template")
+    SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
+    template_path = os.path.join(SDLC_ROOT, "TEMPLATES", "Review_Report.md.template")
     template_content = ""
     if os.path.exists(template_path):
         with open(template_path, "r") as f:
             template_content = f.read()
 
-    SDLC_DIR = os.path.dirname(os.path.abspath(__file__))
-    playbook_path = os.path.join(os.path.abspath(args.global_dir) if args.global_dir else os.path.dirname(RUNTIME_DIR), "playbooks", "reviewer_playbook.md")
+    SDLC_ROOT = os.path.dirname(os.path.abspath(__file__))
+    playbook_path = os.path.join(os.path.dirname(SDLC_ROOT), "playbooks", "reviewer_playbook.md")
     playbook_content = ""
     if os.path.exists(playbook_path):
         with open(playbook_path, "r") as f:

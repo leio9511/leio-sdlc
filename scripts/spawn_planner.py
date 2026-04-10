@@ -86,12 +86,14 @@ def main():
         sys.exit(1)
         
     try:
-        with open(os.path.join(global_dir, "TEMPLATES", "PR_Contract.md.template"), "r") as tf:
+        SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
+        with open(os.path.join(SDLC_ROOT, "TEMPLATES", "PR_Contract.md.template"), "r") as tf:
             template_content = tf.read()
     except FileNotFoundError:
         template_content = "status: open\n\n# PR-[ID]: [Title]\n\n## 1. Objective\n\n## 2. Target Working Set & File Placement\n\n## 3. Implementation Scope\n\n## 4. TDD Blueprint & Acceptance Criteria\n"
 
-    playbook_path = os.path.join(global_dir, "playbooks", "planner_playbook.md")
+    SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
+    playbook_path = os.path.join(SDLC_ROOT, "playbooks", "planner_playbook.md")
     playbook_content = ""
     if os.path.exists(playbook_path):
         with open(playbook_path, "r") as f:
