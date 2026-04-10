@@ -13,6 +13,7 @@ Review_Report.md
 pr*_content.md
 
 # SDLC Orchestrator Runtime Artifacts
+config/sdlc_config.json
 .coder_session
 Review_Report.md
 current_review.diff
