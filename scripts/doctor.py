@@ -89,8 +89,18 @@ def main():
         
     if args.enforce_git_lock:
         hooks_overlay = script_dir.parent / "TEMPLATES" / "scaffold" / "optional_hooks"
-        hook_issues = apply_overlay(target_dir, hooks_overlay, check_only=not args.fix)
-        issues.extend(hook_issues)
+        pre_commit_src = hooks_overlay / "pre-commit"
+        pre_commit_dest = Path(target_dir) / ".git" / "hooks" / "pre-commit"
+        
+        if pre_commit_src.exists():
+            if not args.fix:
+                if not pre_commit_dest.exists():
+                    issues.append("Missing file .git/hooks/pre-commit")
+            else:
+                pre_commit_dest.parent.mkdir(parents=True, exist_ok=True)
+                if not pre_commit_dest.exists():
+                    shutil.copy2(pre_commit_src, pre_commit_dest)
+                    os.chmod(pre_commit_dest, 0o755)
     
     if not args.fix and issues:
         print('[FATAL] Project is not SDLC compliant. Please run "python3 ~/.openclaw/skills/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
