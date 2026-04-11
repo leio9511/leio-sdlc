@@ -124,12 +124,12 @@ def main():
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
 
     if test_mode:
-        os.makedirs("tests", exist_ok=True)
+        os.makedirs(os.path.join(args.run_dir or ".", "tests"), exist_ok=True)
         log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': args.prd_file, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr}})
-        with open("tests/tool_calls.log", "a") as f:
+        with open(os.path.join(args.run_dir or ".", "tests", "tool_calls.log"), "a") as f:
             f.write(log_entry + "\\n")
         
-        with open("tests/task_string.log", "a") as f:
+        with open(os.path.join(args.run_dir or ".", "tests", "task_string.log"), "a") as f:
             f.write(task_string + "\\n")
 
         if args.slice_failed_pr is not None:
