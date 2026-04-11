@@ -507,6 +507,19 @@ def main():
         notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
 
 
+    # Record baseline commit before starting the main loop
+    os.makedirs(job_dir, exist_ok=True)
+    baseline_file = os.path.join(job_dir, "baseline_commit.txt")
+    if not os.path.exists(baseline_file):
+        try:
+            head_res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True)
+            baseline_hash = head_res.stdout.strip()
+            with open(baseline_file, "w") as f:
+                f.write(baseline_hash)
+            logger.info(f"Recorded baseline commit: {baseline_hash}")
+        except Exception as e:
+            logger.warning(f"Failed to record baseline commit: {e}")
+
     proc = None
 
     def sig_handler(signum, frame):
