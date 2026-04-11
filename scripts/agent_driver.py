@@ -116,15 +116,17 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
             
     return None
 
+RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def build_prompt(role, **kwargs):
     # Support dual-source prompt loading
     import inspect
     caller_frame = inspect.currentframe().f_back
     caller_file = caller_frame.f_globals.get('__file__') if caller_frame else sys.argv[0]
     caller_dir = os.path.dirname(os.path.abspath(caller_file))
-    local_config_path = os.path.normpath(os.path.join(caller_dir, "..", "config", "prompts.json"))
+    local_config_path = os.path.join(os.path.dirname(caller_dir), "config", "prompts.json")
     
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = os.path.dirname(RUNTIME_DIR)
     global_config_path = os.path.join(base_dir, "config", "prompts.json")
     
     print(f""); template = ""

@@ -67,7 +67,7 @@ def main():
     for filename, source in scaffold_files.items():
         target_path = os.path.join(workdir, filename)
         if not os.path.exists(target_path):
-            source_path = os.path.join(SDLC_DIR, "..", source)
+            source_path = os.path.join(os.path.dirname(SDLC_DIR), source)
             if os.path.exists(source_path):
                 import shutil
                 shutil.copy(source_path, target_path)
