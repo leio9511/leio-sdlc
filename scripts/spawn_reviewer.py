@@ -108,8 +108,7 @@ def main():
         with open(template_path, "r") as f:
             template_content = f.read()
 
-    SDLC_ROOT = os.path.dirname(os.path.abspath(__file__))
-    playbook_path = os.path.join(os.path.dirname(SDLC_ROOT), "playbooks", "reviewer_playbook.md")
+    playbook_path = os.path.join(SDLC_ROOT, "playbooks", "reviewer_playbook.md")
     playbook_content = ""
     if os.path.exists(playbook_path):
         with open(playbook_path, "r") as f:

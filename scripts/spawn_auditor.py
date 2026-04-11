@@ -81,11 +81,11 @@ def main():
         print("REJECTED: The PRD mentions specific text/messages but fails to list them in 'Section 7. Hardcoded Content'. Ensure Coder has no room for hallucination.")
         sys.exit(0)
 
-    base_dir = os.path.dirname(current_dir)
+    SDLC_ROOT = os.path.dirname(current_dir)
     task_string = build_prompt("auditor",
         workdir=workdir,
         prd_file=prd_file_abs,
-        base_dir=base_dir
+        base_dir=SDLC_ROOT
     )
     
 
