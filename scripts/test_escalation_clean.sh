@@ -66,11 +66,11 @@ cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import sys
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--out-file', default='/tmp/Review_Report.md')
+parser.add_argument('--out-file', default='/tmp/review_report.json')
 args, _ = parser.parse_known_args()
 with open(args.out_file, "w") as f:
     f.write('''```json
-{"status": "APPROVED", "comments": "OK"}
+{"overall_assessment": "EXCELLENT", "findings": []}
 ```
 ''')
 INNER_EOF

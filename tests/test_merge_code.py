@@ -19,12 +19,18 @@ class TestMergeCode(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_parse_review_verdict_approved(self):
-        content = '```json\n{"status": "APPROVED"}\n```'
+        content = '```json\n{"overall_assessment": "EXCELLENT"}\n```'
         self.assertEqual(merge_code.parse_review_verdict(content), "APPROVED")
 
+        content2 = '{"overall_assessment": "GOOD_WITH_MINOR_SUGGESTIONS"}'
+        self.assertEqual(merge_code.parse_review_verdict(content2), "APPROVED")
+
     def test_parse_review_verdict_action_required(self):
-        content = '{"status": "ACTION_REQUIRED", "comments": "Fix it"}'
+        content = '{"overall_assessment": "NEEDS_ATTENTION", "findings": []}'
         self.assertEqual(merge_code.parse_review_verdict(content), "ACTION_REQUIRED")
+
+        content2 = '```json\n{"overall_assessment": "NEEDS_IMMEDIATE_REWORK"}\n```'
+        self.assertEqual(merge_code.parse_review_verdict(content2), "ACTION_REQUIRED")
 
     def test_parse_review_verdict_invalid(self):
         content = 'This is just some text with no JSON'

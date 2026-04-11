@@ -15,7 +15,7 @@ class TestReviewParsing(unittest.TestCase):
         content = """
 The changes look good.
 ```json
-{"status": "APPROVED", "comments": "Passes all tests."}
+{"overall_assessment": "EXCELLENT", "findings": []}
 ```
 """
         self.assertEqual(parse_review_verdict(content), "APPROVED")
@@ -24,7 +24,7 @@ The changes look good.
         content = """
 Issues found.
 ```json
-{"status": "ACTION_REQUIRED", "comments": "Missing tests."}
+{"overall_assessment": "NEEDS_ATTENTION", "findings": []}
 ```
 """
         self.assertEqual(parse_review_verdict(content), "ACTION_REQUIRED")
@@ -34,7 +34,7 @@ Issues found.
         content = """
 The Coder improperly included [LGTM] in their output. This is a violation.
 ```json
-{"status": "ACTION_REQUIRED", "comments": "Found literal [LGTM] in code which is not allowed."}
+{"overall_assessment": "NEEDS_ATTENTION", "findings": [{"description": "Found literal [LGTM] in code which is not allowed."}]}
 ```
 """
         # The old logic would see "[LGTM]" and approve.

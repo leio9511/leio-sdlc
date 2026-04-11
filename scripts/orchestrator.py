@@ -200,12 +200,15 @@ def extract_json_from_llm_response(content):
 
 def parse_review_verdict(content):
     """
-    Parses structured JSON review status: {"status": "APPROVED", "comments": "..."}
-    Matches the prompt given to the Reviewer.
+    Parses structured JSON review status using the new schema.
     """
     data = extract_json_from_llm_response(content)
     if data and isinstance(data, dict):
-        return data.get("status")
+        assessment = data.get("overall_assessment")
+        if assessment in ["EXCELLENT", "GOOD_WITH_MINOR_SUGGESTIONS"]:
+            return "APPROVED"
+        elif assessment in ["NEEDS_ATTENTION", "NEEDS_IMMEDIATE_REWORK"]:
+            return "ACTION_REQUIRED"
     return None
 
 def trigger_github_sync(workdir, effective_channel, pr_id):

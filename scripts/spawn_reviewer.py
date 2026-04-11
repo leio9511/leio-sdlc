@@ -53,7 +53,7 @@ def main():
     parser.add_argument("--override-diff-file", help="Override the diff file and skip git diff", default=None)
     parser.add_argument("--job-dir", required=False, default=".", help="Working directory for the Reviewer to generate artifacts")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
-    parser.add_argument("--out-file", default="Review_Report.md", help="Path to write the review report")
+    parser.add_argument("--out-file", default="review_report.json", help="Path to write the review report")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     
