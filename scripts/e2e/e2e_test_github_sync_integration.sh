@@ -38,7 +38,7 @@ function setup_sandbox() {
     echo ".sdlc_run.lock" >> .gitignore
     echo "__pycache__/" >> .gitignore
     echo "*.pyc" >> .gitignore
-    echo "Review_Report.md" >> .gitignore
+    echo "review_report.json" >> .gitignore
     echo "scripts/spawn_coder.py" >> .gitignore
     echo "scripts/spawn_reviewer.py" >> .gitignore
     echo "scripts/merge_code.py" >> .gitignore
@@ -67,7 +67,7 @@ sys.exit(0)
 INNER_EOF
 cat << INNER_EOF > scripts/spawn_reviewer.py
 import sys, os
-with open("$RUN_DIR/Review_Report.md", "w") as f:
+with open("$RUN_DIR/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "Looks good"}\n```')
 sys.exit(0)
 INNER_EOF
@@ -129,7 +129,7 @@ sys.exit(0)
 INNER_EOF
 cat << INNER_EOF > scripts/spawn_reviewer.py
 import sys, os
-with open("$RUN_DIR/Review_Report.md", "w") as f:
+with open("$RUN_DIR/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "Looks good"}\n```')
 sys.exit(0)
 INNER_EOF

@@ -88,7 +88,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         
         def mock_reviewer_invoke(*args, **kwargs):
             # simulate agent writing the artifact
-            with open(os.path.join(self.workdir, "Review_Report.md"), "w") as f:
+            with open(os.path.join(self.workdir, "review_report.json"), "w") as f:
                 f.write("mock review report content")
         mock_invoke_agent.side_effect = mock_reviewer_invoke
 
@@ -96,7 +96,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         with open(pr_file, "w") as f:
             f.write("mock_pr_content_for_reviewer")
             
-        test_args = ["spawn_reviewer.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir]
+        test_args = ["spawn_reviewer.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir, "--out-file", "review_report.json", "--run-dir", self.workdir]
         
         dummy_diff = os.path.join(self.workdir, "dummy.diff")
         with open(dummy_diff, "w") as f:

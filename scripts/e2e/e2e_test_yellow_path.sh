@@ -71,18 +71,18 @@ state_file = ".test_state_reviewer"
 # 2nd run: APPROVED
 if not os.path.exists(state_file):
     with open(state_file, "w") as f: f.write("1")
-    with open("$RUN_DIR/Review_Report.md", "w") as f:
+    with open("$RUN_DIR/review_report.json", "w") as f:
         f.write('{"status": "ACTION_REQUIRED", "comments": "Missing test coverage."}')
     sys.exit(0)
 else:
-    with open("$RUN_DIR/Review_Report.md", "w") as f:
+    with open("$RUN_DIR/review_report.json", "w") as f:
         f.write('{"status": "APPROVED", "comments": "Good job."}')
     sys.exit(0)
 EOF
 chmod +x scripts/spawn_reviewer.py
 
 # 4. 准备 Manager Prompt
-MANAGER_PROMPT="You are the leio-sdlc Manager executing a System Test. A PRD exists at \`docs/PRDs/dummy_prd.md\` and its PR contract is already in \`$RUN_DIR/PR_001_Stub.md\`. I have provided an initial \`hello.py\`. Begin immediately at the Review phase. You MUST execute the reviewer script. If you encounter an [ACTION_REQUIRED], you MUST follow the SKILL.md rules and call Command Template 2b: run \`spawn_coder.py --workdir . --feedback-file $RUN_DIR/Review_Report.md --run-dir $RUN_DIR --global-dir $MOCK_GLOBAL\` to fix the code, then run \`spawn_reviewer.py --workdir . --run-dir $RUN_DIR --global-dir $MOCK_GLOBAL\` again. The max revisions is MAX_REVISIONS=3. Continue until you get an APPROVED status in JSON and then perform Merge."
+MANAGER_PROMPT="You are the leio-sdlc Manager executing a System Test. A PRD exists at \`docs/PRDs/dummy_prd.md\` and its PR contract is already in \`$RUN_DIR/PR_001_Stub.md\`. I have provided an initial \`hello.py\`. Begin immediately at the Review phase. You MUST execute the reviewer script. If you encounter an [ACTION_REQUIRED], you MUST follow the SKILL.md rules and call Command Template 2b: run \`spawn_coder.py --workdir . --feedback-file $RUN_DIR/review_report.json --run-dir $RUN_DIR --global-dir $MOCK_GLOBAL\` to fix the code, then run \`spawn_reviewer.py --workdir . --run-dir $RUN_DIR --global-dir $MOCK_GLOBAL\` again. The max revisions is MAX_REVISIONS=3. Continue until you get an APPROVED status in JSON and then perform Merge."
 
 # 5. 执行测试
 export SDLC_TEST_MODE=true

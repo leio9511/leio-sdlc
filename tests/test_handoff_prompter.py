@@ -33,7 +33,7 @@ class TestHandoffPrompter(unittest.TestCase):
         prompt = HandoffPrompter.get_prompt("dead_end")
         self.assertIn("[FATAL_ESCALATION]", prompt)
         self.assertIn("[ACTION REQUIRED FOR MANAGER]", prompt)
-        self.assertIn("Dead End reached. You MUST read `Review_Report.md` (located in the current job directory)", prompt)
+        self.assertIn("Dead End reached. You MUST read `review_report.json` (located in the current job directory)", prompt)
 
     def test_unknown_condition(self):
         prompt = HandoffPrompter.get_prompt("unknown_condition")

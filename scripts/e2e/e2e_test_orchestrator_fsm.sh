@@ -44,7 +44,7 @@ cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     echo ".sdlc_run.lock" >> .gitignore
     echo "__pycache__/" >> .gitignore
     echo "*.pyc" >> .gitignore
-    echo "Review_Report.md" >> .gitignore
+    echo "review_report.json" >> .gitignore
     git add .
     git commit -m "clean state" > /dev/null 2>&1
     
@@ -76,7 +76,7 @@ INNER_EOF
     
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import os
-with open(os.environ["RUN_DIR"] + "/dummy_prd/Review_Report.md", "w") as f:
+with open(os.environ["RUN_DIR"] + "/dummy_prd/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
 INNER_EOF
 
@@ -117,8 +117,8 @@ INNER_EOF
     
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import os
-with open(os.environ["RUN_DIR"] + "/dummy_prd/Review_Report.md", "w") as f:
-    f.write("[ACTION_REQUIRED]\n")
+with open(os.environ["RUN_DIR"] + "/dummy_prd/review_report.json", "w") as f:
+    f.write(\'{"overall_assessment": "NEEDS_ATTENTION", "findings": [{"file_path": "dummy", "line_number": 1, "category": "Correctness", "severity": "MAJOR", "description": "dummy", "recommendation": "dummy"}]}\')
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_arbitrator.py
@@ -246,7 +246,7 @@ INNER_EOF
     
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import os
-with open(os.environ["RUN_DIR"] + "/Target_Project/Review_Report.md", "w") as f:
+with open(os.environ["RUN_DIR"] + "/Target_Project/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
 INNER_EOF
 
@@ -318,7 +318,7 @@ INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import os
-with open(os.environ["RUN_DIR"] + "/MyProject/Review_Report.md", "w") as f:
+with open(os.environ["RUN_DIR"] + "/MyProject/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
 INNER_EOF
 
@@ -364,7 +364,7 @@ INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import os
-with open(os.environ["RUN_DIR"] + "/MyProject/Review_Report.md", "w") as f:
+with open(os.environ["RUN_DIR"] + "/MyProject/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
 INNER_EOF
 
@@ -417,7 +417,7 @@ INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import os
-with open(os.environ["RUN_DIR"] + "/MyProject/Review_Report.md", "w") as f:
+with open(os.environ["RUN_DIR"] + "/MyProject/review_report.json", "w") as f:
     f.write('```json\n{"status": "APPROVED", "comments": "OK"}\n```\n')
 INNER_EOF
 
