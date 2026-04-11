@@ -6,6 +6,8 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1094] Deploy Path and Broadcast Fix**: Injected absolute path anchors to deploy scripts to prevent SLUG extraction drift. Injected CLI `shlex.join` full command broadcast into Orchestrator and Auditor Slack notifications to ensure immediate execution traceability.
+- [x] **[HOTFIX-1094] Config Pollution & Path Chaos Recovery**: Decoupled `RUNTIME_DIR`, `GLOBAL_DIR`, and `WORKDIR` across all engine scripts. Enforced `SDLC_TEST_MODE=true` strict guardrails to prevent `load_or_merge_config` from physically writing `config/sdlc_config.json` into the target source tree, fully eradicating false-positive dirty state pipeline crashes.
 - [x] **[PRD-Workspace-Cleanup] Hard Cleanup and Rsync Rule Fix**: Eradicated the infinite nesting `.dist/dist/` bug by propagating `.gitignore` natively into `build_release.sh` using `rsync --exclude-from`. Executed a physical scrub of hundreds of stale `.sdlc_runs/` sandboxes.
 - [x] **[ISSUE-1088] Fix Planner Template Adherence and Refine Coder Review Retry Logic**: Successfully implemented Four-Path Resilience (Green/Yellow/Red/Black), Scaffold-then-Fill PR generation, and Hot-Preservation for configuration during deployment.
 - [x] **[ISSUE-1071] Automated Test Discovery in Preflight**: Refactored `preflight.sh` to dynamically discover and execute all bash (`scripts/test_*.sh`) and python (`tests/test_*.py`) tests instead of hardcoding them.
