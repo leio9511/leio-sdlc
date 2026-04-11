@@ -19,9 +19,14 @@ def format_notification(event_type: str, context: dict) -> str:
         pr_match = f"pr-{extracted.replace('_', '-')}"
 
     if event_type == "sdlc_resume":
-        return f"🚀 1. [{prd_match}] SDLC 恢复执行..."
+        cmd = context.get("command", "unknown")
+        return f"🚀 1. [{prd_match}] SDLC 恢复执行\n💻 Command: `{cmd}`"
     elif event_type == "sdlc_start":
-        return f"🚀 1. [{prd_match}] SDLC 启动"
+        cmd = context.get("command", "unknown")
+        return f"🚀 1. [{prd_match}] SDLC 启动\n💻 Command: `{cmd}`"
+    elif event_type == "auditor_start":
+        cmd = context.get("command", "unknown")
+        return f"🚀 [Auditor] 启动审批流程\n💻 Command: `{cmd}`"
     elif event_type == "slicing_start":
         return f"🔪 2. [{prd_match}] 切片中..."
     elif event_type == "slicing_end":

@@ -41,6 +41,9 @@ def main():
     import subprocess
     from agent_driver import notify_channel
     
+    import shlex
+    full_cmd = shlex.join([sys.executable] + sys.argv)
+    
     msg = "Auditor Ignition: Starting audit..."
     cmd_handshake.extend(["-m", msg])
     
@@ -49,6 +52,8 @@ def main():
         if res.returncode != 0:
             print(f"[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nInvalid notification channel format or failed handshake. You MUST provide a valid OpenClaw channel string (e.g., `slack:CXXXXXX`) and ensure the gateway is running.")
             sys.exit(1)
+            
+    notify_channel(args.channel, "Auditor Ignition: Starting audit...", "auditor_start", {"prd_file": args.prd_file, "command": full_cmd})
 
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)

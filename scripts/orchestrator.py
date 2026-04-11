@@ -435,16 +435,20 @@ def main():
     if os.path.exists(job_dir) and not args.force_replan:
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
         if len(md_files) > 0:
+            import shlex
+            full_cmd = shlex.join([sys.executable] + sys.argv)
             logger.info("State 0: Existing PRs detected. Resuming queue...")
             dlog(f"Transitioning to State 0 for PRD {prd_filename} (resuming)")
-            notify_channel(effective_channel, "Ignition: Resuming existing queue...", "sdlc_resume", {"prd_id": prd_filename})
+            notify_channel(effective_channel, "Ignition: Resuming existing queue...", "sdlc_resume", {"prd_id": prd_filename, "command": full_cmd})
     else:
         if args.force_replan and os.path.exists(job_dir):
             import shutil
             shutil.rmtree(job_dir)
+        import shlex
+        full_cmd = shlex.join([sys.executable] + sys.argv)
         logger.info("State 0: Auto-slicing PRD...")
         dlog(f"Transitioning to State 0 for PRD {prd_filename} (auto-slicing)")
-        notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename})
+        notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
             proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
