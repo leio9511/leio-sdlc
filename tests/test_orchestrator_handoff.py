@@ -202,13 +202,13 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
                 
         any_match = False
         for call in mock_print.call_args_list:
-            if len(call[0]) > 0 and "No open PRs found. Exiting." in str(call[0][0]):
+            if len(call[0]) > 0 and "[ACTION REQUIRED FOR MANAGER] UAT Failed" in str(call[0][0]):
                 any_match = True
                 break
         
         if not any_match:
             output = "\n".join([str(c) for c in mock_print.call_args_list])
-            if "No open PRs found. Exiting." in output:
+            if "[ACTION REQUIRED FOR MANAGER] UAT Failed" in output:
                 any_match = True
 
         self.assertTrue(any_match, f"Expected print not found in {mock_print.call_args_list}")

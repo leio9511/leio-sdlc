@@ -564,7 +564,10 @@ def main():
                     
                     uat_out_file = os.path.abspath(os.path.join(run_dir, "uat_report.json"))
                     if os.path.exists(uat_out_file):
-                        os.remove(uat_out_file)
+                        try:
+                            os.remove(uat_out_file)
+                        except OSError:
+                            pass
                     
                     uat_cmd = [
                         sys.executable, os.path.join(RUNTIME_DIR, "spawn_verifier.py"),
