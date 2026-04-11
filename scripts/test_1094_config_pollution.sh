@@ -1,4 +1,5 @@
 #!/bin/bash
+# PR-002: Integration test for config pollution
 export SDLC_TEST_MODE=true
 export PYTHONPATH="$(dirname "$0")"
 

@@ -46,11 +46,13 @@ def load_or_merge_config(sdlc_root):
                 local_config[k] = v
                 changed = True
         if changed and os.environ.get("SDLC_TEST_MODE") != "true":
+            # PR-002: Prevent physical config write if in test mode
             with open(config_path, "w") as fw:
                 json.dump(local_config, fw, indent=4)
         return local_config
     else:
         if os.environ.get("SDLC_TEST_MODE") != "true":
+            # PR-002: Prevent physical config write if in test mode
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             with open(config_path, "w") as f:
                 json.dump(config_template, f, indent=4)
