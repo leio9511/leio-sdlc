@@ -159,9 +159,6 @@ def teardown_coder_session(workdir, run_dir="."):
         except OSError:
             pass # Reaper safety check: process already reaped or pgid not found
 
-import json
-
-
 def validate_prd_is_committed(prd_file, workdir):
     prd_path_abs = os.path.abspath(prd_file)
     if os.path.exists(prd_path_abs):
@@ -302,7 +299,6 @@ def main():
         manifest_path = os.path.join(args.workdir, ".sdlc_lock_manifest.json")
         if os.path.exists(manifest_path):
             try:
-                import json
                 with open(manifest_path, "r") as f:
                     manifest_data = json.load(f)
                 for lock_path in manifest_data.get("locks", []):
@@ -451,12 +447,39 @@ def main():
 
     if os.path.exists(job_dir) and not args.force_replan:
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
-        if len(md_files) > 0:
+        if len(md_files) > 0 and not os.path.exists(os.path.join(job_dir, ".queue_empty_force")):
             import shlex
             full_cmd = shlex.join([sys.executable] + sys.argv)
             logger.info("State 0: Existing PRs detected. Resuming queue...")
             dlog(f"Transitioning to State 0 for PRD {prd_filename} (resuming)")
             notify_channel(effective_channel, "Ignition: Resuming existing queue...", "sdlc_resume", {"prd_id": prd_filename, "command": full_cmd})
+        elif os.path.exists(os.path.join(job_dir, ".queue_empty_force")):
+            pass
+        else:
+            if args.force_replan and os.path.exists(job_dir):
+                import shutil
+                shutil.rmtree(job_dir)
+            import shlex
+            full_cmd = shlex.join([sys.executable] + sys.argv)
+            logger.info("State 0: Auto-slicing PRD...")
+            dlog(f"Transitioning to State 0 for PRD {prd_filename} (auto-slicing)")
+            notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
+            notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
+            try:
+                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
+                proc.wait()
+                if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
+            except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
+            if not os.path.exists(job_dir):
+                print("[FATAL] Planner failed to generate any PRs.")
+                print(HandoffPrompter.get_prompt("planner_failure"))
+                sys.exit(1)
+            md_files = glob.glob(os.path.join(job_dir, "*.md"))
+            if len(md_files) == 0:
+                print("[FATAL] Planner failed to generate any PRs.")
+                print(HandoffPrompter.get_prompt("planner_failure"))
+                sys.exit(1)
+            notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
     else:
         if args.force_replan and os.path.exists(job_dir):
             import shutil
@@ -533,10 +556,54 @@ def main():
                 output = result.stdout.strip()
                 logger.debug(f"get_next_pr.py exit_code={result.returncode}, output='{output}'")
                 if "[QUEUE_EMPTY]" in output or not output:
-                    print("No open PRs found. Exiting.")
-                    print(HandoffPrompter.get_prompt("happy_path"))
-                    notify_channel(effective_channel, "Success: All PRs completed!", "all_done", {"prd_id": prd_filename})
-                    sys.exit(0)
+                    logger.info("State 6: UAT Verification")
+                    prd_files_set = {os.path.abspath(args.prd_file)}
+                    for f in glob.glob(os.path.join(job_dir, "PRD_*.md")):
+                        prd_files_set.add(os.path.abspath(f))
+                    prd_files_str = ",".join(list(prd_files_set))
+                    
+                    uat_out_file = os.path.abspath(os.path.join(run_dir, "uat_report.json"))
+                    if os.path.exists(uat_out_file):
+                        os.remove(uat_out_file)
+                    
+                    uat_cmd = [
+                        sys.executable, os.path.join(RUNTIME_DIR, "spawn_verifier.py"),
+                        "--prd-files", prd_files_str,
+                        "--workdir", workdir,
+                        "--out-file", uat_out_file
+                    ]
+                    if args.enable_exec_from_workspace:
+                        uat_cmd.append("--enable-exec-from-workspace")
+                        
+                    res = drun(uat_cmd, capture_output=True, text=True)
+                    if hasattr(args, "debug") and args.debug:
+                        logger.debug(f"UAT Verifier returned {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
+
+                    
+                    uat_status = "UNKNOWN"
+                    if os.path.exists(uat_out_file):
+                        try:
+                            with open(uat_out_file, "r") as f:
+                                uat_data = json.load(f)
+                                uat_status = uat_data.get("status", "UNKNOWN")
+                        except Exception as e:
+                            dlog(f"Failed to parse uat_report.json: {e}")
+                            
+                    if uat_status not in ["PASS", "NEEDS_FIX"]:
+                        print("[ACTION REQUIRED FOR MANAGER] UAT Failed. uat_report.json is missing or invalid JSON.")
+                        notify_channel(effective_channel, "UAT Verification failed due to missing or invalid JSON report. Manager is reviewing...", "uat_error", {"prd_id": prd_filename})
+                        sys.exit(1)
+                        
+                    msg = f"UAT Verification completed. Status: {uat_status}. Manager is reviewing..."
+                    notify_channel(effective_channel, msg, "uat_complete", {"prd_id": prd_filename, "status": uat_status})
+                    
+                    if uat_status == "PASS":
+                        print("[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py.")
+                        sys.exit(0)
+                    else:
+                        print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo.")
+                        sys.exit(1)
+
                 current_pr = output.split('\n')[-1].strip()
                 if not os.path.exists(current_pr):
                     print(HandoffPrompter.get_prompt("dead_end"))

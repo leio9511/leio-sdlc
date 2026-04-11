@@ -31,6 +31,11 @@ cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
 cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
+cp "${PROJECT_ROOT}/scripts/spawn_verifier.py" scripts/
+mkdir -p playbooks
+cp "${PROJECT_ROOT}/playbooks/verifier_playbook.md" playbooks/
+mkdir -p config
+cp "${PROJECT_ROOT}/config/prompts.json" config/
 
 echo ".sdlc_run.lock" > .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
@@ -117,8 +122,13 @@ if ! grep -q "State 5 Escalation - Tier 1 (Reset): Deleting branch and retrying.
     exit 1
 fi
 
-if ! grep -q "No open PRs found. Exiting." orchestrator.log; then
-    echo "❌ test_escalation_clean.sh FAILED: Orchestrator did not successfully close the PR after recovery."
+if ! grep -q "State 6: UAT Verification" orchestrator.log; then
+    echo "❌ test_escalation_clean.sh FAILED: Orchestrator did not successfully close the PR after recovery (State 6 UAT not reached)."
+    exit 1
+fi
+
+if ! grep -q "UAT Passed" orchestrator.log; then
+    echo "❌ test_escalation_clean.sh FAILED: Orchestrator did not successfully pass UAT."
     exit 1
 fi
 

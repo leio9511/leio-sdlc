@@ -3,7 +3,7 @@ import os
 import unittest
 import subprocess
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 # Force scripts into path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
@@ -129,8 +129,9 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
     @patch('os.chdir')
     @patch('os.open', return_value=99)
     @patch('fcntl.flock')
+    @patch('os.remove')
     @patch('git_utils.check_git_boundary')
-    def test_queue_empty(self, mock_check, mock_flock, mock_open, mock_chdir, mock_print, mock_glob, mock_exists, mock_run, mock_exit, mock_args):
+    def test_queue_empty(self, mock_check, mock_remove, mock_flock, mock_open, mock_chdir, mock_print, mock_glob, mock_exists, mock_run, mock_exit, mock_args):
         args = MagicMock()
         args.workdir = "/dummy"
         args.prd_file = "dummy.md"
@@ -145,6 +146,7 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         args.test_sleep = False
         args.global_dir = None
         args.channel = 'slack:C123'
+        args.debug = False
         mock_args.return_value = args
         
         mock_exists.return_value = True
@@ -166,21 +168,26 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         mock_run.side_effect = mock_run_logic
         mock_exit.side_effect = SystemExit(0)
         
-        orig_open = open
+        # We need to handle the open call for both PR.md and uat_report.json
+        # The easiest way is with a side_effect that checks the path.
+        # We also mock os.remove which is called if uat_report.json "exists".
+        
         def m_open_side_effect(path, *a, **k):
              if ".md" in str(path):
                  m = MagicMock()
                  m.__enter__.return_value.read.return_value = 'status: closed\n'
                  return m
-             return orig_open(path, *a, **k)
+             # This will be used for uat_report.json
+             return mock_open(read_data='{"status":"PASS"}')(path, *a,**k)
 
         with patch('builtins.open', side_effect=m_open_side_effect):
-            try:
-                orchestrator.main()
-            except SystemExit:
-                pass
+            with patch('json.load', return_value={"status": "PASS", "executive_summary": "Passed"}):
+                try:
+                    orchestrator.main()
+                except SystemExit:
+                    pass
                 
-        any_match = any("No open PRs found. Exiting." in str(call) for call in mock_print.call_args_list)
+        any_match = any("[SUCCESS_HANDOFF] UAT Passed" in str(call) for call in mock_print.call_args_list)
         self.assertTrue(any_match, f"Expected print not found in {mock_print.call_args_list}")
 
 if __name__ == '__main__':
