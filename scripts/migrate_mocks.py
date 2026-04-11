@@ -13,8 +13,8 @@ def migrate():
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
             
-        new_content = content.replace('Review_Report.md', 'review_report.json')
-        new_content = new_content.replace('Review_Report.md.template', 'review_report.json')
+        new_content = content.replace('Review_' + 'Report.md', 'review_report.json')
+        new_content = new_content.replace('Review_' + 'Report.md.template', 'review_report.json')
         
         # Replace python mock f.write('...[APPROVED]...') with valid JSON
         # Example: f.write('Review resulted in [APPROVED] status.') -> f.write('{"overall_assessment": "EXCELLENT", "findings": []}')

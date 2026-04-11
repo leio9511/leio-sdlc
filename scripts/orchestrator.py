@@ -625,7 +625,7 @@ def main():
 
                     orch_yellow_counter = 0
                     
-                    review_artifact = os.path.join(run_dir, "Review_Report.md")
+                    review_artifact = os.path.join(run_dir, "review_report.json")
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     logger.info(f"State 4: Spawning Reviewer for {current_pr}")

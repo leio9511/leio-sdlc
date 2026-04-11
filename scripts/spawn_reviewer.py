@@ -102,11 +102,7 @@ def main():
         sys.exit(0)
 
     SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
-    template_path = os.path.join(SDLC_ROOT, "TEMPLATES", "Review_Report.md.template")
     template_content = ""
-    if os.path.exists(template_path):
-        with open(template_path, "r") as f:
-            template_content = f.read()
 
     playbook_path = os.path.join(SDLC_ROOT, "playbooks", "reviewer_playbook.md")
     playbook_content = ""
