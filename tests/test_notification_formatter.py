@@ -6,8 +6,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 from notification_formatter import format_notification
 
 def test_format_sdlc_start():
-    res = format_notification("sdlc_start", {"prd_id": "PRD_081_test.md"})
-    assert res == "🚀 1. [prd-081] SDLC 启动"
+    res = format_notification("sdlc_start", {"prd_id": "PRD_081_test.md", "command": "python3 script.py"})
+    assert res == "🚀 1. [prd-081] SDLC 启动\n💻 Command: `python3 script.py`"
+
+def test_format_sdlc_resume():
+    res = format_notification("sdlc_resume", {"prd_id": "PRD_081_test.md", "command": "python3 script.py"})
+    assert res == "🚀 1. [prd-081] SDLC 恢复执行\n💻 Command: `python3 script.py`"
+
+def test_format_auditor_start():
+    res = format_notification("auditor_start", {"prd_id": "PRD_081_test.md", "command": "python3 spawn_auditor.py"})
+    assert res == "🚀 [Auditor] 启动审批流程\n💻 Command: `python3 spawn_auditor.py`"
 
 def test_format_slicing_start():
     res = format_notification("slicing_start", {"prd_id": "PRD_081_test.md"})
