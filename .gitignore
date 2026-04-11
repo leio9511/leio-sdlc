@@ -9,13 +9,13 @@ current_review.diff
 build_preflight.log
 memory_proof.txt
 review_report.txt
-Review_Report.md
+review_report.json
 pr*_content.md
 
 # SDLC Orchestrator Runtime Artifacts
 config/sdlc_config.json
 .coder_session
-Review_Report.md
+review_report.json
 current_review.diff
 recent_history.diff
 current_arbitration.diff

@@ -15,7 +15,7 @@ As of v0.8.x, LEIO SDLC implements a strict separation of concerns to ensure the
 - **Data Plane (Working Directory)**: The target project's root folder (`--workdir`). This is where actual business code lives and where `git commit` / `git merge` operations happen. No SDLC runtime artifacts are stored here.
 - **Control Plane (Global Run Directory)**: An isolated sandbox (`--global-dir`, default: `/root/.openclaw/workspace/.sdlc_runs_global`) that stores all AI runtime artifacts:
   - PR Contracts (Micro-slices)
-  - `Review_Report.md` & `*.diff` files
+  - `review_report.json` & `*.diff` files
   - `.coder_session` and state machine trackers
   - Forensic logs and quarantine states
 

@@ -37,7 +37,7 @@ def main():
         workdir=workdir,
         pr_content=pr_content,
         diff_file=diff_file,
-        review_report_path=os.path.join(args.run_dir, "Review_Report.md"), run_dir=args.run_dir
+        review_report_path=os.path.join(args.run_dir, "review_report.json"), run_dir=args.run_dir
     )
     
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
