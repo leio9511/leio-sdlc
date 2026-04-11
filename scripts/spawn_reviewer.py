@@ -76,8 +76,6 @@ def main():
     match = re.search(r'PR_0*(\d+)', os.path.basename(args.pr_file))
     if match:
         pr_num = int(match.group(1))
-    
-    history_depth = max(5, pr_num)
 
     if args.override_diff_file:
         diff_file = args.override_diff_file
@@ -88,7 +86,14 @@ def main():
         diff_cmd = f"git diff {args.diff_target} --no-color > {diff_file}"
         subprocess.run(diff_cmd, shell=True)
             
-        history_cmd = f"git log -n {history_depth} -p {args.diff_target} > {os.path.join(args.run_dir, 'recent_history.diff')}"
+        baseline_file = os.path.join(args.run_dir, "baseline_commit.txt")
+        if os.path.exists(baseline_file):
+            with open(baseline_file, "r") as f:
+                baseline_hash = f.read().strip()
+            history_cmd = f"git log -p {baseline_hash}..HEAD > {os.path.join(args.run_dir, 'recent_history.diff')}"
+        else:
+            history_depth = max(5, pr_num)
+            history_cmd = f"git log -n {history_depth} -p {args.diff_target} > {os.path.join(args.run_dir, 'recent_history.diff')}"
         subprocess.run(history_cmd, shell=True)
         
     guardrail_violation = check_guardrails(workdir, pr_content, [os.path.join(workdir, diff_file)])
