@@ -39,8 +39,27 @@ def send_feedback(session_key, message, workdir='.'):
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
     session_file = os.path.join(run_dir, ".coder_session")
     try:
+        import json
         with open(feedback_file, "r") as f:
             feedback_content = f.read()
+            
+        try:
+            # Try to extract pure JSON from the file, as it might be wrapped in markdown
+            import re
+            json_match = re.search(r'```json\s*(.*?)\s*```', feedback_content, re.DOTALL)
+            if json_match:
+                feedback_content = json_match.group(1).strip()
+            else:
+                json_match = re.search(r'(\{.*?\})', feedback_content, re.DOTALL)
+                if json_match:
+                    feedback_content = json_match.group(1).strip()
+                    
+            # Ensure it's valid JSON, then dump it raw
+            json_obj = json.loads(feedback_content)
+            feedback_content = json.dumps(json_obj, indent=2)
+        except Exception:
+            pass # Fall back to raw string if parsing fails
+            
         msg = build_prompt("coder_revision", feedback_content=feedback_content)
         
         if os.path.exists(session_file):
