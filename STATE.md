@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1107] Planner Slice Numbering Prompt Hardening**: Modified `config/prompts.json` to strictly enforce the static pass-through of the `--insert-after` argument, fixing the double-nested sub-numbering hallucination bug.
 - [x] **[ISSUE-1094] Deploy Path and Broadcast Fix**: Injected absolute path anchors to deploy scripts to prevent SLUG extraction drift. Injected CLI `shlex.join` full command broadcast into Orchestrator and Auditor Slack notifications to ensure immediate execution traceability.
 - [x] **[HOTFIX-1094] Config Pollution & Path Chaos Recovery**: Decoupled `RUNTIME_DIR`, `GLOBAL_DIR`, and `WORKDIR` across all engine scripts. Enforced `SDLC_TEST_MODE=true` strict guardrails to prevent `load_or_merge_config` from physically writing `config/sdlc_config.json` into the target source tree, fully eradicating false-positive dirty state pipeline crashes.
 - [x] **[PRD-Workspace-Cleanup] Hard Cleanup and Rsync Rule Fix**: Eradicated the infinite nesting `.dist/dist/` bug by propagating `.gitignore` natively into `build_release.sh` using `rsync --exclude-from`. Executed a physical scrub of hundreds of stale `.sdlc_runs/` sandboxes.
