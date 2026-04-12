@@ -7,7 +7,7 @@ set -e
 # Defaults to google/gemini-2.0-flash if not provided.
 
 export LLM_DRIVER="gemini"
-export TEST_MODEL="${1:-${TEST_MODEL:-google/gemini-2.0-flash}}"
+export TEST_MODEL="${1:-${TEST_MODEL:-gemini-2.5-flash}}"
 
 echo "==========================================="
 echo "Running Isolated E2E Test for Gemini Driver"

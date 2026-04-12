@@ -73,7 +73,11 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
     )
     task_string += jit_guardrail
 
-    fd, path = tempfile.mkstemp(suffix=".txt", prefix=f"sdlc_prompt_{session_key}_", dir="/tmp", text=True)
+    project_root = os.path.dirname(RUNTIME_DIR)
+    temp_dir = os.path.join(project_root, ".tmp")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    fd, path = tempfile.mkstemp(suffix=".txt", prefix=f"sdlc_prompt_{session_key}_", dir=temp_dir, text=True)
     try:
         os.chmod(path, 0o600)
         with os.fdopen(fd, 'w') as tmp:
