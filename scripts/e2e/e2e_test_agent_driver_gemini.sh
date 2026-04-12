@@ -4,7 +4,7 @@ set -e
 # test_agent_driver_gemini.sh
 # Standalone E2E test harness for Gemini driver integration
 # Usage: ./test_agent_driver_gemini.sh [model_name]
-# Defaults to google/gemini-2.0-flash if not provided.
+# Defaults to gemini-2.5-flash if not provided.
 
 export LLM_DRIVER="gemini"
 export TEST_MODEL="${1:-${TEST_MODEL:-gemini-2.5-flash}}"
