@@ -44,3 +44,23 @@ def test_format_coder_start_microsliced():
 def test_format_coder_start_microsliced_complex():
     res = format_notification("coder_start", {"pr_id": "PR_003_1_2_Fix_Something.md"})
     assert res == "👨💻 4. [pr-003-1-2] Coder 运行中..."
+
+def test_format_auditor_approved():
+    res = format_notification("auditor_approved", {"prd_id": "PRD_123_Test.md"})
+    assert res == "✅ [Auditor] PRD 审查通过 (APPROVED)。"
+
+def test_format_auditor_rejected():
+    res = format_notification("auditor_rejected", {"prd_id": "PRD_123_Test.md"})
+    assert res == "❌ [Auditor] PRD 审查未通过 (REJECTED)，请根据反馈进行修改并重试。"
+
+def test_format_uat_complete_pass():
+    res = format_notification("uat_complete", {"prd_id": "PRD_123_Test.md", "status": "PASS"})
+    assert res == "🎉 [prd-123] UAT Verification: Passed."
+
+def test_format_uat_complete_fail():
+    res = format_notification("uat_complete", {"prd_id": "PRD_123_Test.md", "status": "NEEDS_FIX"})
+    assert res == "⚠️ [prd-123] UAT Verification: Missed (Needs Fix)."
+
+def test_format_uat_error():
+    res = format_notification("uat_error", {"prd_id": "PRD_123_Test.md"})
+    assert res == "❌ [prd-123] UAT Verification Error: 测试报告解析失败或发生异常。"

@@ -64,5 +64,17 @@ def format_notification(event_type: str, context: dict) -> str:
     elif event_type == "github_sync_failed":
         err = context.get('error', 'unknown error')
         return f"⚠️ GitHub sync failed: {err}"
+    elif event_type == "auditor_approved":
+        return f"✅ [Auditor] PRD 审查通过 (APPROVED)。"
+    elif event_type == "auditor_rejected":
+        return f"❌ [Auditor] PRD 审查未通过 (REJECTED)，请根据反馈进行修改并重试。"
+    elif event_type == "uat_complete":
+        status = context.get('status', 'UNKNOWN')
+        if status == "PASS":
+            return f"🎉 [{prd_match}] UAT Verification: Passed."
+        else:
+            return f"⚠️ [{prd_match}] UAT Verification: Missed (Needs Fix)."
+    elif event_type == "uat_error":
+        return f"❌ [{prd_match}] UAT Verification Error: 测试报告解析失败或发生异常。"
     
     return f"🤖 [SDLC Engine] 未知事件: {event_type}"
