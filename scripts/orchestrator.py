@@ -174,6 +174,8 @@ def validate_prd_is_committed(prd_file, workdir):
             print("[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path>")
             sys.exit(1)
 
+from utils_json import extract_and_parse_json
+
 def parse_review_verdict(content):
     """
     Parses structured JSON review status using the new schema.

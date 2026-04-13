@@ -163,3 +163,11 @@ def test_orchestrator_system_alert_invocation(mock_workdir):
         assert len(system_alert_calls) > 0
         sys_alert_arg = system_alert_calls[0][0][0]
         assert "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text." in sys_alert_arg
+
+def test_parse_review_verdict_success():
+    content = '{"overall_assessment": "EXCELLENT"}'
+    assert orchestrator.parse_review_verdict(content) == "APPROVED"
+
+def test_parse_review_verdict_failure():
+    content = 'invalid json'
+    assert orchestrator.parse_review_verdict(content) is None
