@@ -28,6 +28,7 @@ cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
 cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
 cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
+cp "${PROJECT_ROOT}/scripts/utils_json.py" scripts/
 cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/

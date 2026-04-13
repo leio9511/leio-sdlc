@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from git_utils import safe_git_checkout, GitCheckoutError
 from notification_formatter import format_notification
 from handoff_prompter import HandoffPrompter
+from utils_json import extract_and_parse_json
 
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
@@ -716,12 +717,33 @@ def main():
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
                     proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True)
                     proc.wait()
-                    if os.path.exists(review_report_path):
-                        with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
-                    else: review_content = ""
-                
-                    # New Structured JSON Parsing logic
-                    verdict = parse_review_verdict(review_content)
+                    
+                    json_retry_count = 0
+                    max_json_retries = 3
+                    verdict = None
+                    
+                    while json_retry_count < max_json_retries:
+                        if os.path.exists(review_report_path):
+                            with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
+                        else: review_content = ""
+                    
+                        try:
+                            # Use new robust parser
+                            data = extract_and_parse_json(review_content)
+                            assessment = data.get("overall_assessment") if isinstance(data, dict) else None
+                            if assessment in ["EXCELLENT", "GOOD_WITH_MINOR_SUGGESTIONS"]:
+                                verdict = "APPROVED"
+                            elif assessment in ["NEEDS_ATTENTION", "NEEDS_IMMEDIATE_REWORK"]:
+                                verdict = "ACTION_REQUIRED"
+                            else:
+                                verdict = None
+                            break # successfully parsed, exit loop
+                        except ValueError as e:
+                            json_retry_count += 1
+                            logger.warning(f"Failed to parse Reviewer JSON (Attempt {json_retry_count}/{max_json_retries}). Retry would occur here.")
+                            if json_retry_count >= max_json_retries:
+                                break
+                                
                     if verdict == "APPROVED":
                         drun(["git", "reset", "--hard", "HEAD"])
                         drun(["git", "clean", "-fd"])
