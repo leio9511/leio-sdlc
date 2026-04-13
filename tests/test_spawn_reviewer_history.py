@@ -103,3 +103,77 @@ def test_spawn_reviewer_uses_fallback_if_missing():
                     history_cmd_found = True
                     
             assert history_cmd_found, f"git log fallback command was not called correctly. Expected '{expected_cmd}' in calls"
+
+def test_spawn_reviewer_creates_session_file():
+    with tempfile.TemporaryDirectory() as td:
+        workdir = os.path.join(td, "workdir")
+        run_dir = os.path.join(td, "run_dir")
+        os.makedirs(workdir)
+        os.makedirs(run_dir)
+        
+        pr_file = os.path.join(td, "PR_003.md")
+        with open(pr_file, "w") as f:
+            f.write("dummy content")
+            
+        test_args = [
+            "spawn_reviewer.py",
+            "--pr-file", pr_file,
+            "--diff-target", "master",
+            "--workdir", workdir,
+            "--run-dir", run_dir
+        ]
+
+        def fake_exit(code):
+            raise SystemExit(code)
+
+        with patch("sys.argv", test_args), \
+             patch("subprocess.run"), \
+             patch("spawn_reviewer.check_guardrails", return_value=None), \
+             patch("spawn_reviewer.invoke_agent", return_value='{"status":"APPROVED"}'), \
+             patch("sys.exit", side_effect=fake_exit):
+            
+            try:
+                spawn_reviewer.main()
+            except SystemExit:
+                pass
+                
+            session_file = os.path.join(run_dir, ".reviewer_session")
+            assert os.path.exists(session_file), "Session file was not created"
+            with open(session_file, "r") as f:
+                content = f.read().strip()
+            assert content.startswith("subtask-")
+
+def test_spawn_reviewer_system_alert():
+    with tempfile.TemporaryDirectory() as td:
+        workdir = os.path.join(td, "workdir")
+        run_dir = os.path.join(td, "run_dir")
+        os.makedirs(workdir)
+        os.makedirs(run_dir)
+        
+        session_file = os.path.join(run_dir, ".reviewer_session")
+        with open(session_file, "w") as f:
+            f.write("subtask-12345678")
+            
+        test_args = [
+            "spawn_reviewer.py",
+            "--run-dir", run_dir,
+            "--system-alert", "test alert"
+        ]
+
+        def fake_exit(code):
+            raise SystemExit(code)
+
+        with patch("sys.argv", test_args), \
+             patch("subprocess.run") as mock_run, \
+             patch("sys.exit", side_effect=fake_exit), \
+             patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            
+            try:
+                spawn_reviewer.main()
+            except SystemExit:
+                pass
+                
+            mock_run.assert_called_once()
+            cmd = mock_run.call_args[0][0]
+            assert cmd == ["openclaw", "agent", "--session-id", "subtask-12345678", "-m", "test alert"]
+

@@ -48,17 +48,46 @@ def check_guardrails(workdir, pr_content, diff_files):
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn a reviewer agent.")
-    parser.add_argument("--pr-file", required=True, help="Path to the PR Contract file")
-    parser.add_argument("--diff-target", required=True, help="Git diff target range (e.g., base_hash..latest_hash)")
+    parser.add_argument("--pr-file", required=False, help="Path to the PR Contract file")
+    parser.add_argument("--diff-target", required=False, help="Git diff target range (e.g., base_hash..latest_hash)")
     parser.add_argument("--override-diff-file", help="Override the diff file and skip git diff", default=None)
     parser.add_argument("--job-dir", required=False, default=".", help="Working directory for the Reviewer to generate artifacts")
-    parser.add_argument("--workdir", required=True, help="Working directory lock")
+    parser.add_argument("--workdir", required=False, help="Working directory lock")
     parser.add_argument("--out-file", default="review_report.json", help="Path to write the review report")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
+    parser.add_argument("--system-alert", help="Send a system alert to the existing reviewer session", default=None)
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
+
+    session_file = os.path.join(args.run_dir, ".reviewer_session")
+
+    if args.system_alert:
+        if not os.path.exists(session_file):
+            print(f"[FATAL] Session file {session_file} not found. Cannot send system alert.", file=sys.stderr)
+            sys.exit(1)
+        with open(session_file, "r") as sf:
+            session_id = sf.read().strip()
+        
+        cmd = ["openclaw", "agent", "--session-id", session_id, "-m", args.system_alert]
+        print(f"[reviewer] Sending system alert to session {session_id}")
+        
+        if os.environ.get("SDLC_TEST_MODE") == "true":
+            with open(os.path.join(args.run_dir, args.out_file), "w") as rf:
+                rf.write('```json\n{"status": "APPROVED", "comments": "Mock LGTM from alert"}\n```')
+            print('{"status": "mock_success", "role": "reviewer_alert"}')
+            sys.exit(0)
+            
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"[FATAL] System alert failed: {result.stderr}", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+
+    if not args.workdir or not args.pr_file or not args.diff_target:
+        print("[FATAL] --workdir, --pr-file, and --diff-target are required when not using --system-alert", file=sys.stderr)
+        sys.exit(1)
 
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
@@ -137,6 +166,10 @@ def main():
 
     import time
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
+    
+    with open(session_file, "w") as sf:
+        sf.write(session_id)
+        
     invoke_agent(task_string, session_key=session_id, role="reviewer")
 
     review_report_path = os.path.join(args.run_dir, args.out_file)
