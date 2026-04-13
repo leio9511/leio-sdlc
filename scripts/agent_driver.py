@@ -92,7 +92,7 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
             # "Uses subprocess and stdio to shell out to gemini run --model <MODEL> (or appropriate CLI flags based on LLM_DRIVER)"
             model = os.environ.get("TEST_MODEL", "google/gemini-2.0-flash")
             cmd_exec = resolve_cmd("gemini")
-            cmd = [cmd_exec, "--model", model, "-p", secure_msg]
+            cmd = [cmd_exec, "--yolo", "-p", secure_msg]
         else:
             cmd_exec = resolve_cmd("openclaw")
             cmd = [cmd_exec, "agent", "--session-id", session_key, "-m", secure_msg]

@@ -1,5 +1,5 @@
-import re
 #!/usr/bin/env python3
+import re
 import argparse
 import tempfile
 import os
