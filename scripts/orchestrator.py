@@ -174,39 +174,20 @@ def validate_prd_is_committed(prd_file, workdir):
             print("[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path>")
             sys.exit(1)
 
-def extract_json_from_llm_response(content):
-    """
-    Robustly extracts and parses JSON from an LLM response that might be wrapped in markdown.
-    """
-    if not content or not content.strip():
-        return None
-    try:
-        # Search for JSON block wrapped in markdown
-        json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(1).strip())
-            
-        # Fallback to searching for anything that looks like a JSON object
-        json_match = re.search(r'(\{.*?\})', content, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(1).strip())
-            
-        # Try parsing the whole thing
-        return json.loads(content.strip())
-    except (json.JSONDecodeError, AttributeError, ValueError):
-        return None
-
 def parse_review_verdict(content):
     """
     Parses structured JSON review status using the new schema.
     """
-    data = extract_json_from_llm_response(content)
-    if data and isinstance(data, dict):
-        assessment = data.get("overall_assessment")
-        if assessment in ["EXCELLENT", "GOOD_WITH_MINOR_SUGGESTIONS"]:
-            return "APPROVED"
-        elif assessment in ["NEEDS_ATTENTION", "NEEDS_IMMEDIATE_REWORK"]:
-            return "ACTION_REQUIRED"
+    try:
+        data = extract_and_parse_json(content)
+        if data and isinstance(data, dict):
+            assessment = data.get("overall_assessment")
+            if assessment in ["EXCELLENT", "GOOD_WITH_MINOR_SUGGESTIONS"]:
+                return "APPROVED"
+            elif assessment in ["NEEDS_ATTENTION", "NEEDS_IMMEDIATE_REWORK"]:
+                return "ACTION_REQUIRED"
+    except Exception:
+        pass
     return None
 
 def trigger_github_sync(workdir, effective_channel, pr_id):
