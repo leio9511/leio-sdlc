@@ -740,9 +740,13 @@ def main():
                             break # successfully parsed, exit loop
                         except ValueError as e:
                             json_retry_count += 1
-                            logger.warning(f"Failed to parse Reviewer JSON (Attempt {json_retry_count}/{max_json_retries}). Retry would occur here.")
+                            logger.warning(f"Failed to parse Reviewer JSON (Attempt {json_retry_count}/{max_json_retries}). Retrying with system alert.")
                             if json_retry_count >= max_json_retries:
                                 break
+                                
+                            sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True)
+                            proc.wait()
                                 
                     if verdict == "APPROVED":
                         drun(["git", "reset", "--hard", "HEAD"])
