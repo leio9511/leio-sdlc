@@ -7,6 +7,8 @@ README.md
 package.json
 .gitignore
 .release_ignore
+scripts/gemini-deploy.sh
+tests/test_gemini_deploy.sh
 *.log
 *.diff
 .review_count

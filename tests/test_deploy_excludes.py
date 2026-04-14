@@ -23,6 +23,8 @@ class TestDeployExcludes(unittest.TestCase):
             prod_dir = os.path.join(mock_home, ".openclaw", "skills", "leio-sdlc")
             self.assertTrue(os.path.exists(prod_dir), "Prod dir not created")
             self.assertFalse(os.path.exists(os.path.join(prod_dir, "tests")), "tests/ directory should be excluded")
+            self.assertFalse(os.path.exists(os.path.join(prod_dir, "scripts/gemini-deploy.sh")), "gemini-deploy.sh should be excluded from prod")
+            self.assertFalse(os.path.exists(os.path.join(prod_dir, "tests/test_gemini_deploy.sh")), "test_gemini_deploy.sh should be excluded from prod")
 
     def test_deploy_excludes_sdlc_runs(self):
         with tempfile.TemporaryDirectory() as tempdir:
