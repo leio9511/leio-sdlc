@@ -73,8 +73,7 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
     )
     task_string += jit_guardrail
 
-    project_root = os.path.dirname(RUNTIME_DIR)
-    temp_dir = os.path.join(project_root, ".tmp")
+    temp_dir = os.path.expanduser("~/.openclaw/workspace/.tmp")
     os.makedirs(temp_dir, exist_ok=True)
 
     fd, path = tempfile.mkstemp(suffix=".txt", prefix=f"sdlc_prompt_{session_key}_", dir=temp_dir, text=True)
@@ -85,17 +84,36 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
         
         secure_msg = f"Read your complete task instructions from {path}. Do not modify this file."
         
-        # Determine LLM driver
+    # Determine LLM driver
         llm_driver = os.environ.get("LLM_DRIVER", "openclaw").lower()
         
+        # Check session map
+        temp_dir = os.path.expanduser("~/.openclaw/workspace/.tmp")
+        session_map_file = os.path.join(temp_dir, f".session_map_{session_key}.json")
+        actual_id = None
+        if os.path.exists(session_map_file):
+            try:
+                with open(session_map_file, "r") as f:
+                    mapping = json.load(f)
+                    actual_id = mapping.get("actual_id")
+            except Exception:
+                pass
+
         if llm_driver == "gemini":
+            from config import DEFAULT_GEMINI_MODEL
             # --yolo is CRITICAL: prevents interactive Y/n prompt blocking in headless/CI environments
-            model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL", "google/gemini-2.0-flash")
+            model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL") or DEFAULT_GEMINI_MODEL
             cmd_exec = resolve_cmd("gemini")
-            cmd = [cmd_exec, "--yolo", "-p", task_string, "--model", model]
+            if actual_id:
+                cmd = [cmd_exec, "--yolo", "-p", secure_msg, "-r", actual_id]
+            else:
+                cmd = [cmd_exec, "--yolo", "-p", secure_msg, "--model", model]
         else:
             cmd_exec = resolve_cmd("openclaw")
-            cmd = [cmd_exec, "agent", "--session-id", session_key, "-m", secure_msg]
+            if actual_id:
+                cmd = [cmd_exec, "agent", "--session-id", actual_id, "-m", secure_msg]
+            else:
+                cmd = [cmd_exec, "agent", "--session-id", session_key, "-m", secure_msg]
             
         print(f"[{role or 'system'}] Invoking agent driver: {' '.join(cmd)}")
         
@@ -103,6 +121,25 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
                 print(result.stdout)
+                
+                # Session Mapping anti-race capture
+                if llm_driver == "gemini" and not actual_id:
+                    list_cmd = [cmd_exec, "--list-sessions", "-o", "json"]
+                    list_res = subprocess.run(list_cmd, capture_output=True, text=True)
+                    if list_res.returncode == 0:
+                        try:
+                            sessions = json.loads(list_res.stdout)
+                            for s in sessions:
+                                if "prompt" in s and path in s["prompt"]:
+                                    with open(session_map_file, "w") as f:
+                                        json.dump({"actual_id": s["id"]}, f)
+                                    break
+                        except Exception as e:
+                            print(f"Error parsing session list: {e}", file=sys.stderr)
+                elif llm_driver == "openclaw" and not actual_id:
+                    with open(session_map_file, "w") as f:
+                        json.dump({"actual_id": session_key}, f)
+
                 if return_output:
                     return session_key, result.stdout
                 return session_key
