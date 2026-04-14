@@ -11,7 +11,8 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 3. **Implicit Engine & Model Configuration**: Relying solely on environment variables (`LLM_DRIVER` and `SDLC_MODEL`) hides the execution context from CLI history. Explicit CLI arguments are needed for `orchestrator.py` and its subordinate `spawn_*.py` scripts.
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than the global `.tmp` directory.
+1. **Remove `scripts/config.py`**: The previous implementation attempted to fix magic strings by extracting `DEFAULT_GEMINI_MODEL` to `scripts/config.py`. However, with explicit CLI argument injection (`--model`), the fallback logic is naturally handled by `argparse` defaults in the entrypoint scripts. The `config.py` file is now redundant overhead and should be deleted to prevent fragmentation.
+2. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than the global `.tmp` directory.
 2. **Automated Skill Linking**: Update `deploy.sh` and `kit-deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI, enabling fully headless deployments.
 3. **Explicit CLI Arguments**: 
    - Add `--engine` argument (choices: `openclaw`, `gemini`; default: `openclaw`) to `orchestrator.py` and all `spawn_*.py` scripts.
@@ -22,6 +23,9 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Deployment Scripts Modification**: 
   - Locate `gemini skills link "$TARGET_DIR"` (or similar invocations) in `deploy.sh` and `kit-deploy.sh`. Append the `--consent` flag.
+- **Redundant Configuration Cleanup**:
+  - Delete `scripts/config.py`.
+  - In `scripts/agent_driver.py`, remove the `import config` statement and remove any fallback logic relying on it. The `engine` and `model` are now guaranteed to be provided via the function arguments.
 - **CLI Argument Parsing & Explicit Dependency Injection**:
   - Update `argparse` configuration in `scripts/orchestrator.py` and `scripts/spawn_*.py` (Planner, Coder, Reviewer, Auditor, Manager, Verifier, Arbitrator).
   - Add `--engine` and `--model` with self-explanatory help strings.
@@ -63,6 +67,7 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 - `scripts/orchestrator.py`
 - `scripts/spawn_*.py` (all spawn scripts)
 - `scripts/agent_driver.py`
+- `scripts/config.py` (To be deleted)
 
 ## 7. Hardcoded Content (硬编码内容)
 
