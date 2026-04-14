@@ -27,7 +27,7 @@ python3 scripts/spawn_planner.py --prd-file docs/PRDs/dummy_triad_prd.md --workd
 echo "Asserting Output..."
 cat triad_planner.log
 # Find the generated PR file
-PR_FILE=$(ls .sdlc_runs/*/dummy_triad_prd/PR_*.md 2>/dev/null | head -n 1 || true)
+PR_FILE=$( (ls .sdlc_runs/*/dummy_triad_prd/PR_Slice_1.md 2>/dev/null || ls .sdlc_runs/*/dummy_triad_prd/PR_A.md 2>/dev/null || ls .sdlc_runs/*/dummy_triad_prd/PR_001_*.md 2>/dev/null) | head -n 1 || true)
 
 if [ -n "$PR_FILE" ] && [ -f "$PR_FILE" ]; then
     if grep -q "PL-999" "$PR_FILE" && grep -q "#" "$PR_FILE"; then
