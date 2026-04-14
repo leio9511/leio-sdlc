@@ -2,9 +2,10 @@
 export SDLC_TEST_MODE=true
 set -e
 
-# scripts/e2e_test_hierarchical_resilience.sh - End-to-end verification of Four-Path Resilience
+# e2e_test_hierarchical_resilience.sh - End-to-end verification of Four-Path Resilience
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 function setup_sandbox() {
     sandbox_dir=$(mktemp -d)
@@ -21,24 +22,17 @@ INNER_EOF
     git config user.email "e2e@example.com"
     git commit --allow-empty -m "init" > /dev/null 2>&1
     echo "*.log" > .gitignore
+    echo ".tmp/" >> .gitignore
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
     mkdir -p docs/PRDs
     mkdir -p scripts config
     
-    # Copy essential scripts
-    cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
-    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
-    cp "${PROJECT_ROOT}/config/prompts.json" config/
-    cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
+    init_hermetic_sandbox "scripts"
 
     echo "*.lock" >> .gitignore
-    echo "__pycache__/" >> .gitignore
+    echo "scripts/__pycache__/" >> .gitignore
     
     export MOCK_GLOBAL_DIR=$(mktemp -d)
     mkdir -p "$MOCK_GLOBAL_DIR/config"
@@ -124,39 +118,14 @@ INNER_EOF
     # Verify transitions
     CODER_RUNS=$(wc -l < /tmp/coder_runs.log 2>/dev/null || echo 0)
     
-    # Yellow limit is 3, Red limit is 2.
-    # Total coder runs before Black path:
-    # 1st Red cycle: 1 initial + 3 yellow retries = 4
-    # Wait, yellow retry: "if yellow_counter < yellow_retry_limit"
-    # Actually, the logic in orchestrator:
-    # yellow_counter starts at 0. review rejects -> yellow_counter += 1 (now 1).
-    # 1 < 3? yes -> spawn coder.
-    # review rejects -> yellow_counter += 1 (now 2). 2 < 3? yes -> spawn coder.
-    # review rejects -> yellow_counter += 1 (now 3). 3 < 3? no -> spawn arbitrator.
-    # Arbitrator confirms reject -> state_5_trigger = True.
-    # So 3 coder runs per Red cycle? Wait:
-    # Initial spawn coder (State 3).
-    # Review rejects (1) -> spawn coder (retry 1).
-    # Review rejects (2) -> spawn coder (retry 2).
-    # Review rejects (3) -> spawn arbitrator.
-    # So 3 coder runs total per Red cycle.
-    # Red limit is 2. 
-    # Red cycle 1: 3 coder runs. red_counter becomes 1. git reset.
-    # Red cycle 2: 3 coder runs. red_counter becomes 2. git reset.
-    # Red cycle 3: 3 coder runs. red_counter becomes 3... wait.
-    # if red_counter < red_retry_limit (2): continue.
-    # Initial run (red_counter=0) -> state_5 -> red_counter=1 -> continue
-    # Next run (red_counter=1) -> state_5 -> red_counter=2 -> continue
-    # Next run (red_counter=2) -> state_5 -> else block (Black path)
-    # Total coder runs = 3 * 3 = 9.
-
     if ! grep -q "Red Path Triggered" orchestrator.log; then
         echo "❌ FAILED: Red Path was never triggered."
         cat orchestrator.log
         exit 1
     fi
     
-    CODER_RUNS=$(wc -l < /tmp/coder_runs.log 2>/dev/null || echo 0)
+    # Yellow limit is 3, Red limit is 2.
+    # Total coder runs calculation in previous turn was correct (9).
     if [ "$CODER_RUNS" -ne 9 ]; then
         echo "❌ FAILED: Expected 9 coder runs (Yellow and Red transitions), got $CODER_RUNS"
         cat orchestrator.log
@@ -209,4 +178,3 @@ function test_deploy_hot_preservation() {
 
 test_deploy_hot_preservation
 test_e2e_hierarchical_resilience
-

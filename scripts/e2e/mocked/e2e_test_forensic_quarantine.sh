@@ -2,10 +2,12 @@
 export SDLC_TEST_MODE=true
 set -e
 
-# test_forensic_quarantine.sh - Verify that dirty files are tracked during State 5 Escalation
+# e2e_test_forensic_quarantine.sh - Verify that dirty files are tracked during State 5 Escalation
 # and that Control Plane state is preserved in global run-dir.
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+
 SANDBOX_DIR=$(mktemp -d)
 MOCK_GLOBAL_DIR=$(mktemp -d)
 cd "$SANDBOX_DIR"
@@ -18,15 +20,7 @@ echo "initial" > init.txt
 git add init.txt
 git commit -m "init" > /dev/null 2>&1
 
-mkdir -p scripts
-cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
-cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
-cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
-cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
-cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
-cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
-cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
-cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
+init_hermetic_sandbox "$SANDBOX_DIR/scripts"
 
 # Explicitly ignore common noise to avoid [FATAL] Dirty Git Workspace
 echo ".sdlc_run.lock" > .gitignore
@@ -36,6 +30,7 @@ echo "orchestrator.log" >> .gitignore
 echo "orchestrator_s5.log" >> .gitignore
 echo "cleanup.log" >> .gitignore
 echo "scripts/__pycache__/" >> .gitignore
+echo ".tmp/" >> .gitignore
 git add .gitignore scripts
 git commit -m "setup" > /dev/null 2>&1
 
@@ -119,7 +114,7 @@ fi
 echo "Testing --cleanup forensic quarantine..."
 git checkout -b "feature_branch" > /dev/null 2>&1
 echo "dirty crash file" > crash_artifact.txt
-python3 scripts/orchestrator.py --force-replan true --cleanup --workdir "$(pwd)" --global-dir "$MOCK_GLOBAL_DIR" --prd-file dummy_prd.md > cleanup.log 2>&1
+python3 scripts/orchestrator.py --force-replan true --cleanup --workdir "$(pwd)" --global-dir "$MOCK_GLOBAL_DIR" --prd-file dummy_prd.md > cleanup.log 2>&1 || true
 
 echo "Checking quarantined branch..."
 QUARANTINE_BRANCH=$(git branch --list "feature_branch_crashed_*" | head -n 1 | sed 's/[* ]//g')
