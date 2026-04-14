@@ -30,7 +30,13 @@ cd "$MOCK_SKILL_SRC"
 
 echo "--- test_deploy_skips_gemini_link_when_absent ---"
 # Ensure gemini is NOT in PATH
-export PATH=$(echo $PATH | sed 's/:\/tmp\/mock_bin//g')
+# We create a fake PATH without the directory that contains gemini
+REAL_GEMINI=$(command -v gemini || true)
+if [ -n "$REAL_GEMINI" ]; then
+    GEMINI_DIR=$(dirname "$REAL_GEMINI")
+    export PATH=$(echo $PATH | sed "s|:$GEMINI_DIR||g" | sed "s|^$GEMINI_DIR:||g")
+fi
+
 ./deploy.sh > deploy_no_gemini.log 2>&1
 if grep -q "gemini skills link" deploy_no_gemini.log; then
     echo "❌ Assertion Failed: Executed gemini link when absent!"
