@@ -136,6 +136,12 @@ perform_hard_copy_deployment() {
         echo "🔄 Restarting OpenClaw gateway..."
         openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
     fi
+
+    # 8. Gemini CLI Dual-Compatibility Link
+    if command -v gemini >/dev/null 2>&1; then
+        echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
+        gemini skills link "$PROD_DIR" || echo "⚠️ Gemini link failed, but deployment succeeded."
+    fi
 }
 
 perform_hard_copy_deployment "$@"
