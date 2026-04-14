@@ -63,3 +63,8 @@ Affected_Projects: [leio-sdlc]
 # System-wide configuration constants
 DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
 ```
+
+- **For `scripts/agent_driver.py` (File Indirection prompt wrapper)**:
+```python
+secure_msg = f"Read your complete task instructions from {path}. Do not modify this file."
+```
