@@ -24,7 +24,7 @@ Affected_Projects: [leio-sdlc]
 - **FR-2**: 增强 `agent_driver.py`，当 `LLM_DRIVER=gemini` 时，通过 `gemini -p "task"` 命令调度子任务。
 - **FR-3**: 确保 leio-sdlc 和 pm-skill 的 `SKILL.md` 与 Gemini CLI 格式兼容（YAML frontmatter）。
 - **FR-4**: 提供清晰的环境变量配置（`SDLC_MODEL`, `GEMINI_API_KEY` 等），供用户在部署时设置。
-- **FR-5**: Gemini 分支必须使用 `--yolo` 参数，保证在无头环境（Headless/CI）下执行敏感命令时无需人类交互确认，防止流水线永久挂起死锁。
+- **FR-5**: Gemini 分支必须使用 `--yolo` 参数（**Boss 明确要求**），保证在无头环境（Headless/CI）下执行敏感命令时无需人类交互确认，防止流水线永久挂起死锁。
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 
@@ -36,8 +36,10 @@ Affected_Projects: [leio-sdlc]
 
 ### 3.2 调度层：agent_driver.py 的 Gemini 分支
 
-**⚠️ 关键要求：必须保留 `--yolo` 参数**
-在无头自动化环境中，`gemini` 执行敏感命令时会弹出交互式确认（Y/n）。若不加 `--yolo`，orchestrator 将永远挂起等待人类响应，导致流水线死锁。
+**⚠️ `--yolo` 参数是 Boss 明确要求的 Feature（来自 leio 的业务需求）**
+目的：确保 Gemini CLI Agent 在执行敏感命令时不会弹出交互式确认（Y/n），从而避免自动化流水线在无头环境（Headless/CI）中永久挂起死锁。
+
+在无头自动化环境中，`gemini` 默认会在执行敏感操作时弹出交互式确认（Y/n）。若不加 `--yolo`，orchestrator 将永远挂起等待人类响应，导致流水线死锁。
 
 当前代码已有：
 ```python
@@ -113,5 +115,6 @@ if llm_driver == "gemini":
     model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL", "google/gemini-2.0-flash")
     cmd_exec = resolve_cmd("gemini")
     # --yolo is CRITICAL: prevents interactive Y/n prompt blocking in headless/CI environments
+    # NOTE: This is a Boss-required feature to ensure the pipeline never hangs waiting for human input
     cmd = [cmd_exec, "--yolo", "-p", task_string, "--model", model]
 ```
