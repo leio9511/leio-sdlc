@@ -2,7 +2,7 @@
 export SDLC_TEST_MODE=true
 set -e
 
-# e2e_test_hierarchical_resilience.sh - End-to-end verification of Hierarchical Resilience
+# e2e_test_hierarchical_resilience.sh - End-to-end verification of Four-Path Resilience
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
@@ -58,7 +58,7 @@ status: open
 slice_depth: 0
 INNER_EOF
 
-    # Stub coder to always succeed
+    # Stub coder
     cat << 'INNER_EOF' > scripts/spawn_coder.py
 import sys, os
 with open("/tmp/coder_runs.log", "a") as f:
@@ -72,7 +72,7 @@ sys.exit(0)
 INNER_EOF
     chmod +x scripts/spawn_coder.py
 
-    # Stub reviewer to always reject (trigger Yellow path)
+    # Stub reviewer to always reject
     cat << 'INNER_EOF' > scripts/spawn_reviewer.py
 import sys, os
 import json
@@ -83,7 +83,7 @@ for i, arg in enumerate(sys.argv):
         
 if out_file:
     with open(out_file, "w") as f:
-        f.write(json.dumps({"status": "ACTION_REQUIRED", "comments": "mock reject"}))
+        f.write(json.dumps({"overall_assessment": "NEEDS_ATTENTION", "comments": "mock reject"}))
 sys.exit(0)
 INNER_EOF
     chmod +x scripts/spawn_reviewer.py
@@ -115,13 +115,29 @@ INNER_EOF
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
     mv ../orchestrator.log orchestrator.log
 
-    # Verify Red Path was triggered
+    # Verify transitions
+    CODER_RUNS=$(wc -l < /tmp/coder_runs.log 2>/dev/null || echo 0)
+    
     if ! grep -q "Red Path Triggered" orchestrator.log; then
         echo "❌ FAILED: Red Path was never triggered."
         cat orchestrator.log
         exit 1
     fi
     
+    # Yellow limit is 3, Red limit is 2.
+    # Total coder runs calculation in previous turn was correct (9).
+    if [ "$CODER_RUNS" -ne 9 ]; then
+        echo "❌ FAILED: Expected 9 coder runs (Yellow and Red transitions), got $CODER_RUNS"
+        cat orchestrator.log
+        exit 1
+    fi
+    
+    if ! grep -q "Spawn Planner triggered (Black Path)!" orchestrator.log && ! grep -q "superseded" "$RUN_DIR/PR_001_Test.md" && ! grep -q "blocked_fatal" "$RUN_DIR/PR_001_Test.md"; then
+        echo "❌ FAILED: Black Path (Planner slice) was never triggered."
+        cat orchestrator.log
+        exit 1
+    fi
+
     echo "✅ PASS: Hierarchical Resilience (Four-Path) successfully tested."
 }
 
