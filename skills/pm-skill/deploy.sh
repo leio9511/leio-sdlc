@@ -55,7 +55,7 @@ if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
     openclaw gateway restart || true
 fi
 
-# 8. Gemini CLI Dual-Compatibility Link
+# 8. Gemini CLI Dual-Compatibility Link (Graceful)
 if command -v gemini >/dev/null 2>&1; then
     echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
     gemini skills link "$PROD_DIR" || echo "⚠️ Gemini link failed, but deployment succeeded."
