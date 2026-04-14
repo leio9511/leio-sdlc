@@ -6,6 +6,14 @@ Affected_Projects: [leio-sdlc]
 
 > ⚠️ **V1 免责声明**：本版本采用纯 `--yolo` 模式，无命令过滤机制，存在 AI 幻觉生成危险命令的风险。V2（详见 ISSUE-1126）将引入 Policy Engine 分层安全控制。
 
+---
+
+### ⚠️ Boss Mandate
+
+**We want to build V1 as an OpenClaw Agent equivalent.** Since OpenClaw's native Agent is effectively running in YOLO mode (i.e., all tool calls are auto-approved without human confirmation), we intentionally accept the same behavior for the Gemini CLI Agent.
+
+**Security enhancement is deferred to V2 (ISSUE-1126).** The purpose of this PRD is to detach leio-sdlc from the OpenClaw dependency, enabling a standalone Gemini CLI-based workflow. If you need stronger security guarantees, please wait for V2 or implement your own sandboxed environment.
+
 ## 1. Context & Problem (业务背景与核心痛点)
 
 **目标**：在仅有 Gemini CLI 的空白 Linux 机器上，无需安装任何 OpenClaw 依赖，即可驱动完整的 leio-sdlc 流水线（PRD 生成 → Auditor 审核 → Orchestrator 执行）。
@@ -135,7 +143,8 @@ if llm_driver == "gemini":
     cmd_exec = resolve_cmd("gemini")
     # --yolo is CRITICAL: prevents interactive Y/n prompt blocking in headless/CI environments
     # NOTE: This is a Boss-required feature to ensure the pipeline never hangs waiting for human input
-    # Security is handled by ~/.gemini/policies/sdlc.toml (blacklist denies dangerous commands)
+    # Security in V1 is equivalent to OpenClaw Agent (yolo mode, no command filtering)
+    # V2 (ISSUE-1126) will add Policy Engine-based command filtering
     cmd = [cmd_exec, "--yolo", "-p", task_string, "--model", model]
 ```
 
