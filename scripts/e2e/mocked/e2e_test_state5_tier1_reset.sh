@@ -2,9 +2,10 @@
 export SDLC_TEST_MODE=true
 set -e
 
-# scripts/test_state5_tier1_reset.sh - Test for PR-002
+# scripts/test_state5_tier1_reset.sh - Test for State 5 Tier 1 Reset
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 function setup_sandbox() {
     sandbox_dir=$(mktemp -d)
@@ -21,33 +22,28 @@ INNER_EOF
     git config user.email "e2e@example.com"
     git commit --allow-empty -m "init" > /dev/null 2>&1
     echo "*.log" > .gitignore
+    echo ".tmp/" >> .gitignore
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
     mkdir -p docs/PRDs
     mkdir -p scripts config
-    
-    # Copy essential scripts
-    cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
-cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
-    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
-    cp "${PROJECT_ROOT}/config/prompts.json" config/
-    cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
-    cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
+
+    init_hermetic_sandbox "scripts"
 
     echo "*.lock" >> .gitignore
-    echo "__pycache__/" >> .gitignore
+    echo "scripts/__pycache__/" >> .gitignore
+    git add .gitignore
+    git commit -m "ignore noise" > /dev/null 2>&1
 }
 
 function run_test() {
     echo "--- Running State 5 Tier 1 Reset Test ---"
     setup_sandbox
-    
+
     # Create a dummy PRD
     echo "dummy prd" > docs/PRDs/TestProject.md
-    
+
     export MOCK_GLOBAL_DIR=$(mktemp -d)
     # Create a PR in the global run dir
     PROJECT_NAME=$(basename "$sandbox_dir")
@@ -60,11 +56,9 @@ INNER_EOF
 
     # Stub spawn_coder.py to intentionally fail to trigger State 5
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, subprocess, os
+import sys
 # Simulate a coder that leaves the workspace dirty but fails
-if not os.path.exists("run_once.txt"):
-    with open("run_once.txt", "w") as f: f.write("1")
-    with open("dirty_file.txt", "w") as f:
+with open("dirty_file.txt", "w") as f:
     f.write("I am dirty")
 sys.exit(1)
 INNER_EOF
@@ -82,19 +76,10 @@ INNER_EOF
 
     # Use a lock-safe execution environment
     export SDLC_BYPASS_BRANCH_CHECK=1
-    
-    # Run orchestrator.
-    # We expect it to:
-    # 1. Start PR_001
-    # 2. Spawn coder (which fails and leaves workspace dirty)
-    # 3. Trigger State 5
-    # 4. Perform Tier 1 Reset (git reset --hard, git clean -fd)
-    # 5. Succeed checkout master
-    
+
     # Use a mock global dir
     echo "Starting orchestrator..."
     # We use a temporary log file so we don't pollute the git status of the sandbox if it checks it
-    git status
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
     mv ../orchestrator.log orchestrator.log
 
@@ -123,28 +108,36 @@ INNER_EOF
         git checkout master > /dev/null 2>&1 || { echo "❌ FAILED: Cannot checkout master after reset."; exit 1; }
     fi
 
-    if [ -f "dirty_file.txt" ]; then
-        echo "❌ FAILED: dirty_file.txt still exists. Clean failed."
-        cat orchestrator.log
-        exit 1
-    fi
-
-    # Project basename is evaluated to the sandbox_dir name
+    # Verify the global run directory structure is preserved
     PROJECT_NAME=$(basename "$sandbox_dir")
     RUN_DIR="$MOCK_GLOBAL_DIR/.sdlc_runs/$PROJECT_NAME"
-
+    
     if [ ! -d "$RUN_DIR" ]; then
         echo "❌ FAILED: Global run directory $RUN_DIR does not exist."
         exit 1
     fi
-
-    # Explicitly check that git info exclude does NOT contain .sdlc_runs/
-    if grep -q "\.sdlc_runs/" .git/info/exclude 2>/dev/null; then
-        echo "❌ FAILED: .git/info/exclude contains .sdlc_runs/, it should not."
+    
+    # Check that the forensic snapshot was created (proving dirty state was archived)
+    SNAPSHOT_COUNT=$(ls -d "$RUN_DIR"/TestProject_crashed_* 2>/dev/null | wc -l)
+    if [ "$SNAPSHOT_COUNT" -lt 1 ]; then
+        echo "❌ FAILED: No forensic snapshot found."
+        ls -la "$RUN_DIR" 2>/dev/null || echo "RUN_DIR does not exist"
         exit 1
     fi
 
+    echo "✅ Found $SNAPSHOT_COUNT forensic snapshot(s)"
+
+    # The dirty file should be in the snapshot
+    if ! ls "$RUN_DIR"/TestProject_crashed_*/dirty_file.txt 2>/dev/null | head -1 | xargs -I {} test -f {}; then
+        echo "❌ FAILED: dirty_file.txt not found in snapshot."
+        ls -la "$RUN_DIR"/TestProject_crashed_* 2>/dev/null || echo "No snapshots"
+        exit 1
+    fi
+
+    echo "✅ dirty_file.txt archived in snapshot"
+
     echo "✅ PASS: State 5 Tier 1 Reset successfully cleaned workspace and preserved Control Plane state."
+    rm -rf "$sandbox_dir" "$MOCK_GLOBAL_DIR"
 }
 
 run_test

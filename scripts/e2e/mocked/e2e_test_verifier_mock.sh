@@ -3,6 +3,9 @@ set -e
 
 echo "Running E2E Mock Test for UAT Verifier Engine..."
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+
 # Setup temporary directories
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
@@ -16,14 +19,14 @@ export MOCK_VERIFIER_RESULT='{"status": "PASS", "executive_summary": "All requir
 WORK_DIR="$TEST_DIR/workdir"
 mkdir -p "$WORK_DIR"
 
+init_hermetic_sandbox "$WORK_DIR/scripts"
+
 PRD_FILE="$TEST_DIR/test_prd.md"
 echo "# Mock PRD" > "$PRD_FILE"
 
 OUT_FILE="$TEST_DIR/test_uat_report.json"
 
-SCRIPT_PATH="/root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_verifier.py"
-
-python3 "$SCRIPT_PATH" --prd-files "$PRD_FILE" --workdir "$WORK_DIR" --out-file "$OUT_FILE" --enable-exec-from-workspace
+python3 "$WORK_DIR/scripts/spawn_verifier.py" --prd-files "$PRD_FILE" --workdir "$WORK_DIR" --out-file "$OUT_FILE" --enable-exec-from-workspace
 
 if [ ! -f "$OUT_FILE" ]; then
     echo "Error: Output file $OUT_FILE was not created."
