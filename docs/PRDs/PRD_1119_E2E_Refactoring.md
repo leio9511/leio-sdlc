@@ -1,46 +1,64 @@
-# PRD: E2E Testing Architecture Refactoring & Sandbox Fixes
+# PRD: E2E Testing Architecture Refactoring (Staggered Migration)
 **Issue ID:** ISSUE-1119
 **Project:** leio-sdlc
 
 ## 1. Context & Problem
-Currently, the `preflight.sh` script runs all E2E tests inside `scripts/e2e/` blindly. This includes:
-1. 8 deprecated tests (e.g., natural language CUJs, outdated blue-green, kanban).
-2. Pure logic tests (mocked) and live LLM tests mixed together.
-Furthermore, the recent extraction of `utils_json.py` broke several core E2E tests (e.g., `e2e_test_orchestrator_fsm.sh`, `e2e_test_hierarchical_resilience.sh`) because the test sandbox creation scripts were not updated to copy `utils_json.py` into the temporary execution directories.
+The `leio-sdlc` E2E test suite has grown organically and contains 20+ valid tests along with several deprecated ones. A previous attempt to refactor the entire suite in a single PR failed due to context overflow and quota limits. 
+Additionally, the suite suffers from:
+1. "Shotgun Surgery" patterns where each test script manually copies dependencies into its sandbox.
+2. Lack of distinction between deterministic (mocked) and non-deterministic (Live LLM) tests.
+3. Frequent failures due to missing `utils_json.py` in sandboxed environments.
 
 ## 2. Requirements & User Stories
-- **Requirement 1:** Delete the 8 deprecated E2E tests (`e2e_test_kanban_runner.sh`, `e2e_test_blue_green_deploy.sh`, `e2e_test_cuj_1_mock.sh` through `e2e_test_cuj_5_mock.sh`, and `e2e_test_yellow_path.sh`).
-- **Requirement 2:** Refactor the `scripts/e2e/` directory by creating two subdirectories: `mocked/` and `live_llm/`. Move `e2e_test_triad_planner.sh` and `e2e_test_triad_reviewer.sh` to `live_llm/`. Move all remaining valid E2E tests into `mocked/`.
-- **Requirement 3:** Fix the `ModuleNotFoundError: No module named 'utils_json'` using a Centralized Fixture pattern. Create a common `setup_sandbox.sh` script or function that encapsulates the logic for preparing the E2E execution environment (copying `orchestrator.py`, `utils_json.py`, and other required dependencies). Update all E2E tests to source or call this centralized fixture instead of copying files individually.
-- **Requirement 4:** Modify `preflight.sh` to remove the `--e2e-test` flag logic. The default execution of `preflight.sh` MUST automatically run all tests in `scripts/e2e/mocked/`. Add a new optional flag `--live-llm` which, if provided, will run the tests in `scripts/e2e/live_llm/`.
-- **Requirement 5:** Change the failure behavior in `preflight.sh`. Mocked E2E tests are deterministic; therefore, if any test in `scripts/e2e/mocked/` fails, `preflight.sh` MUST exit with status 1 (blocking the build). Live LLM tests (`scripts/e2e/live_llm/`) are flaky by nature; if they fail, the script should output an `[E2E WARNING]` but continue execution without exiting with an error code.
+- **Requirement 1 (Infrastructure & Seed):** Create `scripts/e2e/mocked/` and `scripts/e2e/live_llm/`. Create a centralized fixture `scripts/e2e/setup_sandbox.sh`. Move a single "seed" test (`e2e_test_orchestrator_fsm.sh`) to `mocked/` and refactor it to use the fixture.
+- **Requirement 2 (Staggered Batch Migration):** Move the remaining 20+ valid E2E tests into the correct subdirectories in small, manageable batches (max 5 tests per PR).
+- **Requirement 3 (Sandbox Dependency Injection):** Ensure `setup_sandbox.sh` copies `orchestrator.py`, `utils_json.py`, and all related scripts into the test environment. Fix all `ModuleNotFoundError` issues.
+- **Requirement 4 (Preflight Guardrail Upgrade):** Update `preflight.sh` to:
+    - Default behavior: Run all tests in `mocked/`.
+    - Exit behavior: Any failure in `mocked/` MUST result in `exit 1` (blocking build).
+    - Optional flag: `--live-llm` to run tests in `live_llm/` (non-blocking, warning only).
 
 ## 3. Architecture & Technical Strategy
-- **File Deletions:** Git rm the 8 deprecated scripts.
-- **Directory Structure:** Create `scripts/e2e/mocked` and `scripts/e2e/live_llm`. Git mv the scripts accordingly.
-- **Centralized Sandbox Fixture:** Create `scripts/e2e/setup_sandbox.sh` which exports a function (e.g., `init_hermetic_sandbox()`). This function must dynamically find the project root and copy all `.py` files from `scripts/` (including `utils_json.py`) and required config files into a provided temp directory. Modify the individual E2E test scripts to `source scripts/e2e/setup_sandbox.sh` and invoke the initialization function. (Use Python/Native APIs to refactor the bash scripts, absolutely NO sed/awk shotgun surgery).
-- **Preflight Modification:** Update `preflight.sh` to change the loop from `scripts/e2e/*.sh` to `scripts/e2e/mocked/*.sh` (default) and conditionally `scripts/e2e/live_llm/*.sh` based on argument parsing. Adjust the failure response `exit 1` vs `[E2E WARNING]` logic.
+- **Centralized Sandbox Fixture:** Create `scripts/e2e/setup_sandbox.sh`. This script must export a function `init_hermetic_sandbox`.
+    - **Path Stability:** The script MUST use `PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"` to anchor itself to the project root, ensuring file copies work regardless of the CWD.
+    - **Dependency Injection:** The function must copy `orchestrator.py`, `utils_json.py`, and other required scripts into the provided target directory.
+- **Planner Micro-Slicing Mandate:** The Planner MUST break this PRD into multiple dependency-ordered PRs. 
+    - PR 1: Infrastructure (folders + `setup_sandbox.sh`) and 1st Seed test (`e2e_test_orchestrator_fsm.sh`).
+    - PR 2-N: Batch file moves (max 5 files each) and refactoring to use the fixture.
+    - Final PR: `preflight.sh` logic overhaul.
+- **Strict I/O Policy:** Coder MUST use native `write/edit` APIs for file modifications. **STRICTLY PROHIBITED:** Using `cat << EOF` or `sed/awk` to manipulate code.
+- **TDD Exit Conditions:** Every PR in the chain must have a clear acceptance test: the specific tests moved or the infrastructure created must be verified green before merging.
 
 ## 4. Acceptance Criteria
-- [ ] 8 deprecated files are removed from the repository.
-- [ ] `scripts/e2e/` contains `mocked/` and `live_llm/` folders.
-- [ ] `live_llm/` contains exactly 2 triad scripts.
-- [ ] Running `bash preflight.sh` successfully executes all mock E2E tests and exits with 0.
-- [ ] Running `bash preflight.sh` does NOT run the live LLM triad tests.
-- [ ] Running `bash preflight.sh --live-llm` runs the live LLM tests, treating failures only as warnings.
-- [ ] If ANY mock E2E test in `scripts/e2e/mocked/` fails, `preflight.sh` MUST exit with code 1 immediately.
+- [ ] `scripts/e2e/` is organized into `mocked/` and `live_llm/`.
+- [ ] `setup_sandbox.sh` is the single source of truth for sandbox initialization.
+- [ ] `bash preflight.sh` runs all mocked tests by default and exits 1 on any failure.
+- [ ] No `ModuleNotFoundError: No module named 'utils_json'` occurs in any retained test.
+- [ ] Total migration of all 20+ valid tests is completed without context overflow.
 
 ## 5. Overall Test Strategy
-- Unit test: N/A
-- Integration/E2E test: Run `preflight.sh` locally to verify 0 failures and correct routing of mocked vs live tests.
+- Individual PR validation: Run each migrated batch manually.
+- Final validation: `bash preflight.sh` must be 100% green.
 
 ## 6. Framework Modifications
-No core framework changes. This is pure test infrastructure refactoring.
+No core logic changes to the SDLC engine; purely a test infrastructure refactoring.
 
 ## 7. Hardcoded Content
-- Directory names: `mocked/`, `live_llm/`
-- Command flag: `--live-llm`
-- Error message to fix: `ModuleNotFoundError: No module named 'utils_json'`
-- Log message on live_llm test failure: `[E2E WARNING]`
-- Centralized fixture script: `scripts/e2e/setup_sandbox.sh`
-- Fixture function name: `init_hermetic_sandbox()`
+- **Directory names:** `mocked/`, `live_llm/`
+- **Warning string:** `[E2E WARNING]`
+- **Bash Function Skeleton:**
+```bash
+init_hermetic_sandbox() {
+    local target_dir="$1"
+    if [ -z "$target_dir" ]; then
+        echo "Error: target_dir is required"
+        return 1
+    fi
+    # Implementation: find PROJECT_ROOT via BASH_SOURCE, then cp dependencies
+}
+```
+- **Path Resolution Pattern:**
+```bash
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+```
+
