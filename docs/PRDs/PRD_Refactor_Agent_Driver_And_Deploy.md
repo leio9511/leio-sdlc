@@ -11,7 +11,7 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 3. **Implicit Engine & Model Configuration**: Relying solely on environment variables (`LLM_DRIVER` and `SDLC_MODEL`) hides the execution context from CLI history. Explicit CLI arguments are needed for `orchestrator.py` and its subordinate `spawn_*.py` scripts.
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Remove `scripts/config.py`**: The previous implementation attempted to fix magic strings by extracting `DEFAULT_GEMINI_MODEL` to `scripts/config.py`. However, with explicit CLI argument injection (`--model`), the fallback logic is naturally handled by `argparse` defaults in the entrypoint scripts. The `config.py` file is now redundant overhead and should be deleted to prevent fragmentation.
+1. **Consolidate Defaults via SSOT**: The `scripts/config.py` file must be used as the Single Source of Truth (SSOT) for system-wide defaults like `DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"`. Instead of hardcoding this fallback inside the driver or scattering it across multiple `argparse` definitions, all entrypoint scripts (`orchestrator.py` and `spawn_*.py`) will import this constant to set their CLI argument defaults.
 2. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than the global `.tmp` directory.
 2. **Automated Skill Linking**: Update `deploy.sh` and `kit-deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI, enabling fully headless deployments.
 3. **Explicit CLI Arguments**: 
@@ -24,11 +24,10 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 - **Deployment Scripts Modification**: 
   - Locate `gemini skills link "$PROD_DIR"` in `deploy.sh`. Append the `--consent` flag. (Note: `kit-deploy.sh` does not invoke this command, so it requires no changes).
 - **Redundant Configuration Cleanup**:
-  - Delete `scripts/config.py`.
-  - In `scripts/agent_driver.py`, remove the `import config` statement and remove any fallback logic relying on it. The `engine` and `model` are now guaranteed to be provided via the function arguments.
+  - In `scripts/agent_driver.py`, remove the fallback logic relying on the config. The `engine` and `model` are now guaranteed to be provided explicitly via the function arguments. (The `config.py` file remains as the SSOT for `argparse` defaults).
 - **CLI Argument Parsing & Explicit Dependency Injection**:
   - Update `argparse` configuration in `scripts/orchestrator.py` and `scripts/spawn_*.py` (Planner, Coder, Reviewer, Auditor, Manager, Verifier, Arbitrator).
-  - Add `--engine` and `--model` with self-explanatory help strings.
+  - Add `--engine` and `--model` with self-explanatory help strings. Ensure the default value for `--model` is dynamically imported from `config.DEFAULT_GEMINI_MODEL` to prevent Scattered Configuration anti-patterns.
   - In `orchestrator.py`, ensure the `cmd` lists that invoke `spawn_*.py` explicitly append `--engine args.engine --model args.model`.
   - In `scripts/agent_driver.py`, update the `invoke_agent` function signature to explicitly accept `engine` and `model` as keyword arguments. All `spawn_*.py` scripts must pass these parsed arguments down explicitly.
   - **CRITICAL FIX**: `spawn_coder.py` currently bypasses `invoke_agent` and uses a hardcoded `openclaw_agent_call` for interactive feedback loops. Refactor `spawn_coder.py` to route all Agent calls through the unified `invoke_agent` (or adapt `openclaw_agent_call` to wrap `invoke_agent`) so that the injected `--engine` and `--model` parameters are respected globally by the Coder agent as well.
@@ -67,11 +66,18 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 - `scripts/orchestrator.py`
 - `scripts/spawn_*.py` (all spawn scripts)
 - `scripts/agent_driver.py`
-- `scripts/config.py` (To be deleted)
+- `scripts/config.py`
 
 ## 7. Hardcoded Content (硬编码内容)
 
 ### Exact Text Replacements:
+
+- **For `scripts/config.py` (Define system constants)**:
+```python
+# System-wide configuration constants
+DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
+DEFAULT_LLM_ENGINE = "openclaw"
+```
 
 - **For Deployment Scripts (Gemini Link command in `deploy.sh`)**:
 ```bash
