@@ -13,7 +13,7 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 ## 2. Requirements & User Stories (需求定义)
 1. **Consolidate Defaults via SSOT**: The `scripts/config.py` file must be used as the Single Source of Truth (SSOT) for system-wide defaults like `DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"`. Instead of hardcoding this fallback inside the driver or scattering it across multiple `argparse` definitions, all entrypoint scripts (`orchestrator.py` and `spawn_*.py`) will import this constant to set their CLI argument defaults.
 2. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than the global `.tmp` directory.
-2. **Automated Skill Linking**: Update `deploy.sh` and `kit-deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI, enabling fully headless deployments.
+2. **Automated Skill Linking**: Update `deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI, enabling fully headless deployments.
 3. **Explicit CLI Arguments**: 
    - Add `--engine` argument (choices: `openclaw`, `gemini`; default: `openclaw`) to `orchestrator.py` and all `spawn_*.py` scripts.
    - Add `--model` argument (default: `gemini-3.1-pro-preview`) to `orchestrator.py` and all `spawn_*.py` scripts.
@@ -59,6 +59,7 @@ Following the implementation of dual deployment tests and Gemini CLI session map
   - Update `tests/test_gemini_agent_driver.py` to verify the new `run_dir` logic in `invoke_agent`.
 - **Integration/E2E Testing**:
   - Update bash integration tests (e.g., `test_034_dual_deploy.sh`) to ensure `--consent` doesn't break the CLI syntax.
+  - **CRITICAL Coder Interactive Loop Test**: Implement a specific mock test (e.g. `tests/test_spawn_coder_refactor.py` or bash equivalent) to simulate a Reviewer rejecting a PR, ensuring that the refactored `invoke_agent` in `spawn_coder.py` successfully handles iterative feedback loops without crashing.
   - Run `orchestrator.py` in test mode using the explicit `--engine` flag to ensure end-to-end parameter propagation works.
 
 ## 6. Framework Modifications (框架防篡改声明)
@@ -86,6 +87,6 @@ gemini skills link "$PROD_DIR" --consent
 
 - **For CLI Help Texts (argparse)**:
 ```python
-parser.add_argument("--engine", choices=["openclaw", "gemini"], default="openclaw", help="Execution engine to use for the agent driver (default: openclaw)")
-parser.add_argument("--model", default="gemini-3.1-pro-preview", help="Model to use when --engine is gemini (default: gemini-3.1-pro-preview)")
+parser.add_argument("--engine", choices=["openclaw", "gemini"], default=config.DEFAULT_LLM_ENGINE, help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+parser.add_argument("--model", default=config.DEFAULT_GEMINI_MODEL, help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
 ```
