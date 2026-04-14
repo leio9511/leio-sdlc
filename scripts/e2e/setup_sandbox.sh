@@ -30,10 +30,12 @@ init_hermetic_sandbox() {
     cp "$PROJECT_ROOT/scripts/spawn_coder.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/spawn_reviewer.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/spawn_arbitrator.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/spawn_auditor.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/merge_code.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/get_next_pr.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/commit_state.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/doctor.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/update_pr_status.py" "$target_dir/" 2>/dev/null || true
 
     local parent_dir="$(dirname "$target_dir")"
     mkdir -p "$parent_dir/config"
