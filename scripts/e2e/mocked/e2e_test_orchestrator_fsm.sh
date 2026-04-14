@@ -3,7 +3,8 @@ set -e
 
 # test_orchestrator_fsm.sh - Deterministic FSM Testing Strategy for PR-045.3
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 export MOCK_GLOBAL_DIR=$(mktemp -d)
 
 function setup_sandbox() {
@@ -31,9 +32,8 @@ echo ".sdlc_repo.lock" >> .gitignore
     mkdir -p scripts config
     
     # We copy the real orchestrator.py --force-replan false to run
-    cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
-cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
-    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
+    init_hermetic_sandbox "scripts"
+    cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/config/prompts.json" config/
     cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
     cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
