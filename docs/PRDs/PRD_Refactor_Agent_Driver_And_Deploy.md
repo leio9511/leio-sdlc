@@ -22,11 +22,11 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Deployment Scripts Modification**: 
   - Locate `gemini skills link "$TARGET_DIR"` (or similar invocations) in `deploy.sh` and `kit-deploy.sh`. Append the `--consent` flag.
-- **CLI Argument Parsing**:
+- **CLI Argument Parsing & Explicit Dependency Injection**:
   - Update `argparse` configuration in `scripts/orchestrator.py` and `scripts/spawn_*.py` (Planner, Coder, Reviewer, Auditor, Manager, Verifier, Arbitrator).
   - Add `--engine` and `--model` with self-explanatory help strings.
-  - In `orchestrator.py`, ensure the `cmd` lists that invoke `spawn_*.py` append `--engine args.engine --model args.model`.
-  - In each `spawn_*.py`, set `os.environ["LLM_DRIVER"] = args.engine` and `os.environ["SDLC_MODEL"] = args.model` immediately after `parse_args()`, allowing the downstream `agent_driver.py` to transparently consume them.
+  - In `orchestrator.py`, ensure the `cmd` lists that invoke `spawn_*.py` explicitly append `--engine args.engine --model args.model`.
+  - Instead of mutating `os.environ` as global state, update the `invoke_agent` function signature in `agent_driver.py` to explicitly accept `engine` and `model` as keyword arguments. All `spawn_*.py` scripts must pass these parsed arguments down explicitly.
 - **JIT Prompt Isolation (`agent_driver.py`)**:
   - Update the `invoke_agent` function signature to accept an optional `run_dir` parameter.
   - If `run_dir` is provided, `temp_dir = os.path.join(run_dir, ".tmp")`. Otherwise, fallback to the global `~/.openclaw/workspace/.tmp`.
