@@ -1,25 +1,30 @@
 #!/bin/bash
 set -e
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+
 # Setup a test git repo
-WORK_DIR="/tmp/test_1058_guardrail_$$"
-mkdir -p "$WORK_DIR"
+WORK_DIR=$(mktemp -d)
 cd "$WORK_DIR"
-git init
+git init > /dev/null 2>&1
 echo "test" > test.txt
 git add test.txt
 git config user.email "test@example.com"
 git config user.name "Test User"
-git commit -m "initial commit"
+git commit -m "initial commit" > /dev/null 2>&1
 
 touch dummy_prd.md
 
-# Copy leio-sdlc to a temp "production" directory
-PROD_SKILL_DIR="/tmp/mock_skill_leio_sdlc_$$"
-cp -r /root/.openclaw/workspace/projects/leio-sdlc "$PROD_SKILL_DIR"
+# Setup hermetic sandbox
+init_hermetic_sandbox "$WORK_DIR/scripts"
+
+# We must ensure setup_logging is there too if needed
+cp "$PROJECT_ROOT/scripts/setup_logging.py" "$WORK_DIR/scripts/" 2>/dev/null || true
+cp "$PROJECT_ROOT/config/prompts.json" "$WORK_DIR/config/" 2>/dev/null || true
 
 # Script path
-ORCHESTRATOR="$PROD_SKILL_DIR/scripts/orchestrator.py"
+ORCHESTRATOR="$WORK_DIR/scripts/orchestrator.py"
 
 export SDLC_TEST_MODE=true
 
@@ -63,6 +68,5 @@ fi
 
 # Clean up
 rm -rf "$WORK_DIR"
-rm -rf "$PROD_SKILL_DIR"
 
 echo "All tests passed successfully."

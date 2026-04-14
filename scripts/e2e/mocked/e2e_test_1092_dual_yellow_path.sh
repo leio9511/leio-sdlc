@@ -14,8 +14,9 @@ git commit -m "init" > /dev/null
 
 export SDLC_TEST_MODE="true"
 
-# The scripts path
-SDLC_ROOT="/root/.openclaw/workspace/projects/leio-sdlc"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+SDLC_ROOT="$PROJECT_ROOT"
 
 echo "Testing spawn_planner.py without --global-dir..."
 python3 "$SDLC_ROOT/scripts/spawn_planner.py" --workdir "$TEST_DIR" --prd-file PRD.md
@@ -29,6 +30,7 @@ else
 fi
 
 echo "Testing orchestrator.py without --global-dir..."
+python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR" --fix
 python3 "$SDLC_ROOT/scripts/orchestrator.py" --workdir "$TEST_DIR" --prd-file PRD.md --force-replan false --test-sleep --enable-exec-from-workspace --channel test_channel
 
 echo "PASS: orchestrator.py did not raise RuntimeError"
@@ -40,8 +42,7 @@ echo "All tests passed."
 echo "Setting up orchestrator FSM test environment..."
 # Copy the scripts to a temporary bin dir so we can mock the spawned agents
 TMP_SCRIPTS=$(mktemp -d)
-cp -r "$SDLC_ROOT/scripts/"* "$TMP_SCRIPTS/"
-cp -r "$SDLC_ROOT/config/" "$TMP_SCRIPTS/../config/"
+init_hermetic_sandbox "$TMP_SCRIPTS"
 export RUNTIME_DIR="$TMP_SCRIPTS"
 
 # 1. Mock spawn_coder to just exit 0, but leave a dirty git workspace
@@ -96,9 +97,13 @@ setup_fake_pr() {
     git commit --allow-empty -m "init" > /dev/null
     mkdir -p .sdlc_runs/mock2/PRD
     echo ".sdlc_repo.lock" > .gitignore
+    echo ".tmp/" >> .gitignore
     echo "status: in_progress" > .sdlc_runs/mock2/PRD/PR_001.md
     git add .
     git commit -m "add pr" > /dev/null
+    python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR/mock2" --fix
+    git add .
+    git commit -m "doctor fix" > /dev/null
 }
 
 echo "Test Case 1: Mock git status dirty"

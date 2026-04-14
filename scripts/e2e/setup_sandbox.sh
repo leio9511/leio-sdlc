@@ -23,6 +23,20 @@ init_hermetic_sandbox() {
     cp "$PROJECT_ROOT/scripts/agent_driver.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/agent_llm.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/config.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/notification_formatter.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/handoff_prompter.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/setup_logging.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/spawn_planner.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/spawn_coder.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/spawn_reviewer.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/spawn_arbitrator.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/merge_code.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/get_next_pr.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/commit_state.py" "$target_dir/" 2>/dev/null || true
+
+    local parent_dir="$(dirname "$target_dir")"
+    mkdir -p "$parent_dir/config"
+    cp -r "$PROJECT_ROOT/config/"* "$parent_dir/config/" 2>/dev/null || true
 
     # Provide a simple check to ensure at least orchestrator.py is there
     if [ ! -f "$target_dir/orchestrator.py" ]; then

@@ -6,6 +6,9 @@ set -e
 # Usage: ./test_agent_driver_gemini.sh [model_name]
 # Defaults to gemini-2.5-flash if not provided.
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+
 export LLM_DRIVER="gemini"
 export TEST_MODEL="${1:-${TEST_MODEL:-gemini-2.5-flash}}"
 
@@ -14,16 +17,16 @@ echo "Running Isolated E2E Test for Gemini Driver"
 echo "Model: $TEST_MODEL"
 echo "==========================================="
 
-PROJECT_DIR=$(dirname $(dirname $(dirname $(realpath $0))))
+# Create a temporary test workspace
+TEST_DIR=$(mktemp -d)
+cd "$TEST_DIR"
+init_hermetic_sandbox "$TEST_DIR/scripts"
 
-# Create a temporary python test script to invoke agent_driver
-TEST_SCRIPT=$(mktemp)
-cat << PYEOF > "$TEST_SCRIPT"
+# Create a minimal test script
+cat << 'PYEOF' > test_gemini.py
 import sys
 import os
-
-# Append the project scripts directory so agent_driver can be imported
-sys.path.insert(0, os.path.join("$PROJECT_DIR", "scripts"))
+sys.path.insert(0, os.path.join("$PROJECT_ROOT", "scripts"))
 
 try:
     from agent_driver import invoke_agent
@@ -35,8 +38,6 @@ task = "Respond with a simple 'OK' if you receive this message. This is a connec
 print("Testing Gemini driver invocation...")
 
 try:
-    # We bypass the actual execution in the test if gemini is not available on this CI
-    # But since it's an isolated integration test, it's expected to run.
     session = invoke_agent(task, role="test_harness")
     if session:
         print("Test successful, session created.")
@@ -48,10 +49,10 @@ except Exception as e:
     sys.exit(1)
 PYEOF
 
-python3 "$TEST_SCRIPT"
+python3 test_gemini.py
 RESULT=$?
 
-rm -f "$TEST_SCRIPT"
+rm -rf "$TEST_DIR"
 
 if [ $RESULT -eq 0 ]; then
     echo "==========================================="
