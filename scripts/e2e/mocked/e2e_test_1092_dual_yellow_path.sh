@@ -6,6 +6,10 @@ set -e
 TEST_DIR=$(mktemp -d)
 echo "Setting up test workspace in $TEST_DIR"
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+SDLC_ROOT="$PROJECT_ROOT"
+
 cd "$TEST_DIR"
 git init > /dev/null
 echo "Affected_Projects: [mock2]" > PRD.md
@@ -13,10 +17,6 @@ git add PRD.md
 git commit -m "init" > /dev/null
 
 export SDLC_TEST_MODE="true"
-
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
-SDLC_ROOT="$PROJECT_ROOT"
 
 echo "Testing spawn_planner.py without --global-dir..."
 python3 "$SDLC_ROOT/scripts/spawn_planner.py" --workdir "$TEST_DIR" --prd-file PRD.md

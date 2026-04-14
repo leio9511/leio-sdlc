@@ -9,6 +9,9 @@ echo "Running Anti-Reward Hacking Tests..."
 
 TEST_DIR=$(mktemp -d)
 cd "$TEST_DIR"
+git init > /dev/null 2>&1
+git config user.email "test@test.com"
+git config user.name "Test"
 mkdir -p bin
 cat << 'INNER_EOF' > bin/openclaw
 #!/bin/bash

@@ -7,10 +7,12 @@
 PROJECT_DIR=$(dirname "$0")
 TMP_TEST_LOG=$(mktemp)
 
-RUN_E2E=0
-if [[ "$1" == "--e2e-test" ]]; then
-    RUN_E2E=1
-fi
+RUN_LIVE_LLM=0
+for arg in "$@"; do
+    if [[ "$arg" == "--live-llm" ]]; then
+        RUN_LIVE_LLM=1
+    fi
+done
 
 echo "[$(date '+%H:%M:%S')] Starting Smart Preflight Checks..."
 
@@ -45,12 +47,19 @@ run_test() {
     ((TOTAL_PASSED++))
 }
 
-run_e2e_test() {
+run_live_llm_test() {
     local cmd="$1"
     local desc="$2"
     
-    if ! eval "$cmd" > /dev/null 2>&1; then
+    if ! eval "$cmd" > "$TMP_TEST_LOG" 2>&1; then
         echo "[E2E WARNING] $desc failed. Continuing."
+        echo "=== WARNING DETAILS ==="
+        if grep -iE -A 10 -B 2 "error:|exception|failed|unresolved|expecting|traceback|❌" "$TMP_TEST_LOG" | head -n 50; then
+            :
+        else
+            tail -n 50 "$TMP_TEST_LOG"
+        fi
+        echo "======================="
     else
         ((TOTAL_PASSED++))
     fi
@@ -84,10 +93,15 @@ else
     done
 fi
 
-# 4. E2E Tests
-if [ $RUN_E2E -eq 1 ]; then
-    for f in scripts/e2e/e2e_test_*.sh; do
-        run_e2e_test "bash $f" "$(basename "$f")"
+# 4. E2E Mocked Tests
+for f in scripts/e2e/mocked/*.sh; do
+    run_test "bash $f" "Mocked E2E: $(basename "$f")"
+done
+
+# 5. E2E Live LLM Tests
+if [ $RUN_LIVE_LLM -eq 1 ]; then
+    for f in scripts/e2e/live_llm/*.sh; do
+        run_live_llm_test "bash $f" "Live LLM E2E: $(basename "$f")"
     done
 fi
 

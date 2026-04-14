@@ -23,10 +23,10 @@ cd "$TEST_DIR"
 init_hermetic_sandbox "$TEST_DIR/scripts"
 
 # Create a minimal test script
-cat << 'PYEOF' > test_gemini.py
+cat << PYEOF > test_gemini.py
 import sys
 import os
-sys.path.insert(0, os.path.join("$PROJECT_ROOT", "scripts"))
+sys.path.insert(0, "$PROJECT_ROOT/scripts")
 
 try:
     from agent_driver import invoke_agent
