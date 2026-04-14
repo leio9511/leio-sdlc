@@ -92,7 +92,7 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
             # --yolo is CRITICAL: prevents interactive Y/n prompt blocking in headless/CI environments
             model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL", "google/gemini-2.0-flash")
             cmd_exec = resolve_cmd("gemini")
-            cmd = [cmd_exec, "--yolo", "-p", secure_msg, "--model", model]
+            cmd = [cmd_exec, "--yolo", "-p", task_string, "--model", model]
         else:
             cmd_exec = resolve_cmd("openclaw")
             cmd = [cmd_exec, "agent", "--session-id", session_key, "-m", secure_msg]
