@@ -136,7 +136,7 @@ echo "Deploying leio-sdlc to $TARGET_DIR..."
 # 3. Print setup instructions
 ```
 
-### agent_driver.py Gemini 分支增强：
+### agent_driver.py Gemini 分支增强（Section 7 完整硬编码）：
 ```python
 if llm_driver == "gemini":
     model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL", "google/gemini-2.0-flash")
@@ -147,7 +147,3 @@ if llm_driver == "gemini":
     # V2 (ISSUE-1126) will add Policy Engine-based command filtering
     cmd = [cmd_exec, "--yolo", "-p", task_string, "--model", model]
 ```
-
-### 3.7 V2 Policy 文件示例（ISSUE-1126 中详细定义）
-
-V2 将提供预配置的 Policy 文件：`sdlc-coder.toml`（yolo + blacklist）、`sdlc-reviewer.toml`（plan + whitelist）等。
