@@ -94,5 +94,90 @@ class TestGeminiAgentDriver(unittest.TestCase):
         expected_dir = os.path.expanduser("~/.openclaw/workspace/.tmp")
         mock_makedirs.assert_any_call(expected_dir, exist_ok=True)
 
+    @patch("agent_driver.tempfile.mkstemp")
+    @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.subprocess.run")
+    @patch("agent_driver.resolve_cmd")
+    def test_file_indirection_prompt_format(self, mock_resolve_cmd, mock_run, mock_exists, mock_mkstemp):
+        mock_resolve_cmd.return_value = "/mock/bin/gemini"
+        mock_run.return_value = MagicMock(returncode=0, stdout="[]")
+        mock_exists.return_value = False
+        mock_mkstemp.return_value = (3, "/mock/tmp/sdlc_prompt_123.txt")
+        
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}):
+            # We must mock os.fdopen so it doesn't fail on fake fd
+            with patch("agent_driver.os.fdopen", mock_open()):
+                with patch("agent_driver.os.chmod"):
+                    with patch("agent_driver.os.remove"):
+                        invoke_agent("test task", session_key="test-session")
+            
+        cmd = mock_run.call_args_list[0][0][0]
+        p_idx = cmd.index("-p")
+        prompt_arg = cmd[p_idx + 1]
+        self.assertEqual(prompt_arg, "Read your complete task instructions from /mock/tmp/sdlc_prompt_123.txt. Do not modify this file.")
+
+    @patch("builtins.open", new_callable=mock_open, read_data='{"actual_id": "RESUMED_UUID_456"}')
+    @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.subprocess.run")
+    @patch("agent_driver.resolve_cmd")
+    def test_lock_free_session_resume(self, mock_resolve_cmd, mock_run, mock_exists, mock_file):
+        mock_resolve_cmd.return_value = "/mock/bin/gemini"
+        mock_run.return_value = MagicMock(returncode=0, stdout="success")
+        
+        # Make os.path.exists return True for the session map file
+        def fake_exists(path):
+            if ".session_map_test-session.json" in path:
+                return True
+            return False
+        mock_exists.side_effect = fake_exists
+        
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}):
+            with patch("agent_driver.tempfile.mkstemp", return_value=(3, "/tmp/fake.txt")):
+                with patch("agent_driver.os.fdopen", mock_open()):
+                    with patch("agent_driver.os.chmod"):
+                        with patch("agent_driver.os.remove"):
+                            invoke_agent("test task", session_key="test-session")
+                            
+        cmd = mock_run.call_args_list[0][0][0]
+        self.assertIn("-r", cmd)
+        r_idx = cmd.index("-r")
+        self.assertEqual(cmd[r_idx + 1], "RESUMED_UUID_456")
+
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("agent_driver.tempfile.mkstemp")
+    @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.subprocess.run")
+    @patch("agent_driver.resolve_cmd")
+    def test_session_uuid_capture(self, mock_resolve_cmd, mock_run, mock_exists, mock_mkstemp, mock_file):
+        mock_resolve_cmd.return_value = "/mock/bin/gemini"
+        
+        # First call is the gemini run, second call is the list-sessions
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="success"),
+            MagicMock(returncode=0, stdout=json.dumps([
+                {"id": "IGNORE_ME", "prompt": "some other prompt"},
+                {"id": "CAPTURED_UUID_789", "prompt": "Read your complete task instructions from /mock/tmp/sdlc_prompt_capture.txt."}
+            ]))
+        ]
+        
+        mock_exists.return_value = False
+        mock_mkstemp.return_value = (3, "/mock/tmp/sdlc_prompt_capture.txt")
+        
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}):
+            with patch("agent_driver.os.fdopen", mock_open()):
+                with patch("agent_driver.os.chmod"):
+                    with patch("agent_driver.os.remove"):
+                        invoke_agent("test task", session_key="capture-session")
+                        
+        # Check if list-sessions was called
+        self.assertEqual(mock_run.call_count, 2)
+        list_cmd = mock_run.call_args_list[1][0][0]
+        self.assertIn("--list-sessions", list_cmd)
+        
+        # Check if open was called to write the mapping
+        write_calls = [c for c in mock_file.mock_calls if "write" in str(c)]
+        written_data = "".join(c[1][0] for c in write_calls)
+        self.assertIn('"actual_id": "CAPTURED_UUID_789"', written_data)
+
 if __name__ == "__main__":
     unittest.main()
