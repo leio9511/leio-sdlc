@@ -15,10 +15,9 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 2. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than the global `.tmp` directory.
 2. **Automated Skill Linking**: Update `deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI, enabling fully headless deployments.
 3. **Explicit CLI Arguments**: 
-   - Add `--engine` argument (choices: `openclaw`, `gemini`; default: `openclaw`) to `orchestrator.py` and all `spawn_*.py` scripts.
-   - Add `--model` argument (default: `gemini-3.1-pro-preview`) to `orchestrator.py` and all `spawn_*.py` scripts.
-   - `orchestrator.py` must forward these arguments to any `spawn_*.py` subprocess it creates.
-   - The values passed via these CLI arguments should override or set the underlying environment variables used by `agent_driver.py`.
+   - Add `--engine` argument (choices: `openclaw`, `gemini`; default: `config.DEFAULT_LLM_ENGINE`) to `orchestrator.py` and all `spawn_*.py` scripts.
+   - Add `--model` argument (default: `config.DEFAULT_GEMINI_MODEL`) to `orchestrator.py` and all `spawn_*.py` scripts.
+   - `orchestrator.py` must forward these arguments explicitly to any `spawn_*.py` subprocess it creates (no implicit environment variable passing).
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Deployment Scripts Modification**: 
@@ -33,9 +32,8 @@ Following the implementation of dual deployment tests and Gemini CLI session map
   - **CRITICAL FIX**: `spawn_coder.py` currently bypasses `invoke_agent` and uses a hardcoded `openclaw_agent_call` for interactive feedback loops. Refactor `spawn_coder.py` to route all Agent calls through the unified `invoke_agent` so that the injected `--engine` and `--model` CLI parameters are respected globally by the Coder agent as well.
 - **JIT Prompt Isolation (`agent_driver.py`)**:
   - Update the `invoke_agent` function signature to accept an optional `run_dir` parameter.
-  - If `run_dir` is provided, `temp_dir = os.path.join(run_dir, ".tmp")`. Otherwise, fallback to the global `~/.openclaw/workspace/.tmp`.
+  - If `run_dir` is provided and it exists, `temp_dir = os.path.join(run_dir, ".tmp")`. Otherwise, rely on standard OS mechanisms (`import tempfile`, then `temp_dir = tempfile.gettempdir()`) to prevent Environment Coupling anti-patterns. NEVER hardcode absolute paths like `~/.openclaw/workspace`.
   - Ensure `os.makedirs(temp_dir, exist_ok=True)` is called.
-  - Update all `spawn_*.py` scripts to pass `run_dir=args.run_dir` (or `args.workdir` if `run_dir` is not explicitly available) to `invoke_agent`.
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 
