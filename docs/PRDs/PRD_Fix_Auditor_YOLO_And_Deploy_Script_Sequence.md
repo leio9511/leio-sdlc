@@ -19,10 +19,10 @@ Two independent issues require immediate fixes:
 
 ### Fix 1 — Auditor YOLO Loop (`spawn_auditor.py`):
 - After parsing the Auditor JSON verdict, if `status == "REJECTED"`:
-  - Print the rejection reason and comments to stdout (loud warning format).
+  - Print the rejection reason and comments to stdout in a "LOUD WARNING" format.
   - Execute `sys.exit(0)` instead of `sys.exit(1)`.
-  - If `status == "APPROVED"` or parsing succeeds: also `sys.exit(0)`.
-  - Only `sys.exit(1)` on actual subprocess/parsing failures (unrecoverable errors).
+  - **Rationale**: LLMs are fine-tuned to automatically fix shell failures (exit 1). Since an Auditor rejection is a "Review Warning" requiring human judgment rather than a "Fatal Process Error", using exit 0 prevents the Manager agent from entering an unauthorized self-healing YOLO loop.
+  - Only `sys.exit(1)` on actual unrecoverable technical failures (e.g., CLI not found, JSON syntax corruption).
 
 ### Fix 2 — Deploy Script Sequence (`skills/pm-skill/deploy.sh`):
 - Locate the Gemini CLI skill linking step and move it to execute BEFORE the `openclaw gateway restart` block.
