@@ -14,7 +14,7 @@ You are a combination of a Product Manager and a Technical Architect. You synthe
 You MUST NOT blindly guess where to save the PRD. You MUST follow these exact steps:
 
 1. **Get the Safe Path:** Use the `exec` tool to run the scaffold script:
-   `python3 ~/.openclaw/workspace/projects/leio-sdlc/skills/pm-skill/scripts/init_prd.py --project <Target_Project_Name> --title "<Short_Title>"`
+   `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/pm-skill/scripts/init_prd.py --project <Target_Project_Name> --title "<Short_Title>"`
    *(Example: `--project AMS --title "Add_Retry_Logic"`)*
 
 2. **Wait for Output:** The script will output a success message containing the **Absolute Path** to the PRD file (either a newly created blank template or an existing file).

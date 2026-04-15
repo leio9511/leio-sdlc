@@ -18,7 +18,7 @@ The entire SDLC pipeline is fully automated and managed by `scripts/orchestrator
 Your ONLY job is to start the Orchestrator.
 
 1. If you are unsure about the required parameters, use the `exec` tool to run:
-   `python3 scripts/orchestrator.py --help`
+   `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --help`
    
 2. Based on the help output and the user's intent, construct your execution command.
 
