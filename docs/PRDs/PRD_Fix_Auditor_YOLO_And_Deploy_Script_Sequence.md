@@ -19,9 +19,10 @@ Two independent issues require immediate fixes:
 
 ### Fix 1 — Auditor YOLO Loop (`spawn_auditor.py`):
 - After parsing the Auditor JSON verdict, if `status == "REJECTED"`:
-  - Print the rejection reason and comments to stdout in a "LOUD WARNING" format.
+  - Maintain the existing `notify_channel()` and `[ACTION REQUIRED FOR MANAGER]` closure logic.
   - Execute `sys.exit(2)` instead of `sys.exit(1)`.
-  - **Rationale**: LLMs are fine-tuned to automatically fix general shell failures (exit 1). By using a specific semantic exit code (`exit 2`) for a logical rejection, we can instruct the Manager agent (via prompt engineering) that this is a "Review Block" requiring human judgment, not a technical failure, thereby suppressing the unauthorized YOLO self-healing loop.
+  - **Rationale**: LLMs are fine-tuned to automatically fix general shell failures (exit 1). By using a specific semantic exit code (`exit 2`) for a logical rejection, we can signal a "Human Decision Required" state.
+  - **Manager Loop Closure**: Update `config/prompts.json` to include a specific instruction for the Manager agent regarding `exit 2`.
   - Only `sys.exit(1)` on actual unrecoverable technical failures (e.g., CLI not found, JSON syntax corruption).
 
 ### Fix 2 — Deploy Script Sequence (`skills/pm-skill/deploy.sh`):
@@ -35,10 +36,15 @@ Two independent issues require immediate fixes:
   - **When** it processes and outputs the rejection.
   - **Then** the process exits with code `2` (Specific Rejection) and the Manager recognizes this as a human-decision-required state, not a process failure.
 
-- **Scenario 2:** Deploy script completes fully without SIGTERM interruption.
+- **Scenario 3:** Deploy script completes fully without SIGTERM interruption.
   - **Given** a clean system with Gemini CLI available.
-  - **When** `./kit-deploy.sh` or `bash skills/pm-skill/deploy.sh` is executed.
+  - **When** `./deploy.sh` for `pm-skill` is executed.
   - **Then** the `gemini skills link --consent` step completes successfully before gateway restart, and no `[Y/n]` prompt appears.
+
+- **Scenario 4:** Manager handles Exit 2 correctly.
+  - **Given** the Auditor returns `exit 2`.
+  - **When** the Manager processes this result.
+  - **Then** it stops immediately and presents the feedback to the Boss without attempting an automatic fix.
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 - **Unit Testing**: Add a test in `tests/test_spawn_auditor_rejection.py` that mocks an Auditor REJECTED JSON response and verifies the process exits with code `2`.
@@ -47,22 +53,28 @@ Two independent issues require immediate fixes:
 ## 6. Framework Modifications (框架防篡改声明)
 - `scripts/spawn_auditor.py`
 - `skills/pm-skill/deploy.sh`
+- `config/prompts.json`
 
 ## 7. Hardcoded Content (硬编码内容)
 
 ### Exact Text Replacements:
 
+- **For `config/prompts.json` (Add Exit 2 handling to Manager prompt)**:
+```text
+[CRITICAL: EXIT CODE 2 HANDLING]
+If a tool (like spawn_auditor.py) returns Exit Code 2, it indicates a "Logical Rejection" or "Human Review Required" state. This is NOT a technical failure. You are STRICTLY FORBIDDEN from attempting to fix, rewrite, or auto-retry the task. You MUST halt immediately and report the results to the Boss.
+```
+
 - **For `scripts/spawn_auditor.py` (Auditor rejection handling)**:
 ```python
-# After parsing JSON verdict:
-if parsed.get("status") in ("REJECTED", "APPROVED"):
-    print(f"\n[Auditor] Status: {parsed.get('status')}")
-    if parsed.get('status') == "REJECTED":
-        print(f"\n{'='*60}")
-        print(f"  AUDITOR REJECTED — Please review the feedback above.")
-        print(f"{'='*60}\n")
+    if status == "APPROVED":
+        agent_driver.notify_channel(args.channel, "Auditor APPROVED the PRD.", "auditor_approved", {"prd_file": args.prd_file})
+        print("[ACTION REQUIRED FOR MANAGER] The Auditor APPROVED the PRD. Notify the Boss of the successful audit, then you MUST immediately halt all further operations and WAIT for explicit authorization to deploy.")
+        sys.exit(0)
+    else:
+        agent_driver.notify_channel(args.channel, "Auditor REJECTED the PRD.", "auditor_rejected", {"prd_file": args.prd_file})
+        print("[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD. Report the rejection reasons to the Boss, then you MUST immediately halt all further operations and WAIT for explicit instructions.")
         sys.exit(2)  # Specific rejection code for Manager interception
-    sys.exit(0)
 ```
 
 - **For `skills/pm-skill/deploy.sh` (Gemini link before restart)**:
