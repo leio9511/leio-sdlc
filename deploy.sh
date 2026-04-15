@@ -133,8 +133,10 @@ perform_hard_copy_deployment() {
 
     # 7. Gateway Reload (MUST BE THE FINAL STEP)
     if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
-        echo "🔄 Restarting OpenClaw gateway..."
-        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+        if command -v openclaw >/dev/null 2>&1; then
+            echo "🔄 Restarting OpenClaw gateway..."
+            openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+        fi
     fi
 
     # 8. Gemini CLI Dual-Compatibility Link

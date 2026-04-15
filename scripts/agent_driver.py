@@ -6,6 +6,9 @@ import time
 import sys
 import uuid
 import shutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Dynamic module resolution for monorepo development vs production deployment
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +27,11 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
     else:
         msg = f"🤖 [SDLC Engine] {msg}"
     if effective_channel:
+        if not shutil.which("openclaw"):
+            channel = effective_channel
+            logger.info(f"[Channel Message to {channel}]: {msg}")
+            return
+            
         cmd = ["openclaw", "message", "send"]
         if ":" in effective_channel:
             parts = effective_channel.split(":")

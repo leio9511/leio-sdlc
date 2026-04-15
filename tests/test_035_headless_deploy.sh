@@ -37,11 +37,40 @@ EXIT_CODE=$?
 # Verify output
 if grep -q "Mock Gemini CLI: Consent given" /tmp/deploy_output.log; then
     echo "✅ SUCCESS: Headless deployment confirmed."
-    rm -rf /tmp/mock_bin /tmp/headless_deploy_test_home /tmp/deploy_output.log
-    exit 0
 else
     echo "❌ FAILURE: Headless deployment stalled or failed to use --consent."
     cat /tmp/deploy_output.log
     rm -rf /tmp/mock_bin /tmp/headless_deploy_test_home /tmp/deploy_output.log
     exit 1
 fi
+
+echo "--- Running test_deploy_without_openclaw ---"
+unset HOME_MOCK
+unset NO_RESTART
+export PATH="/tmp/mock_bin:/usr/bin:/bin"
+
+# We want to make sure the openclaw command is absolutely not available
+./deploy.sh > /tmp/deploy_no_openclaw.log 2>&1
+EXIT_1=$?
+
+./kit-deploy.sh > /tmp/kit_deploy_no_openclaw.log 2>&1
+EXIT_2=$?
+
+if [ $EXIT_1 -ne 0 ] || [ $EXIT_2 -ne 0 ]; then
+    echo "❌ FAILURE: deploy or kit-deploy failed without openclaw."
+    cat /tmp/deploy_no_openclaw.log
+    cat /tmp/kit_deploy_no_openclaw.log
+    rm -rf /tmp/mock_bin /tmp/headless_deploy_test_home /tmp/deploy_output.log /tmp/deploy_no_openclaw.log /tmp/kit_deploy_no_openclaw.log
+    exit 1
+fi
+
+if grep -qi "command not found" /tmp/deploy_no_openclaw.log /tmp/kit_deploy_no_openclaw.log; then
+    echo "❌ FAILURE: scripts output 'command not found'."
+    grep -i "command not found" /tmp/deploy_no_openclaw.log /tmp/kit_deploy_no_openclaw.log
+    rm -rf /tmp/mock_bin /tmp/headless_deploy_test_home /tmp/deploy_output.log /tmp/deploy_no_openclaw.log /tmp/kit_deploy_no_openclaw.log
+    exit 1
+fi
+
+echo "✅ SUCCESS: test_deploy_without_openclaw passed."
+rm -rf /tmp/mock_bin /tmp/headless_deploy_test_home /tmp/deploy_output.log /tmp/deploy_no_openclaw.log /tmp/kit_deploy_no_openclaw.log
+exit 0

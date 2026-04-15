@@ -58,5 +58,7 @@ if command -v gemini >/dev/null 2>&1; then
 fi
 
 if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
-    openclaw gateway restart || true
+    if command -v openclaw >/dev/null 2>&1; then
+        openclaw gateway restart || true
+    fi
 fi

@@ -214,5 +214,16 @@ class TestGeminiAgentDriver(unittest.TestCase):
         written_data = "".join(c[1][0] for c in write_calls)
         self.assertIn('"actual_id": "CAPTURED_UUID_789"', written_data)
 
+    @patch("agent_driver.shutil.which")
+    @patch("agent_driver.logger.info")
+    def test_notify_channel_no_openclaw(self, mock_logger_info, mock_which):
+        mock_which.return_value = None
+        from agent_driver import notify_channel
+        channel = "test_channel"
+        msg = "test_msg"
+        expected_msg = f"🤖 [SDLC Engine] {msg}"
+        notify_channel(channel, msg)
+        mock_logger_info.assert_called_with(f"[Channel Message to {channel}]: {expected_msg}")
+
 if __name__ == "__main__":
     unittest.main()
