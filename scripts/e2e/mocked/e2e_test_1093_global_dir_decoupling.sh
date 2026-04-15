@@ -21,6 +21,7 @@ EOF
 chmod +x "$TEST_DIR/bin/openclaw"
 
 # Execution
+export LLM_DRIVER=openclaw
 export PATH="$TEST_DIR/bin:$PATH"
 
 init_hermetic_sandbox "$TEST_DIR/scripts"

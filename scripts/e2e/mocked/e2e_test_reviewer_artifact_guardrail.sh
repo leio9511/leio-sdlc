@@ -35,6 +35,7 @@ echo "Agent executed but did not write file"
 exit 0
 EOF
 chmod +x "$TEMP_DIR/bin/openclaw"
+cp "$TEMP_DIR/bin/openclaw" "$TEMP_DIR/bin/gemini"
 
 if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
     echo "❌ T1 Failed: python script should have exited with 1"
@@ -59,6 +60,7 @@ touch "$RUN_DIR/review_report.json"
 exit 0
 EOF
 chmod +x "$TEMP_DIR/bin/openclaw"
+cp "$TEMP_DIR/bin/openclaw" "$TEMP_DIR/bin/gemini"
 
 if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL"; then
     echo "❌ T2 Failed: python script should have exited with 0"

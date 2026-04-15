@@ -48,6 +48,7 @@ for arg in "$@"; do
 done
 INNER_EOF
 chmod +x scripts/openclaw
+cp scripts/openclaw scripts/gemini
 
 # Run spawner with PATH override
 echo "prd" > docs/PRDs/prd.md
