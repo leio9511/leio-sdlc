@@ -24,9 +24,10 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 - **Hierarchical Configuration Resolution**:
   - In `scripts/agent_driver.py`, implement a robust hierarchical fallback: `(Environment Variable) > (config.py default)`. This ensures that even if environment variables are purged (as in `test_config_externalization`), the system remains robust and backward compatible. NEVER remove fallback logic from the core driver.
 - **CLI Argument Parsing & State Broadcasting**:
-  - Update `argparse` configuration ONLY in `scripts/orchestrator.py` and any standalone entrypoint scripts (e.g., `scripts/spawn_auditor.py`, `scripts/spawn_manager.py` if run manually). Do not add `argparse` definitions to internal `spawn_*.py` child scripts.
-  - Add `--engine` and `--model` with self-explanatory help strings. Ensure the default value for `--model` is dynamically imported from `config.DEFAULT_GEMINI_MODEL` to prevent Scattered Configuration anti-patterns.
-  - Immediately after parsing arguments in the entrypoints, set `os.environ["LLM_DRIVER"] = args.engine` and `os.environ["SDLC_MODEL"] = args.model`. This mutates the process-local environment only, cleanly broadcasting configurations to child processes without polluting the global shell or causing Tramp Data anti-patterns via explicit parameter passing.
+  - Update `argparse` configuration ONLY in `scripts/orchestrator.py` and any standalone entrypoint scripts (e.g., `scripts/spawn_auditor.py`).
+  - Add `--engine` and `--model` with help strings.
+  - **Dynamic Environment Awareness**: To prevent the "State Clobbering" anti-pattern, the `default` value for these argparse arguments must be environment-aware: `default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE)`. This ensures that when a script is run as a subprocess (inheriting state), it does not accidentally overwrite parent configurations with static defaults.
+  - Only modify `os.environ` if the argument was explicitly provided via CLI, or ensure the assignment is idempotent relative to the inherited state.
   - Rely on standard environment variable inheritance to propagate these settings cleanly to `agent_driver.py` and child `spawn_*.py` processes.
   - **CRITICAL FIX**: `spawn_coder.py` currently uses a hardcoded `openclaw_agent_call` (which directly invokes the `openclaw` binary) for interactive feedback loops. Refactor `spawn_coder.py` to replace `openclaw_agent_call` with `invoke_agent` from `agent_driver.py`, ensuring the Coder respects the inherited `LLM_DRIVER` (e.g., Gemini) globally instead of overriding it.
 - **JIT Prompt Isolation (`agent_driver.py`)**:
