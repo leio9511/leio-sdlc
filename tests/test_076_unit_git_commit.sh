@@ -3,6 +3,8 @@ set -e
 
 echo "Running test_076_unit_git_commit.sh..."
 
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 
@@ -16,9 +18,9 @@ git commit -m "initial commit"
 
 echo "dirty code hallucinated by coder" > ghost_file.py
 
-cat << 'EOF' > run_test.py
+cat << EOF > run_test.py
 import sys
-sys.path.append("$(cd "$(dirname "$0")/.." && pwd)/scripts")
+sys.path.append("${REPO_ROOT}/scripts")
 try:
     from orchestrator import force_commit_untracked_changes
     force_commit_untracked_changes(".")
