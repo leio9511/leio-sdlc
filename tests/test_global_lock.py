@@ -30,7 +30,8 @@ def test_lock_acquisition_and_manifest():
     print("✅ Parsing successful.")
     
     print("Testing acquire_global_locks...")
-    lock_dir = os.path.expanduser("~/.openclaw/workspace/locks")
+    import tempfile
+    lock_dir = os.path.join(tempfile.gettempdir(), "openclaw_locks")
     if os.path.exists(lock_dir):
         # Clean up existing locks for these names to ensure fresh run
         for p in projects:

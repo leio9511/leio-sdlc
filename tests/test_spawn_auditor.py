@@ -111,7 +111,7 @@ def test_auditor_notifies_on_missing_sections(mock_notify, capsys):
 def test_prd_template_contains_section_7():
     template_path = os.path.join(os.path.dirname(__file__), "..", "skills", "pm-skill", "TEMPLATES", "PRD.md.template")
     if not os.path.exists(template_path):
-        template_path = "/root/.openclaw/workspace/projects/docs/TEMPLATES/PRD.md.template"
+        template_path = os.path.join(os.path.dirname(__file__), "..", ".dist", "skills", "pm-skill", "TEMPLATES", "PRD.md.template")
         
     with open(template_path, "r") as f:
         content = f.read()
