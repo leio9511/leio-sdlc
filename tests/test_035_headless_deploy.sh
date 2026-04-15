@@ -26,7 +26,7 @@ export HOME_MOCK="/tmp/headless_deploy_test_home"
 export NO_RESTART=true
 
 # Create a dummy project environment
-cd /root/.openclaw/workspace/projects/leio-sdlc
+cd "$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p .dist
 touch .dist/dummy_file
 

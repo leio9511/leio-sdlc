@@ -28,7 +28,7 @@ check_file() {
     echo "✅ $file passed checks."
 }
 
-REPO_ROOT="/root/.openclaw/workspace/projects/leio-sdlc"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 check_file "$REPO_ROOT/SKILL.md"
 check_file "$REPO_ROOT/skills/pm-skill/SKILL.md"

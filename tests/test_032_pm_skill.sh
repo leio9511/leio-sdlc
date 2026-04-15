@@ -42,7 +42,7 @@ export MOCK_WORKSPACE="/root/.openclaw/workspace/AMS"
 mkdir -p "$MOCK_WORKSPACE/docs/PRDs"
 
 # Execute the skill test runner with an explicit instruction to use the write tool to ensure the agent creates the file
-bash scripts/skill_test_runner.sh /root/.openclaw/workspace/projects/leio-sdlc/skills/pm-skill "I want a feature to export reports as PDF in the AMS project. Please generate the PRD. You MUST physically use the 'write' tool to save the PRD to /root/.openclaw/workspace/AMS/docs/PRDs/PRD_033_PDF.md. Ensure the PRD contains the words 'AMS', 'Testing Strategy', and 'TDD Guardrail'." || true
+bash scripts/skill_test_runner.sh "$(cd "$(dirname "$0")/.." && pwd)"/skills/pm-skill "I want a feature to export reports as PDF in the AMS project. Please generate the PRD. You MUST physically use the 'write' tool to save the PRD to /root/.openclaw/workspace/AMS/docs/PRDs/PRD_033_PDF.md. Ensure the PRD contains the words 'AMS', 'Testing Strategy', and 'TDD Guardrail'." || true
 
 # Assertion 1: Artifact Delivery
 PRD_FILE=$(ls "$MOCK_WORKSPACE/docs/PRDs/PRD_"*".md" 2>/dev/null | head -n 1)
@@ -88,7 +88,7 @@ mkdir -p "$MOCK_HOME_PM/.openclaw/skills"
 export HOME_MOCK="$MOCK_HOME_PM"
 export PATH=$(echo $PATH | sed 's/:\/tmp\/mock_bin_pm//g')
 
-cd /root/.openclaw/workspace/projects/leio-sdlc
+cd "$(cd "$(dirname "$0")/.." && pwd)"
 bash skills/pm-skill/deploy.sh --no-restart > deploy_pm_no_gemini.log 2>&1
 
 if grep -q "gemini skills link" deploy_pm_no_gemini.log; then

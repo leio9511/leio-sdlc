@@ -14,7 +14,7 @@ FILEEOF
 
 echo "Running Assertion 1..."
 cd "$DIR"
-OUTPUT=$(python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/get_next_pr.py --workdir . --job-dir docs/PRs/mock_072)
+OUTPUT=$(python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/get_next_pr.py --workdir . --job-dir docs/PRs/mock_072)
 
 if echo "$OUTPUT" | grep -q "QUEUE_EMPTY"; then
     echo "Assertion 1 passed."
@@ -24,7 +24,7 @@ else
 fi
 
 echo "Running Assertion 2..."
-python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/update_pr_status.py --pr-file "$DIR/docs/PRs/mock_072/PR_001_Mock.md" --status in_progress
+python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/update_pr_status.py --pr-file "$DIR/docs/PRs/mock_072/PR_001_Mock.md" --status in_progress
 
 HEAD_LINE=$(head -n 1 "$DIR/docs/PRs/mock_072/PR_001_Mock.md")
 if [ "$HEAD_LINE" != "status: in_progress" ]; then

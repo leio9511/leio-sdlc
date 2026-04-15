@@ -18,7 +18,7 @@ echo "dirty code hallucinated by coder" > ghost_file.py
 
 cat << 'EOF' > run_test.py
 import sys
-sys.path.append("/root/.openclaw/workspace/projects/leio-sdlc/scripts")
+sys.path.append("$(cd "$(dirname "$0")/.." && pwd)/scripts")
 try:
     from orchestrator import force_commit_untracked_changes
     force_commit_untracked_changes(".")

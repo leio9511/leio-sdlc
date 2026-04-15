@@ -10,7 +10,7 @@ mkdir -p "$WORKSPACE"
 trap 'rm -rf "$WORKSPACE"' EXIT
 
 # Absolute path to spawn_reviewer.py and PR file
-SPAWN_SCRIPT=$(realpath "/root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_reviewer.py")
+SPAWN_SCRIPT=$(realpath "$(cd "$(dirname "$0")/.." && pwd)/scripts/spawn_reviewer.py")
 DUMMY_PR="$WORKSPACE/PR_002_dummy.md"
 touch "$DUMMY_PR"
 

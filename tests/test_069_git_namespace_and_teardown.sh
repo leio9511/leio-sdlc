@@ -26,7 +26,7 @@ EOF
 git add docs/PRs/PRD_069_Test/PR_001_Namespace_Fix.md
 
 # Path to original orchestrator
-ORCHESTRATOR="/root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py --force-replan true --channel "valid:id""
+ORCHESTRATOR="$(cd "$(dirname "$0")/.." && pwd)/scripts/orchestrator.py --force-replan true --channel "valid:id""
 
 # Create a wrapper Python script to test the logic directly since we can't easily inject into orchestrator.py --force-replan true --channel "valid:id"'s while loop without it running everything
 cat << 'EOF' > test_extraction.py

@@ -3,7 +3,7 @@ set -e
 
 # Setup test environment
 export SDLC_TEST_MODE="true"
-WORKDIR="/root/.openclaw/workspace/projects/leio-sdlc"
+WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$WORKDIR"
 
 # Create a dummy PR contract

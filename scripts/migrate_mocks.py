@@ -3,7 +3,7 @@ import glob
 import re
 
 def migrate():
-    base_dir = '/root/.openclaw/workspace/projects/leio-sdlc'
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     e2e_scripts = glob.glob(os.path.join(base_dir, 'scripts', 'e2e', 'e2e_test_*.sh'))
     test_scripts = glob.glob(os.path.join(base_dir, 'tests', '*.py'))
     

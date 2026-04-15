@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-WORKDIR="/root/.openclaw/workspace/projects/leio-sdlc/tests/sandbox_070"
+WORKDIR="$(cd "$(dirname "$0")/.." && pwd)/tests/sandbox_070"
 JOBDIR="$WORKDIR/docs/PRs/dummy_job"
 rm -rf "$WORKDIR"
 mkdir -p "$JOBDIR"
@@ -27,7 +27,7 @@ Mock TDD
 MOCK
 
 # Run create_pr_contract.py
-python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/create_pr_contract.py \
+python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/create_pr_contract.py \
     --workdir "$WORKDIR" \
     --job-dir "$JOBDIR" \
     --title "Mock PR" \
@@ -51,7 +51,7 @@ fi
 echo "✅ Test passed: 'status: open' is not duplicated and template is respected."
 
 # Verify TEMPLATES/PR_Contract.md.template structure
-TEMPLATE_FILE="/root/.openclaw/workspace/projects/leio-sdlc/TEMPLATES/PR_Contract.md.template"
+TEMPLATE_FILE="$(cd "$(dirname "$0")/.." && pwd)/TEMPLATES/PR_Contract.md.template"
 
 if [ ! -f "$TEMPLATE_FILE" ]; then
     echo "❌ Error: $TEMPLATE_FILE does not exist."

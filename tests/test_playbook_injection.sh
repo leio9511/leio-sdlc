@@ -24,7 +24,7 @@ export SDLC_TEST_MODE=true
 
 # Test Reviewer
 echo "Running spawn_reviewer.py..."
-python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_reviewer.py \
+python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/spawn_reviewer.py \
     --pr-file PR.md \
     --diff-target HEAD \
     --workdir "$TEST_DIR"
@@ -45,7 +45,7 @@ fi
 
 # Test Planner
 echo "Running spawn_planner.py..."
-python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_planner.py \
+python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/spawn_planner.py \
     --prd-file PRD.md \
     --workdir "$TEST_DIR"
 
