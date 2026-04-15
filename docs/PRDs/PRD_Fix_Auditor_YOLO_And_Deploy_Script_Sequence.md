@@ -20,9 +20,8 @@ Two independent issues require immediate fixes:
 ### Fix 1 — Auditor YOLO Loop (`spawn_auditor.py`):
 - After parsing the Auditor JSON verdict, if `status == "REJECTED"`:
   - Maintain the existing `notify_channel()` and `[ACTION REQUIRED FOR MANAGER]` closure logic.
-  - Execute `sys.exit(2)` instead of `sys.exit(1)`.
-  - **Rationale**: LLMs are fine-tuned to automatically fix general shell failures (exit 1). By using a specific semantic exit code (`exit 2`) for a logical rejection, we can signal a "Human Decision Required" state.
-  - **Manager Loop Closure**: Update `config/prompts.json` to include a specific instruction for the Manager agent regarding `exit 2`.
+  - Execute `sys.exit(0)` instead of `sys.exit(1)`.
+  - **Rationale**: An Auditor rejection is a successful execution of a business verification task, not a technical process failure. LLMs are fine-tuned to automatically fix shell failures (exit 1), but see exit 0 as completion. By using exit 0 and relying on the explicit `[ACTION REQUIRED FOR MANAGER]` stdout instructions, we cleanly separate process logic from domain logic and suppress the unauthorized self-healing loop.
   - Only `sys.exit(1)` on actual unrecoverable technical failures (e.g., CLI not found, JSON syntax corruption).
 
 ### Fix 2 — Deploy Script Sequence (`skills/pm-skill/deploy.sh`):
@@ -34,17 +33,17 @@ Two independent issues require immediate fixes:
 - **Scenario 1:** Auditor REJECTED does not trigger YOLO retry.
   - **Given** `spawn_auditor.py` receives a `{"status": "REJECTED"}` verdict.
   - **When** it processes and outputs the rejection.
-  - **Then** the process exits with code `2` (Specific Rejection) and the Manager recognizes this as a human-decision-required state, not a process failure.
+  - **Then** the process exits with code `0` (Success) and the Manager reads the `[ACTION REQUIRED]` instruction to stop and wait for the Boss.
 
 - **Scenario 3:** Deploy script completes fully without SIGTERM interruption.
   - **Given** a clean system with Gemini CLI available.
   - **When** `./deploy.sh` for `pm-skill` is executed.
   - **Then** the `gemini skills link --consent` step completes successfully before gateway restart, and no `[Y/n]` prompt appears.
 
-- **Scenario 4:** Manager handles Exit 2 correctly.
-  - **Given** the Auditor returns `exit 2`.
+- **Scenario 4:** Manager stops on REJECTED correctly.
+  - **Given** the Auditor returns `exit 0` but the status is `REJECTED`.
   - **When** the Manager processes this result.
-  - **Then** it stops immediately and presents the feedback to the Boss without attempting an automatic fix.
+  - **Then** it follows the `[ACTION REQUIRED]` prompt and presents the feedback to the Boss without attempting an automatic fix.
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 - **Unit Testing**: Add a test in `tests/test_spawn_auditor_rejection.py` that mocks an Auditor REJECTED JSON response and verifies the process exits with code `2`.
@@ -53,17 +52,10 @@ Two independent issues require immediate fixes:
 ## 6. Framework Modifications (框架防篡改声明)
 - `scripts/spawn_auditor.py`
 - `skills/pm-skill/deploy.sh`
-- `config/prompts.json`
 
 ## 7. Hardcoded Content (硬编码内容)
 
 ### Exact Text Replacements:
-
-- **For `config/prompts.json` (Add Exit 2 handling to Manager prompt)**:
-```text
-[CRITICAL: EXIT CODE 2 HANDLING]
-If a tool (like spawn_auditor.py) returns Exit Code 2, it indicates a "Logical Rejection" or "Human Review Required" state. This is NOT a technical failure. You are STRICTLY FORBIDDEN from attempting to fix, rewrite, or auto-retry the task. You MUST halt immediately and report the results to the Boss.
-```
 
 - **For `scripts/spawn_auditor.py` (Auditor rejection handling)**:
 ```python
@@ -74,7 +66,7 @@ If a tool (like spawn_auditor.py) returns Exit Code 2, it indicates a "Logical R
     else:
         agent_driver.notify_channel(args.channel, "Auditor REJECTED the PRD.", "auditor_rejected", {"prd_file": args.prd_file})
         print("[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD. Report the rejection reasons to the Boss, then you MUST immediately halt all further operations and WAIT for explicit instructions.")
-        sys.exit(2)  # Specific rejection code for Manager interception
+        sys.exit(0)  # Use exit 0 to prevent LLM retry本能
 ```
 
 - **For `skills/pm-skill/deploy.sh` (Gemini link before restart)**:
