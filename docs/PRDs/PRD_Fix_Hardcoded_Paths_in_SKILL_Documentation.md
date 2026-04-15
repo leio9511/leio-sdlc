@@ -18,19 +18,19 @@ Affected_Projects: [leio-sdlc]
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - 将 `skills/pm-skill/SKILL.md` 中的 `init_prd.py` 执行路径修改为支持环境变量 Fallback 的绝对路径语法：
-  `python3 "${SDLC_SKILLS_ROOT:-~/.openclaw/skills}"/pm-skill/scripts/init_prd.py`
+  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/pm-skill/scripts/init_prd.py`
 - 将 `SKILL.md` 中的 Orchestrator 执行路径修改为支持环境变量 Fallback 的绝对路径语法：
-  `python3 "${SDLC_SKILLS_ROOT:-~/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py`
-- 此方案（Bash 默认值展开机制）既满足了环境解耦的架构要求（允许高阶用户通过 `$SDLC_SKILLS_ROOT` 变更安装点），又保证了对纯净系统零配置“开箱即用”的用户体验。
+  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py`
+- 此方案（Bash 默认值展开机制）既满足了环境解耦的架构要求（允许高阶用户通过 `$SDLC_SKILLS_ROOT` 变更安装点），又保证了对纯净系统零配置“开箱即用”的用户体验。注意使用了 `$HOME` 替代 `~` 以避免 Bash 字符串展开失效的反模式。
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1**: Agent 解析带有环境变量 Fallback 的命令。
   - **Given** Agent 阅读了 `pm-skill` 的 SKILL.md。
   - **When** 它试图执行 Scaffold 命令。
-  - **Then** 执行的命令应形如 `python3 "${SDLC_SKILLS_ROOT:-~/.openclaw/skills}"/pm-skill/scripts/init_prd.py ...`。
+  - **Then** 执行的命令应形如 `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/pm-skill/scripts/init_prd.py ...`。
 - **Scenario 2**: 外部工作区拉起管线。
   - **Given** Agent 在 `/tmp/external-app` 目录下且没有设置 `SDLC_SKILLS_ROOT`。
-  - **When** 收到启动 SDLC 的指令并执行 `python3 "${SDLC_SKILLS_ROOT:-~/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py ...`。
+  - **When** 收到启动 SDLC 的指令并执行 `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py ...`。
   - **Then** 能够通过 Bash 展开正确解析到默认安装路径并成功启动。
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
@@ -42,7 +42,7 @@ Affected_Projects: [leio-sdlc]
 
 ## 7. Hardcoded Content (硬编码内容)
 1. `skills/pm-skill/SKILL.md` 中必须精确包含以下字符串：
-   `python3 "${SDLC_SKILLS_ROOT:-~/.openclaw/skills}"/pm-skill/scripts/init_prd.py --project <Target_Project_Name> --title "<Short_Title>"`
+   `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/pm-skill/scripts/init_prd.py --project <Target_Project_Name> --title "<Short_Title>"`
 
 2. `SKILL.md` 中必须精确包含以下字符串：
-   `python3 "${SDLC_SKILLS_ROOT:-~/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --help`
+   `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --help`
