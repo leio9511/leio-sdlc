@@ -25,12 +25,12 @@ Following the implementation of dual deployment tests and Gemini CLI session map
   - Locate `gemini skills link "$PROD_DIR"` in `deploy.sh`. Append the `--consent` flag. (Note: `kit-deploy.sh` does not invoke this command, so it requires no changes).
 - **Redundant Configuration Cleanup**:
   - In `scripts/agent_driver.py`, remove the fallback logic relying on the config. The `engine` and `model` are now guaranteed to be provided explicitly via the function arguments. (The `config.py` file remains as the SSOT for `argparse` defaults).
-- **CLI Argument Parsing & State Broadcasting**:
-  - Update `argparse` configuration in `scripts/orchestrator.py` and any standalone entrypoint scripts (e.g., `scripts/spawn_auditor.py`).
-  - Add `--engine` and `--model` with self-explanatory help strings. Ensure the default value for `--model` is dynamically imported from `config.DEFAULT_GEMINI_MODEL` to prevent Scattered Configuration anti-patterns.
-  - In entrypoint scripts, immediately after parsing arguments, set `os.environ["LLM_DRIVER"] = args.engine` and `os.environ["SDLC_MODEL"] = args.model`. This mutates the process-local environment only, cleanly broadcasting configurations to child processes without polluting the global shell.
-  - Remove explicit `engine` and `model` arguments from `invoke_agent` and `spawn_*.py` inter-process calls, relying instead on process-level inheritance of `os.environ`.
-  - **CRITICAL FIX**: `spawn_coder.py` currently bypasses `invoke_agent` and uses a hardcoded `openclaw_agent_call` for interactive feedback loops. Refactor `spawn_coder.py` to route all Agent calls through the unified `invoke_agent` so that the inherited `LLM_DRIVER` (e.g., Gemini) is respected globally by the Coder agent as well.
+- **CLI Argument Parsing & Explicit Dependency Injection (No Tramp Data, No Global State)**:
+  - Update `argparse` configuration in `scripts/orchestrator.py` AND ALL `scripts/spawn_*.py` standalone scripts.
+  - Add `--engine` and `--model` with self-explanatory help strings. Ensure the default value for `--model` is dynamically imported from `config.DEFAULT_GEMINI_MODEL`.
+  - In `orchestrator.py`, ensure the `cmd` lists that invoke `spawn_*.py` explicitly append `--engine args.engine --model args.model` to ensure the configuration is visible in the process execution logs.
+  - Eliminate reliance on `os.environ`. Update the `invoke_agent` function signature in `agent_driver.py` to explicitly accept `engine` and `model` as keyword arguments. All `spawn_*.py` scripts must pass these parsed arguments down explicitly.
+  - **CRITICAL FIX**: `spawn_coder.py` currently bypasses `invoke_agent` and uses a hardcoded `openclaw_agent_call` for interactive feedback loops. Refactor `spawn_coder.py` to route all Agent calls through the unified `invoke_agent` so that the injected `--engine` and `--model` CLI parameters are respected globally by the Coder agent as well.
 - **JIT Prompt Isolation (`agent_driver.py`)**:
   - Update the `invoke_agent` function signature to accept an optional `run_dir` parameter.
   - If `run_dir` is provided, `temp_dir = os.path.join(run_dir, ".tmp")`. Otherwise, fallback to the global `~/.openclaw/workspace/.tmp`.
