@@ -11,19 +11,18 @@ Following the implementation of dual deployment tests and Gemini CLI session map
 3. **Implicit Engine & Model Configuration**: Relying solely on environment variables (`LLM_DRIVER` and `SDLC_MODEL`) hides the execution context from CLI history. Explicit CLI arguments are needed for `orchestrator.py` and its subordinate `spawn_*.py` scripts.
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Consolidate Defaults via SSOT**: The `scripts/config.py` file must be used as the Single Source of Truth (SSOT) for system-wide defaults like `DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"`. Instead of hardcoding this fallback inside the driver or scattering it across multiple `argparse` definitions, all entrypoint scripts (`orchestrator.py` and `spawn_*.py`) will import this constant to set their CLI argument defaults.
-2. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than the global `.tmp` directory.
-2. **Automated Skill Linking**: Update `deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI, enabling fully headless deployments.
+1. **Consolidate Defaults via SSOT**: The `scripts/config.py` file remains as the Single Source of Truth (SSOT) for system-wide defaults. All entrypoint scripts (`orchestrator.py` and manually run `spawn_*.py`) will import this constant to set their CLI argument defaults.
+2. **Per-Run JIT Prompt Isolation**: Refactor `agent_driver.py` to store temporary prompt files inside `run_dir/.tmp` rather than a hardcoded global directory.
+2. **Automated Skill Linking**: Update `deploy.sh` to use the `--consent` flag when linking skills via the Gemini CLI.
 3. **Explicit CLI Arguments**: 
-   - Add `--engine` argument (choices: `openclaw`, `gemini`; default: `config.DEFAULT_LLM_ENGINE`) ONLY to `orchestrator.py` and manually invoked entrypoint scripts.
-   - Add `--model` argument (default: `config.DEFAULT_GEMINI_MODEL`) ONLY to `orchestrator.py` and manually invoked entrypoint scripts.
-   - `orchestrator.py` must forward these arguments implicitly via setting `os.environ` variables, ensuring child scripts do not suffer from Tramp Data pollution while maintaining full observability at the top level.
+   - Add `--engine` and `--model` arguments ONLY to `orchestrator.py` and manually invoked entrypoint scripts.
+   - `orchestrator.py` must forward these arguments via process-level environment variables, ensuring top-level observability without internal API pollution.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Deployment Scripts Modification**: 
   - Locate `gemini skills link "$PROD_DIR"` in `deploy.sh`. Append the `--consent` flag. (Note: `kit-deploy.sh` does not invoke this command, so it requires no changes).
-- **Redundant Configuration Cleanup**:
-  - Delete `scripts/config.py` logic inside the inner scope of `agent_driver.py`. The `engine` and `model` configuration should exclusively rely on standard OS process environment inheritance (`os.environ.get("LLM_DRIVER")`). The `config.py` file remains as the SSOT exclusively for setting the entrypoint `argparse` defaults.
+- **Hierarchical Configuration Resolution**:
+  - In `scripts/agent_driver.py`, implement a robust hierarchical fallback: `(Environment Variable) > (config.py default)`. This ensures that even if environment variables are purged (as in `test_config_externalization`), the system remains robust and backward compatible. NEVER remove fallback logic from the core driver.
 - **CLI Argument Parsing & State Broadcasting**:
   - Update `argparse` configuration ONLY in `scripts/orchestrator.py` and any standalone entrypoint scripts (e.g., `scripts/spawn_auditor.py`, `scripts/spawn_manager.py` if run manually). Do not add `argparse` definitions to internal `spawn_*.py` child scripts.
   - Add `--engine` and `--model` with self-explanatory help strings. Ensure the default value for `--model` is dynamically imported from `config.DEFAULT_GEMINI_MODEL` to prevent Scattered Configuration anti-patterns.
