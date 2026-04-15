@@ -4,7 +4,8 @@ import argparse
 import tempfile
 import os
 import sys
-from agent_driver import build_prompt
+from agent_driver import build_prompt, invoke_agent
+import config
 import subprocess
 import time
 from pathlib import Path
@@ -15,26 +16,9 @@ def extract_pr_id(pr_file_path):
     if match:
         return match.group(1).rstrip('_')
     return basename.split(".")[0]
-def openclaw_agent_call(session_key, message, workdir='.'):
-    cmd = [
-        "openclaw",
-        "agent",
-        "--local",
-        "--session-id",
-        session_key,
-        "--message",
-        message
-    ]
-    try:
-        subprocess.run(cmd, cwd=workdir, check=True)
-        return session_key
-    except subprocess.CalledProcessError as e:
-        print(f"Error calling openclaw agent: {e}")
-        sys.exit(1)
-
-def send_feedback(session_key, message, workdir='.'):
+def send_feedback(session_key, message, workdir='.', run_dir="."):
     """Function to append reviewer feedback to the existing session."""
-    openclaw_agent_call(session_key, message, workdir=workdir)
+    invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir)
     print(f"Sent feedback to session {session_key}")
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
     session_file = os.path.join(run_dir, ".coder_session")
@@ -65,13 +49,13 @@ def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir=
         if os.path.exists(session_file):
             with open(session_file, "r") as sf:
                 session_key = sf.read().strip()
-            send_feedback(session_key, msg, workdir=workdir)
+            send_feedback(session_key, msg, workdir=workdir, run_dir=run_dir)
             return True, session_key
         else:
             import uuid
             session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
             task_string += msg
-            openclaw_agent_call(session_key, task_string, workdir=workdir)
+            invoke_agent(task_string, session_key=session_key, role="coder", run_dir=run_dir)
             with open(session_file, "w") as f:
                 f.write(session_key)
             print(f"Spawned new session {session_key} with feedback")
@@ -88,8 +72,16 @@ def main():
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--global-dir", required=False, help="Global directory for playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
+    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
+    
+    if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
+        os.environ["LLM_DRIVER"] = args.engine
+    if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
+        os.environ["SDLC_MODEL"] = args.model
+        
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
     try:
@@ -157,10 +149,10 @@ def main():
         if args.system_alert:
             msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
             if os.path.exists(session_file):
-                send_feedback(session_key, msg, workdir=workdir)
+                send_feedback(session_key, msg, workdir=workdir, run_dir=args.run_dir)
             else:
                 task_string += msg
-                openclaw_agent_call(session_key, task_string, workdir=workdir)
+                invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
                 with open(session_file, "w") as f:
                     f.write(session_key)
                 print(f"Spawned new session {session_key} with system alert")
@@ -168,11 +160,11 @@ def main():
             handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id, args.run_dir)
         else:
             if not os.path.exists(session_file):
-                openclaw_agent_call(session_key, task_string, workdir=workdir)
+                invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
                 with open(session_file, "w") as f:
                     f.write(session_key)
                 print(f"Spawned new session {session_key}")
             else:
-                openclaw_agent_call(session_key, task_string, workdir=workdir)
+                invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
 if __name__ == "__main__":
     main()

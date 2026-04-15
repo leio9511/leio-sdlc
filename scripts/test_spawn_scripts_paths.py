@@ -8,8 +8,8 @@ import spawn_coder
 
 class TestSpawnScriptsPaths(unittest.TestCase):
     @patch('builtins.open')
-    @patch('spawn_coder.openclaw_agent_call')
-    def test_spawn_coder_playbook_path(self, mock_agent_call, mock_open):
+    @patch('spawn_coder.invoke_agent')
+    def test_spawn_coder_playbook_path(self, mock_invoke, mock_open):
         from scripts import spawn_coder
         
         # Inject fake arguments

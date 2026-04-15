@@ -31,7 +31,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         else:
             del os.environ["SDLC_TEST_MODE"]
 
-    @patch('spawn_coder.openclaw_agent_call')
+    @patch('spawn_coder.invoke_agent')
     @patch('subprocess.check_output')
     def test_spawn_coder_payload_injection(self, mock_check_output, mock_agent_call):
         import spawn_coder
@@ -48,12 +48,12 @@ class TestAgentDriverTriad(unittest.TestCase):
         with patch.object(sys, 'argv', test_args):
             spawn_coder.main()
             
-        self.assertTrue(mock_agent_call.called, "openclaw_agent_call was not called")
+        self.assertTrue(mock_agent_call.called, "invoke_agent was not called")
         args, kwargs = mock_agent_call.call_args
-        self.assertIn("mock_pr_content", args[1])
-        self.assertIn("mock_prd_content", args[1])
+        self.assertIn("mock_pr_content", args[0])
+        self.assertIn("mock_prd_content", args[0])
 
-    @patch('spawn_coder.openclaw_agent_call')
+    @patch('spawn_coder.invoke_agent')
     @patch('subprocess.check_output')
     def test_spawn_coder_feedback_injection(self, mock_check_output, mock_agent_call):
         import spawn_coder
@@ -74,13 +74,13 @@ class TestAgentDriverTriad(unittest.TestCase):
         with patch.object(sys, 'argv', test_args):
             spawn_coder.main()
             
-        self.assertTrue(mock_agent_call.called, "openclaw_agent_call was not called")
+        self.assertTrue(mock_agent_call.called, "invoke_agent was not called")
         args, kwargs = mock_agent_call.call_args
         
         # Verify that the markdown wrapper was stripped and pure JSON is in the prompt
-        self.assertNotIn("```json", args[1])
-        self.assertIn('"overall_assessment": "NEEDS_ATTENTION"', args[1])
-        self.assertIn('"description": "raw JSON test"', args[1])
+        self.assertNotIn("```json", args[0])
+        self.assertIn('"overall_assessment": "NEEDS_ATTENTION"', args[0])
+        self.assertIn('"description": "raw JSON test"', args[0])
 
     def test_build_prompt_resolves_correctly(self):
         prompt = build_prompt("coder", workdir="/tmp/test", playbook_content="mock_playbook", pr_file="test_pr.md", pr_content="mock_pr_content", prd_file="test_prd.md", prd_content="mock_prd_content")

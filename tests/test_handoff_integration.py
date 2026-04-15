@@ -36,9 +36,13 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         args.workdir = "/dummy"
         args.prd_file = "dummy.md"
         args.cleanup = False
+        args.engine = "openclaw"
+        args.model = "test-model"
         args.enable_exec_from_workspace = True
         args.test_sleep = False
         args.global_dir = None
+        args.engine = "openclaw"
+        args.model = "test-model"
         args.channel = 'slack:C123'
         mock_args.return_value = args
 
@@ -89,9 +93,13 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         args.channel = "slack:C123"
         args.notify_target = None
         args.cleanup = False
+        args.engine = "openclaw"
+        args.model = "test-model"
         args.enable_exec_from_workspace = True
         args.test_sleep = False
         args.global_dir = None
+        args.engine = "openclaw"
+        args.model = "test-model"
         args.channel = 'slack:C123'
         mock_args.return_value = args
         
@@ -141,9 +149,13 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         args.max_prs_to_process = 0
         args.coder_session_strategy = "on-escalation"
         args.cleanup = False
+        args.engine = "openclaw"
+        args.model = "test-model"
         args.enable_exec_from_workspace = True
         args.test_sleep = False
         args.global_dir = None
+        args.engine = "openclaw"
+        args.model = "test-model"
         args.channel = 'slack:C123'
         mock_args.return_value = args
         
