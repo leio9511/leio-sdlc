@@ -1,3 +1,4 @@
+import config
 from agent_driver import build_prompt
 
 class HandoffPrompter:
@@ -6,4 +7,4 @@ class HandoffPrompter:
         prompt = build_prompt(f"handoff_{condition}")
         if not prompt:
             return "[ACTION REQUIRED FOR MANAGER]\nUnknown exit condition."
-        return prompt
+        return prompt.replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT)

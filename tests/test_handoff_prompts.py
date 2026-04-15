@@ -19,9 +19,10 @@ def test_prompts():
 
     # Acceptance Criteria 2: happy_path
     happy = HandoffPrompter.get_prompt("happy_path")
+    import config
     assert "[SUCCESS_HANDOFF]" in happy
     assert "1. Update PRD status" in happy
-    assert "python3 {SDLC_SKILLS_ROOT}/issue_tracker/scripts/issues.py" in happy
+    assert f"python3 {config.SDLC_SKILLS_ROOT}/issue_tracker/scripts/issues.py" in happy
     print("✅ happy_path prompt verified.")
 
     # Acceptance Criteria 3: New prompts

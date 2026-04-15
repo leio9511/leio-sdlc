@@ -43,10 +43,16 @@ class TestHandoffPrompter(unittest.TestCase):
     def test_prompt_template_injection(self):
         import config
         prompt = HandoffPrompter.get_prompt("happy_path")
-        rendered_prompt = prompt.replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT)
-        self.assertNotIn("{SDLC_SKILLS_ROOT}", rendered_prompt)
-        self.assertIn(config.SDLC_SKILLS_ROOT, rendered_prompt)
-        self.assertIn("issue_tracker/scripts/issues.py", rendered_prompt)
+        self.assertNotIn("{SDLC_SKILLS_ROOT}", prompt)
+        self.assertIn(config.SDLC_SKILLS_ROOT, prompt)
+        self.assertIn("issue_tracker/scripts/issues.py", prompt)
+
+    def test_handoff_prompter_assertions_fixed(self):
+        import config
+        prompt = HandoffPrompter.get_prompt("git_checkout_error")
+        self.assertNotIn("{SDLC_SKILLS_ROOT}", prompt)
+        self.assertIn(config.SDLC_SKILLS_ROOT, prompt)
+        self.assertIn("leio-sdlc/scripts/orchestrator.py", prompt)
 
 if __name__ == "__main__":
     unittest.main()
