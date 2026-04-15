@@ -44,3 +44,4 @@ tests/planner_sandbox_*
 audit_prompt.txt
 .sdlc_runs/
 tests/test_lock_run/
+sdlc_runs_symlink
