@@ -90,6 +90,6 @@ gemini skills link "$PROD_DIR" --consent
 
 - **For CLI Help Texts (argparse)**:
 ```python
-parser.add_argument("--engine", choices=["openclaw", "gemini"], default=config.DEFAULT_LLM_ENGINE, help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
-parser.add_argument("--model", default=config.DEFAULT_GEMINI_MODEL, help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
+parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
 ```
