@@ -140,7 +140,8 @@ perform_hard_copy_deployment() {
     # 8. Gemini CLI Dual-Compatibility Link
     if command -v gemini >/dev/null 2>&1; then
         echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
-        gemini skills link "$PROD_DIR" --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
+        # Added --consent to avoid stalling during headless deploy
+        gemini skills link "$PROD_DIR"  --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
     fi
 }
 
