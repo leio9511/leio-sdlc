@@ -9,9 +9,9 @@ set -e
 perform_hard_copy_rollback() {
     local SLUG=$(basename "$PWD")
     local HOME_DIR="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_DIR="$HOME_DIR/.openclaw"
-    local SKILLS_DIR="$OPENCLAW_DIR/skills"
-    local RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+    local OPENCLAW_DIR="${SDLC_SKILLS_ROOT:-${HOME_MOCK:-$HOME}/.openclaw/skills}"
+    local SKILLS_DIR="$OPENCLAW_DIR"
+    local RELEASES_DIR="$HOME_DIR/.openclaw/.releases/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
 
     echo "[$(date '+%H:%M:%S')] Starting hard-copy rollback flow for $SLUG"
@@ -44,7 +44,7 @@ perform_hard_copy_rollback() {
     rm -rf "$OLD_DIR"
 
     # 3. Gateway Reload
-    if [ -z "$HOME_MOCK" ]; then
+    if command -v openclaw >/dev/null 2>&1; then
         echo "🔄 Restarting OpenClaw gateway..."
         openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
     fi

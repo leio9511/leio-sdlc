@@ -27,7 +27,7 @@ echo "❌ GIT COMMIT REJECTED ON PROTECTED BRANCH: $CURRENT_BRANCH"
 echo "==============================================================="
 echo "Role Awakening: As a Manager, you should NEVER commit directly!"
 echo "Please use the official gateway to baseline your state/PRD before pipeline ignition:"
-echo "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path_to_files>"
+echo "python3 ${SDLC_SKILLS_ROOT:-~/.openclaw/skills}/leio-sdlc/scripts/commit_state.py --files <path_to_files>"
 echo "==============================================================="
 
 exit 1
