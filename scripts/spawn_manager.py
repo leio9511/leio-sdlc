@@ -22,7 +22,8 @@ def main():
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
 
-    with open("/root/.openclaw/workspace/projects/leio-sdlc/SKILL.md", "r") as f:
+    skill_md_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SKILL.md")
+    with open(skill_md_path, "r") as f:
         skill_text = f.read()
 
     task_string = build_prompt("manager",

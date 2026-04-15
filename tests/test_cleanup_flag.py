@@ -43,7 +43,7 @@ def test_cleanup_quarantine(clean_cwd):
             json.dump({"locks": [dummy_lock_1, dummy_lock_2]}, f)
             
         # Run orchestrator cleanup
-        orchestrator_path = "/root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py"
+        orchestrator_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/orchestrator.py"
         res = subprocess.run([
             "python3", orchestrator_path, 
             "--workdir", td, 
@@ -78,7 +78,7 @@ def test_cleanup_lock_blocked(clean_cwd):
         f = open(lock_path, "w")
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         
-        orchestrator_path = "/root/.openclaw/workspace/projects/leio-sdlc/scripts/orchestrator.py"
+        orchestrator_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/orchestrator.py"
         res = subprocess.run([
             "python3", orchestrator_path, 
             "--workdir", td, 

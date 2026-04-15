@@ -7,7 +7,7 @@ def test_auditor_rejects_missing_hardcoded_content(tmp_path):
     prd_path = tmp_path / "PRD.md"
     prd_path.write_text("# PRD\n1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications")
     
-    script_path = "/root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_auditor.py"
+    script_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/spawn_auditor.py"
     
     # Run auditor script
     env = os.environ.copy()
@@ -27,7 +27,7 @@ def test_auditor_rejects_invalid_template(tmp_path):
     prd_path = tmp_path / "PRD.md"
     prd_path.write_text("# Feral PRD\nMissing headers")
     
-    script_path = "/root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_auditor.py"
+    script_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/spawn_auditor.py"
     
     env = os.environ.copy()
     env["SDLC_TEST_MODE"] = "true"
@@ -42,4 +42,4 @@ def test_auditor_rejects_invalid_template(tmp_path):
     assert "REJECTED: PRD structure does not match the mandatory template" in result.stdout
 
 def test_leio_auditor_removed():
-    assert not os.path.exists("/root/.openclaw/workspace/projects/leio-sdlc/skills/leio-auditor")
+    assert not os.path.exists(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/skills/leio-auditor")

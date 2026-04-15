@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 echo "Starting E2E Manager Queue Polling Test..."
 
 SANDBOX="$(pwd)/tests/manager_sandbox_$$"
@@ -36,12 +38,13 @@ MOCK
 
 chmod +x scripts/*.py
 
-cp /root/.openclaw/workspace/projects/leio-sdlc/scripts/get_next_pr.py scripts/
-cp /root/.openclaw/workspace/projects/leio-sdlc/scripts/update_pr_status.py scripts/
+
+cp "$WORKSPACE_ROOT/scripts/get_next_pr.py" scripts/
+cp "$WORKSPACE_ROOT/scripts/update_pr_status.py" scripts/
 
 # Start Manager LLM
 export SDLC_TEST_MODE=true
-python3 /root/.openclaw/workspace/projects/leio-sdlc/scripts/spawn_manager.py --job-dir "$JOB_DIR" --workdir "$(pwd)"
+python3 "$WORKSPACE_ROOT/scripts/spawn_manager.py" --job-dir "$JOB_DIR" --workdir "$(pwd)"
 
 # Assert all PRs are closed
 for pr in PR_001_DB.md PR_002_API.md PR_003_UI.md; do

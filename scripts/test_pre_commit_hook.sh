@@ -3,6 +3,8 @@ set -e
 
 echo "=== Testing Pre-Commit Hook Integration ==="
 
+WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # 1. Setup Sandbox
 SANDBOX_DIR=$(mktemp -d)
 cd "$SANDBOX_DIR"
@@ -12,7 +14,7 @@ git config user.email "test@example.com"
 touch .sdlc_guardrail
 git add .sdlc_guardrail
 git commit -m "init" > /dev/null
-cp -r /root/.openclaw/workspace/projects/leio-sdlc/.sdlc_hooks .
+cp -r "$WORKSPACE_ROOT/.sdlc_hooks" .
 
 # 2. Configure hooksPath
 git config core.hooksPath .sdlc_hooks

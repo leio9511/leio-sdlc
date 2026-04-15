@@ -12,10 +12,10 @@ class TestCreatePrContract(unittest.TestCase):
         
         # We need TEMPLATES/PR_Contract.md.template in the right place relative to the script
         # The script resolves it as: os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "TEMPLATES", "PR_Contract.md.template")
-        # Which points to /root/.openclaw/workspace/projects/leio-sdlc/TEMPLATES/PR_Contract.md.template
         # So we can just call the script directly.
-        self.script_path = "/root/.openclaw/workspace/projects/leio-sdlc/scripts/create_pr_contract.py"
-        self.config_template_path = "/root/.openclaw/workspace/projects/leio-sdlc/config/sdlc_config.json.template"
+        SDLC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.script_path = os.path.join(SDLC_ROOT, "scripts", "create_pr_contract.py")
+        self.config_template_path = os.path.join(SDLC_ROOT, "config", "sdlc_config.json.template")
 
     def test_only_scaffold_creates_file_with_header(self):
         cmd = [

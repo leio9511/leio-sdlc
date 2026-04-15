@@ -18,12 +18,6 @@ def main():
     
     args = parser.parse_args()
     
-    if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__):
-        if not args.enable_exec_from_workspace:
-            if "--enable-exec-from-workspace" not in sys.argv:
-                print("[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nStartup validation failed (likely executing from the wrong directory). You MUST execute the script using its absolute installed path (e.g., `python3 ~/.openclaw/skills/leio-sdlc/scripts/spawn_verifier.py ...`) OR explicitly append the `--enable-exec-from-workspace` flag if testing locally.")
-                sys.exit(1)
-
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
 

@@ -14,13 +14,6 @@ import config
 from agent_driver import invoke_agent, build_prompt
 
 def main():
-    if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__):
-        # We are executing from the workspace source, not the installed skill directory.
-        # Check if the user explicitly authorized this.
-        if "--enable-exec-from-workspace" not in sys.argv:
-            print("[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nStartup validation failed (likely executing from the wrong directory). You MUST execute the script using its absolute installed path (e.g., `python3 ~/.openclaw/skills/leio-sdlc/scripts/spawn_auditor.py ...`) OR explicitly append the `--enable-exec-from-workspace` flag if testing locally.")
-            sys.exit(1)
-
     parser = argparse.ArgumentParser(description="Spawn an Auditor agent.")
     parser.add_argument("--prd-file", required=True, help="Path to the PRD file")
     parser.add_argument("--workdir", required=True, help="Working directory lock")

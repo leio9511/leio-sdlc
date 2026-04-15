@@ -5,7 +5,8 @@ set -e
 setup_sandbox() {
     TEST_DIR="/tmp/$1"
     mkdir -p "$TEST_DIR"
-    cp -r /root/.openclaw/workspace/projects/leio-sdlc/* "$TEST_DIR/"
+    WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    cp -r "$WORKSPACE_ROOT/"* "$TEST_DIR/"
     cd "$TEST_DIR"
     export PYTHONPATH="$TEST_DIR"
     export WORKSPACE_DIR="$TEST_DIR"
