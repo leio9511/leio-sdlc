@@ -5,49 +5,27 @@ Affected_Projects: [leio-sdlc]
 # PRD: Fix_Auditor_YOLO_And_Deploy_Script_Sequence
 
 ## 1. Context & Problem (业务背景与核心痛点)
-Two independent issues require immediate fixes:
-
-1. **ISSUE-1129 — Auditor YOLO Loop**: When the Auditor agent rejects a PRD (`{"status": "REJECTED"}`), `spawn_auditor.py` terminates with `sys.exit(1)`. This triggers an unintended self-healing loop: the Manager LLM is fine-tuned to auto-correct on shell failures, causing it to ignore the mandatory "NO YOLO / Wait for Authorization" prompts and immediately rewrite the PRD without human approval.
-
-2. **Deploy Script Sequence Bug**: In `skills/pm-skill/deploy.sh`, the `gemini skills link` command is placed after the gateway restart logic. When `kit-deploy.sh` sends SIGTERM to trigger gateway restart, the Gemini CLI link step is killed mid-execution. Additionally, `pm-skill/deploy.sh` lacks the `--consent` flag, causing deployments to hang waiting for interactive `[Y/n]` confirmation.
+1. **Auditor YOLO Loop**: Currently, when the Auditor rejects a PRD, `spawn_auditor.py` exits with `exit(1)`. This triggers the LLM's trained "self-healing" instinct to fix the shell error, causing it to ignore "NO YOLO" prompts and rewrite the PRD without human approval.
+2. **Deploy Script Interruption**: In `pm-skill/deploy.sh`, `gemini skills link` runs after the gateway restart, leading to SIGTERM killing the link process. It also lacks `--consent`.
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Fix Auditor YOLO Loop (ISSUE-1129)**: Modify `spawn_auditor.py` to return a specific semantic rejection code `sys.exit(2)` when the Auditor verdict is `REJECTED`, while still printing a loud warning message so the Manager correctly relays it to the user. This non-standard code will be used to signal a "Human Decision Required" state instead of a process failure.
-2. **Fix Deploy Script Sequence**: Reorder the steps in `skills/pm-skill/deploy.sh` so that `gemini skills link` executes before gateway restart. Also add `--consent` flag to prevent interactive stalls.
+1. **Suppress YOLO Reflex**: Modify `spawn_auditor.py` to return `exit(0)` on `REJECTED` verdicts.
+2. **Fix Deploy Flow**: Reorder `pm-skill/deploy.sh` to link skills before restart and add `--consent`.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-
-### Fix 1 — Auditor YOLO Loop (`spawn_auditor.py`):
-- After parsing the Auditor JSON verdict, if `status == "REJECTED"`:
-  - Maintain the existing `notify_channel()` and `[ACTION REQUIRED FOR MANAGER]` closure logic.
-  - Execute `sys.exit(0)` instead of `sys.exit(1)`.
-  - **Rationale**: An Auditor rejection is a successful execution of a business verification task, not a technical process failure. LLMs are fine-tuned to automatically fix shell failures (exit 1), but see exit 0 as completion. By using exit 0 and relying on the explicit `[ACTION REQUIRED FOR MANAGER]` stdout instructions, we cleanly separate process logic from domain logic and suppress the unauthorized self-healing loop.
-  - Only `sys.exit(1)` on actual unrecoverable technical failures (e.g., CLI not found, JSON syntax corruption).
-
-### Fix 2 — Deploy Script Sequence (`skills/pm-skill/deploy.sh`):
-- Locate the Gemini CLI skill linking step and move it to execute BEFORE the `openclaw gateway restart` block.
-- Append `--consent` flag to the `gemini skills link` command to eliminate interactive `[Y/n]` blocking.
+- **Boss Mandate (Strategic Override)**: This design intentionally deviates from standard Unix "Semantic Exit Code" patterns to address the unique behavioral quirk of LLM Agents. **Boss Mandate**: "This is the only viable short-term fix to break the illusion of LLM. Boss will not treat 'Reject from Auditor' as Error, it is information for Boss to take into consideration. Boss can override the rejection and decide to move on. So it should be treated as exit 0."
+- **Exit Code Logic**: `spawn_auditor.py` will exit with `0` for both `APPROVED` and `REJECTED`. It will only exit with `1` on catastrophic process failures (e.g., Python crash, JSON corrupted beyond repair).
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
-
-- **Scenario 1:** Auditor REJECTED does not trigger YOLO retry.
-  - **Given** `spawn_auditor.py` receives a `{"status": "REJECTED"}` verdict.
-  - **When** it processes and outputs the rejection.
-  - **Then** the process exits with code `0` (Success) and the Manager reads the `[ACTION REQUIRED]` instruction to stop and wait for the Boss.
-
-- **Scenario 3:** Deploy script completes fully without SIGTERM interruption.
-  - **Given** a clean system with Gemini CLI available.
-  - **When** `./deploy.sh` for `pm-skill` is executed.
-  - **Then** the `gemini skills link --consent` step completes successfully before gateway restart, and no `[Y/n]` prompt appears.
-
-- **Scenario 4:** Manager stops on REJECTED correctly.
-  - **Given** the Auditor returns `exit 0` but the status is `REJECTED`.
-  - **When** the Manager processes this result.
-  - **Then** it follows the `[ACTION REQUIRED]` prompt and presents the feedback to the Boss without attempting an automatic fix.
+- **Scenario 1**: Auditor REJECTED does not trigger Manager auto-fix.
+  - **Given** Auditor returns `{"status": "REJECTED"}`.
+  - **Then** `spawn_auditor.py` exits with code `0`.
+- **Scenario 2**: Deploy script completes fully.
+  - **Given** Gemini CLI is available.
+  - **Then** `gemini skills link` completes before restart.
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
-- **Unit Testing**: Add a test in `tests/test_spawn_auditor_rejection.py` that mocks an Auditor REJECTED JSON response and verifies the process exits with code `2`.
-- **Integration Testing**: Run `bash skills/pm-skill/deploy.sh` in a sandbox and verify the script completes without hanging on `[Y/n]`.
+- **Unit Test**: Mock Auditor rejection and assert `exit(0)`.
 
 ## 6. Framework Modifications (框架防篡改声明)
 - `scripts/spawn_auditor.py`
@@ -57,7 +35,7 @@ Two independent issues require immediate fixes:
 
 ### Exact Text Replacements:
 
-- **For `scripts/spawn_auditor.py` (Auditor rejection handling)**:
+- **For `scripts/spawn_auditor.py` (Final Verdict Handling)**:
 ```python
     if status == "APPROVED":
         agent_driver.notify_channel(args.channel, "Auditor APPROVED the PRD.", "auditor_approved", {"prd_file": args.prd_file})
@@ -66,18 +44,16 @@ Two independent issues require immediate fixes:
     else:
         agent_driver.notify_channel(args.channel, "Auditor REJECTED the PRD.", "auditor_rejected", {"prd_file": args.prd_file})
         print("[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD. Report the rejection reasons to the Boss, then you MUST immediately halt all further operations and WAIT for explicit instructions.")
-        sys.exit(0)  # Use exit 0 to prevent LLM retry本能
+        sys.exit(0) # Boss Mandate: Prevent LLM YOLO retry by returning success code
 ```
 
-- **For `skills/pm-skill/deploy.sh` (Gemini link before restart)**:
+- **For `skills/pm-skill/deploy.sh` (Link before restart)**:
 ```bash
-# Gemini CLI Dual-Compatibility Link — BEFORE gateway restart
 if command -v gemini >/dev/null 2>&1; then
     echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
     gemini skills link "$PROD_DIR" --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
 fi
 
-# Gateway restart — AFTER skill linking
 if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
     openclaw gateway restart || true
 fi
