@@ -54,7 +54,9 @@ def test_spawn_auditor_valid_channel_success(mock_notify, capsys):
     os.environ["MOCK_AUDIT_RESULT"] = "APPROVE"
     
     with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", ".", "--channel", "test_channel"]):
-        spawn_auditor.main()
+        with pytest.raises(SystemExit) as e:
+            spawn_auditor.main()
+        assert e.value.code == 0
         
     captured = capsys.readouterr()
     assert "[ACTION REQUIRED FOR MANAGER] The Auditor APPROVED the PRD." in captured.out
@@ -63,7 +65,7 @@ def test_spawn_auditor_valid_channel_success(mock_notify, capsys):
     os.remove(prd_file)
 
 @patch("agent_driver.notify_channel")
-def test_spawn_auditor_valid_channel_reject(mock_notify, capsys):
+def test_auditor_rejected_returns_exit_0(mock_notify, capsys):
     with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
         f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
         prd_file = f.name
@@ -72,7 +74,9 @@ def test_spawn_auditor_valid_channel_reject(mock_notify, capsys):
     os.environ["MOCK_AUDIT_RESULT"] = "REJECT"
     
     with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", ".", "--channel", "test_channel"]):
-        spawn_auditor.main()
+        with pytest.raises(SystemExit) as e:
+            spawn_auditor.main()
+        assert e.value.code == 0
         
     captured = capsys.readouterr()
     assert "[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD." in captured.out
