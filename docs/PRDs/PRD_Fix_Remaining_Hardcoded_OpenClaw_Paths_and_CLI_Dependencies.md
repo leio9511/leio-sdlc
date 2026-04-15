@@ -55,4 +55,24 @@ Affected_Projects: [leio-sdlc]
 - `tests/test_033_cleanup_deprecated.sh`
 
 ## 7. Hardcoded Content (硬编码内容)
-N/A
+
+必须在代码中严格使用以下模板化字符串（配合 `config.SDLC_SKILLS_ROOT` 或环境变量注入使用）以取代硬编码的 `~/.openclaw/skills/...`：
+
+1. **`scripts/orchestrator.py` (Uncommitted files error):**
+   `f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path>"`
+
+2. **`scripts/orchestrator.py` & `scripts/doctor.py` (SDLC compliant error):**
+   `f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.'`
+
+3. **`.sdlc_hooks/pre-commit` (Bash 错误提示):**
+   `"python3 ${SDLC_SKILLS_ROOT:-~/.openclaw/skills}/leio-sdlc/scripts/commit_state.py --files <path_to_files>"`
+
+4. **`skills/pm-skill/rollback.sh` & `scripts/rollback.sh` (环境变量回退):**
+   `OPENCLAW_DIR="${SDLC_SKILLS_ROOT:-${HOME_MOCK:-$HOME}/.openclaw/skills}"`
+   且包含嗅探网关重启的逻辑：
+   ```bash
+   if command -v openclaw >/dev/null 2>&1; then
+       echo "🔄 Restarting OpenClaw gateway..."
+       openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+   fi
+   ```
