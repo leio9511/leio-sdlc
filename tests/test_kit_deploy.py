@@ -54,5 +54,19 @@ class TestKitDeploy(unittest.TestCase):
             
             self.assertEqual(lines[2], "mock-openclaw gateway restart")
 
+    def test_pm_skill_deploy_script_content(self):
+        deploy_sh_path = os.path.join(self.project_root, "skills", "pm-skill", "deploy.sh")
+        with open(deploy_sh_path, "r") as f:
+            content = f.read()
+        
+        self.assertIn("gemini skills link \"$PROD_DIR\" --consent", content)
+        
+        gemini_idx = content.find("gemini skills link")
+        restart_idx = content.find("openclaw gateway restart")
+        
+        self.assertNotEqual(gemini_idx, -1)
+        self.assertNotEqual(restart_idx, -1)
+        self.assertLess(gemini_idx, restart_idx, "gemini skills link must happen before openclaw gateway restart")
+
 if __name__ == '__main__':
     unittest.main()
