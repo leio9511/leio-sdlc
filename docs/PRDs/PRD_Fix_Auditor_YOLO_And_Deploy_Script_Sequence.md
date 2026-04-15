@@ -12,7 +12,7 @@ Two independent issues require immediate fixes:
 2. **Deploy Script Sequence Bug**: In `skills/pm-skill/deploy.sh`, the `gemini skills link` command is placed after the gateway restart logic. When `kit-deploy.sh` sends SIGTERM to trigger gateway restart, the Gemini CLI link step is killed mid-execution. Additionally, `pm-skill/deploy.sh` lacks the `--consent` flag, causing deployments to hang waiting for interactive `[Y/n]` confirmation.
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Fix Auditor YOLO Loop (ISSUE-1129)**: Modify `spawn_auditor.py` to return `sys.exit(0)` even when the Auditor verdict is `REJECTED`, while still printing a loud warning message so the Manager correctly relays it to the user.
+1. **Fix Auditor YOLO Loop (ISSUE-1129)**: Modify `spawn_auditor.py` to return a specific semantic rejection code `sys.exit(2)` when the Auditor verdict is `REJECTED`, while still printing a loud warning message so the Manager correctly relays it to the user. This non-standard code will be used to signal a "Human Decision Required" state instead of a process failure.
 2. **Fix Deploy Script Sequence**: Reorder the steps in `skills/pm-skill/deploy.sh` so that `gemini skills link` executes before gateway restart. Also add `--consent` flag to prevent interactive stalls.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
@@ -41,7 +41,7 @@ Two independent issues require immediate fixes:
   - **Then** the `gemini skills link --consent` step completes successfully before gateway restart, and no `[Y/n]` prompt appears.
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
-- **Unit Testing**: Add a test in `tests/test_spawn_auditor_rejection.py` that mocks an Auditor REJECTED JSON response and verifies the process exits with code `0`.
+- **Unit Testing**: Add a test in `tests/test_spawn_auditor_rejection.py` that mocks an Auditor REJECTED JSON response and verifies the process exits with code `2`.
 - **Integration Testing**: Run `bash skills/pm-skill/deploy.sh` in a sandbox and verify the script completes without hanging on `[Y/n]`.
 
 ## 6. Framework Modifications (框架防篡改声明)
