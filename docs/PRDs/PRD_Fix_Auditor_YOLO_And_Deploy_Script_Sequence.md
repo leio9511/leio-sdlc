@@ -20,8 +20,8 @@ Two independent issues require immediate fixes:
 ### Fix 1 — Auditor YOLO Loop (`spawn_auditor.py`):
 - After parsing the Auditor JSON verdict, if `status == "REJECTED"`:
   - Print the rejection reason and comments to stdout in a "LOUD WARNING" format.
-  - Execute `sys.exit(0)` instead of `sys.exit(1)`.
-  - **Rationale**: LLMs are fine-tuned to automatically fix shell failures (exit 1). Since an Auditor rejection is a "Review Warning" requiring human judgment rather than a "Fatal Process Error", using exit 0 prevents the Manager agent from entering an unauthorized self-healing YOLO loop.
+  - Execute `sys.exit(2)` instead of `sys.exit(1)`.
+  - **Rationale**: LLMs are fine-tuned to automatically fix general shell failures (exit 1). By using a specific semantic exit code (`exit 2`) for a logical rejection, we can instruct the Manager agent (via prompt engineering) that this is a "Review Block" requiring human judgment, not a technical failure, thereby suppressing the unauthorized YOLO self-healing loop.
   - Only `sys.exit(1)` on actual unrecoverable technical failures (e.g., CLI not found, JSON syntax corruption).
 
 ### Fix 2 — Deploy Script Sequence (`skills/pm-skill/deploy.sh`):
@@ -33,7 +33,7 @@ Two independent issues require immediate fixes:
 - **Scenario 1:** Auditor REJECTED does not trigger YOLO retry.
   - **Given** `spawn_auditor.py` receives a `{"status": "REJECTED"}` verdict.
   - **When** it processes and outputs the rejection.
-  - **Then** the process exits with code `0` and the Manager sees it as a normal output, not a failure.
+  - **Then** the process exits with code `2` (Specific Rejection) and the Manager recognizes this as a human-decision-required state, not a process failure.
 
 - **Scenario 2:** Deploy script completes fully without SIGTERM interruption.
   - **Given** a clean system with Gemini CLI available.
@@ -61,7 +61,8 @@ if parsed.get("status") in ("REJECTED", "APPROVED"):
         print(f"\n{'='*60}")
         print(f"  AUDITOR REJECTED — Please review the feedback above.")
         print(f"{'='*60}\n")
-    sys.exit(0)  # NOT exit(1) — prevents Manager YOLO loop
+        sys.exit(2)  # Specific rejection code for Manager interception
+    sys.exit(0)
 ```
 
 - **For `skills/pm-skill/deploy.sh` (Gemini link before restart)**:
