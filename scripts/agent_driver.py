@@ -56,7 +56,7 @@ def resolve_cmd(cmd_name):
         
     return cmd_name
 
-def invoke_agent(task_string, session_key=None, role=None, return_output=False):
+def invoke_agent(task_string, session_key=None, role=None, return_output=False, run_dir=None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
     Supports dynamic path resolution and isolated E2E testing integration.
@@ -73,7 +73,10 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
     )
     task_string += jit_guardrail
 
-    temp_dir = os.path.expanduser("~/.openclaw/workspace/.tmp")
+    if run_dir and os.path.exists(run_dir):
+        temp_dir = os.path.join(run_dir, ".tmp")
+    else:
+        temp_dir = tempfile.gettempdir()
     os.makedirs(temp_dir, exist_ok=True)
 
     fd, path = tempfile.mkstemp(suffix=".txt", prefix=f"sdlc_prompt_{session_key}_", dir=temp_dir, text=True)
@@ -88,7 +91,6 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False):
         llm_driver = os.environ.get("LLM_DRIVER", "openclaw").lower()
         
         # Check session map
-        temp_dir = os.path.expanduser("~/.openclaw/workspace/.tmp")
         session_map_file = os.path.join(temp_dir, f".session_map_{session_key}.json")
         actual_id = None
         if os.path.exists(session_map_file):

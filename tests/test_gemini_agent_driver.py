@@ -81,18 +81,53 @@ class TestGeminiAgentDriver(unittest.TestCase):
         
     @patch("agent_driver.os.makedirs")
     @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.tempfile.mkstemp")
     @patch("agent_driver.subprocess.run")
     @patch("agent_driver.resolve_cmd")
-    def test_global_temp_dir_creation(self, mock_resolve_cmd, mock_run, mock_exists, mock_makedirs):
+    def test_invoke_agent_with_run_dir(self, mock_resolve_cmd, mock_run, mock_mkstemp, mock_exists, mock_makedirs):
         mock_resolve_cmd.return_value = "/mock/bin/gemini"
         mock_run.return_value = MagicMock(returncode=0, stdout="[]")
-        mock_exists.return_value = False
+        
+        def fake_exists(path):
+            if path == "/mock/run_dir":
+                return True
+            return False
+        mock_exists.side_effect = fake_exists
+        mock_mkstemp.return_value = (3, "/mock/run_dir/.tmp/sdlc_prompt_123.txt")
         
         with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}):
-            invoke_agent("test task", session_key="test-session")
-            
-        expected_dir = os.path.expanduser("~/.openclaw/workspace/.tmp")
-        mock_makedirs.assert_any_call(expected_dir, exist_ok=True)
+            with patch("agent_driver.os.fdopen", mock_open()):
+                with patch("agent_driver.os.chmod"):
+                    with patch("agent_driver.os.remove"):
+                        invoke_agent("test task", session_key="test-session", run_dir="/mock/run_dir")
+                        
+        mock_makedirs.assert_any_call("/mock/run_dir/.tmp", exist_ok=True)
+        mock_mkstemp.assert_called_with(suffix=".txt", prefix="sdlc_prompt_test-session_", dir="/mock/run_dir/.tmp", text=True)
+
+    @patch("agent_driver.os.makedirs")
+    @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.tempfile.gettempdir")
+    @patch("agent_driver.tempfile.mkstemp")
+    @patch("agent_driver.subprocess.run")
+    @patch("agent_driver.resolve_cmd")
+    def test_invoke_agent_fallback_tempdir(self, mock_resolve_cmd, mock_run, mock_mkstemp, mock_gettempdir, mock_exists, mock_makedirs):
+        mock_resolve_cmd.return_value = "/mock/bin/gemini"
+        mock_run.return_value = MagicMock(returncode=0, stdout="[]")
+        mock_gettempdir.return_value = "/mock/system/tmp"
+        
+        def fake_exists(path):
+            return False
+        mock_exists.side_effect = fake_exists
+        mock_mkstemp.return_value = (3, "/mock/system/tmp/sdlc_prompt_123.txt")
+        
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}):
+            with patch("agent_driver.os.fdopen", mock_open()):
+                with patch("agent_driver.os.chmod"):
+                    with patch("agent_driver.os.remove"):
+                        invoke_agent("test task", session_key="test-session", run_dir="/mock/nonexistent")
+                        
+        mock_makedirs.assert_any_call("/mock/system/tmp", exist_ok=True)
+        mock_mkstemp.assert_called_with(suffix=".txt", prefix="sdlc_prompt_test-session_", dir="/mock/system/tmp", text=True)
 
     @patch("agent_driver.tempfile.mkstemp")
     @patch("agent_driver.os.path.exists")
