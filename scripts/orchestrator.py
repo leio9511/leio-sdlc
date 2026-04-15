@@ -291,7 +291,7 @@ def main():
 
     if not args.test_sleep and getattr(args, "force_replan", None) is None:
         print("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.")
-        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        print(HandoffPrompter.get_prompt("startup_validation_failed").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         sys.exit(1)
 
     if getattr(args, "force_replan", None) is not None:
@@ -299,7 +299,7 @@ def main():
 
     if "/root/.openclaw/workspace/projects/" in os.path.abspath(__file__) and not args.enable_exec_from_workspace:
         print("[FATAL] Security Violation: This skill is executing from a restricted source directory. For your safety, execution is blocked unless authorized via --enable-exec-from-workspace.")
-        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        print(HandoffPrompter.get_prompt("startup_validation_failed").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         sys.exit(1)
 
     # SDLC_TEST_MODE Leakage Guardrail
@@ -307,7 +307,7 @@ def main():
         if args.enable_exec_from_workspace:
             print("[WARNING] Running Orchestrator in TEST MODE with mocked LLMs. Production safety checks are bypassed.")
         else:
-            print(HandoffPrompter.get_prompt("test_mode_leakage"))
+            print(HandoffPrompter.get_prompt("test_mode_leakage").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -336,7 +336,7 @@ def main():
         res = drun([sys.executable, doctor_script, workdir, "--check"], capture_output=True, text=True)
         if res.returncode != 0:
             print('[FATAL] Project is not SDLC compliant. Please run "python3 ~/.openclaw/skills/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
-            print(HandoffPrompter.get_prompt("startup_validation_failed"))
+            print(HandoffPrompter.get_prompt("startup_validation_failed").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
 
     os.chdir(workdir)
@@ -346,12 +346,12 @@ def main():
     if os.environ.get("SDLC_BYPASS_BRANCH_CHECK") != "1":
         if not os.path.exists(".git"):
             print("[FATAL] Git Boundary Enforcement: workdir must contain a .git directory.")
-            print(HandoffPrompter.get_prompt("invalid_git_boundary"))
+            print(HandoffPrompter.get_prompt("invalid_git_boundary").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
         branch_output = drun(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
         if branch_output not in ["master", "main"]:
             print(f"[FATAL] Orchestrator must be started from the master or main branch. Current: {branch_output}")
-            print(HandoffPrompter.get_prompt("invalid_git_boundary"))
+            print(HandoffPrompter.get_prompt("invalid_git_boundary").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
 
     affected_projects = parse_affected_projects(args.prd_file)
@@ -366,7 +366,7 @@ def main():
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         print("[FATAL] Another SDLC pipeline is currently running. Concurrent execution is blocked.")
-        print(HandoffPrompter.get_prompt("pipeline_locked"))
+        print(HandoffPrompter.get_prompt("pipeline_locked").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         sys.exit(1)
 
     if args.test_sleep:
@@ -377,13 +377,13 @@ def main():
     if status_output.strip(): dlog(f"Dirty status detected: {repr(status_output)}")
     if status_output.strip():
         print("[FATAL] Dirty Git Workspace detected!")
-        print(HandoffPrompter.get_prompt("dirty_workspace"))
+        print(HandoffPrompter.get_prompt("dirty_workspace").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         sys.exit(1)
 
     effective_channel = args.channel or os.environ.get("OPENCLAW_SESSION_KEY") or os.environ.get("OPENCLAW_CHANNEL_ID")
     if not effective_channel and os.environ.get("SDLC_TEST_MODE") != "true":
         print("[FATAL] Missing channel parameter.")
-        print(HandoffPrompter.get_prompt("missing_channel"))
+        print(HandoffPrompter.get_prompt("missing_channel").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         sys.exit(1)
 
     # --- IGNITION GUARDRAIL ---
@@ -405,13 +405,13 @@ def main():
             if res.returncode != 0:
                 print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
                 if res.stderr: print(res.stderr.strip(), file=sys.stderr)
-                print(HandoffPrompter.get_prompt("missing_channel"))
+                print(HandoffPrompter.get_prompt("missing_channel").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                 sys.exit(1)
         else:
             print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
         if "invalid" in effective_channel:
             print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
-            print(HandoffPrompter.get_prompt("missing_channel"))
+            print(HandoffPrompter.get_prompt("missing_channel").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
     # --------------------------
 
@@ -448,12 +448,12 @@ def main():
             except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
             if not os.path.exists(job_dir):
                 print("[FATAL] Planner failed to generate any PRs.")
-                print(HandoffPrompter.get_prompt("planner_failure"))
+                print(HandoffPrompter.get_prompt("planner_failure").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                 sys.exit(1)
             md_files = glob.glob(os.path.join(job_dir, "*.md"))
             if len(md_files) == 0:
                 print("[FATAL] Planner failed to generate any PRs.")
-                print(HandoffPrompter.get_prompt("planner_failure"))
+                print(HandoffPrompter.get_prompt("planner_failure").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                 sys.exit(1)
             notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
     else:
@@ -473,12 +473,12 @@ def main():
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
         if not os.path.exists(job_dir):
             print("[FATAL] Planner failed to generate any PRs.")
-            print(HandoffPrompter.get_prompt("planner_failure"))
+            print(HandoffPrompter.get_prompt("planner_failure").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
         if len(md_files) == 0:
             print("[FATAL] Planner failed to generate any PRs.")
-            print(HandoffPrompter.get_prompt("planner_failure"))
+            print(HandoffPrompter.get_prompt("planner_failure").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
             sys.exit(1)
         notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
 
@@ -499,7 +499,7 @@ def main():
     proc = None
 
     def sig_handler(signum, frame):
-        print(HandoffPrompter.get_prompt("fatal_interrupt"))
+        print(HandoffPrompter.get_prompt("fatal_interrupt").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         raise SystemExit(1)
     
     signal.signal(signal.SIGTERM, sig_handler)
@@ -598,7 +598,7 @@ def main():
 
                 current_pr = output.split('\n')[-1].strip()
                 if not os.path.exists(current_pr):
-                    print(HandoffPrompter.get_prompt("dead_end"))
+                    print(HandoffPrompter.get_prompt("dead_end").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                     sys.exit(1)
                 set_pr_status(current_pr, "in_progress")
 
@@ -619,7 +619,7 @@ def main():
                     if branch_check.returncode == 0: safe_git_checkout(branch_name)
                     else: safe_git_checkout(branch_name, create=True)
                 except GitCheckoutError as e:
-                    print(HandoffPrompter.get_prompt("git_checkout_error"))
+                    print(HandoffPrompter.get_prompt("git_checkout_error").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                     sys.exit(1)
                 
                 # State Machine Expansion: initialize retry counters
@@ -788,7 +788,7 @@ def main():
                         # In test mode, we might delete the file or branch. Just skip the slice if we can't find it.
                         if not os.path.exists(current_pr):
                             print(f"[Warning] PR file {current_pr} not found after state 5 reset. Aborting slice.")
-                            print(HandoffPrompter.get_prompt("dead_end"))
+                            print(HandoffPrompter.get_prompt("dead_end").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                             sys.exit(1)
                             
                         slice_depth = get_pr_slice_depth(current_pr)
@@ -804,22 +804,22 @@ def main():
                                 break
                             else:
                                 set_pr_status(current_pr, "blocked_fatal")
-                                print(HandoffPrompter.get_prompt("dead_end"))
+                                print(HandoffPrompter.get_prompt("dead_end").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                                 sys.exit(1)
                         else:
                             set_pr_status(current_pr, "blocked_fatal")
-                            print(HandoffPrompter.get_prompt("dead_end"))
+                            print(HandoffPrompter.get_prompt("dead_end").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
                             sys.exit(1)
 
 
     except KeyboardInterrupt:
-        print(HandoffPrompter.get_prompt("fatal_interrupt"))
+        print(HandoffPrompter.get_prompt("fatal_interrupt").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         raise
     except SystemExit as e:
         raise
     except Exception as e:
         traceback.print_exc()
-        print(HandoffPrompter.get_prompt("fatal_crash"))
+        print(HandoffPrompter.get_prompt("fatal_crash").replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT))
         raise
     finally:
         if 'proc' in locals() and proc is not None and proc.poll() is None:

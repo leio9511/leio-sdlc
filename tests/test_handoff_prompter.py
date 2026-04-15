@@ -40,5 +40,13 @@ class TestHandoffPrompter(unittest.TestCase):
         self.assertIn("[ACTION REQUIRED FOR MANAGER]", prompt)
         self.assertIn("Unknown exit condition.", prompt)
 
+    def test_prompt_template_injection(self):
+        import config
+        prompt = HandoffPrompter.get_prompt("happy_path")
+        rendered_prompt = prompt.replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT)
+        self.assertNotIn("{SDLC_SKILLS_ROOT}", rendered_prompt)
+        self.assertIn(config.SDLC_SKILLS_ROOT, rendered_prompt)
+        self.assertIn("issue_tracker/scripts/issues.py", rendered_prompt)
+
 if __name__ == "__main__":
     unittest.main()
