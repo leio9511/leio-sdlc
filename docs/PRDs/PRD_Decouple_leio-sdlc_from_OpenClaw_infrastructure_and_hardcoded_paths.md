@@ -57,4 +57,16 @@ Affected_Projects: [leio-sdlc]
 - `tests/*` (涉及断言的单元测试及 bash e2e 测试)
 
 ## 7. Hardcoded Content (硬编码内容)
-N/A
+必须严格使用以下字面量字符串以确保防幻觉与系统兼容性：
+
+1. **Fallback 日志格式 (`agent_driver.py`)**:
+   当检测不到 `openclaw` 命令时，必须输出带有特定前缀的日志：
+   `logger.info(f"[Channel Message to {channel}]: {msg}")`
+
+2. **提示词模板变量 (`config/prompts.json`)**:
+   所有之前硬编码的 `~/.openclaw/skills` 必须精确替换为大括号包裹的模板变量：
+   `{SDLC_SKILLS_ROOT}`
+
+3. **依赖嗅探命令**:
+   在 Bash 脚本中必须使用 `command -v openclaw >/dev/null 2>&1`。
+   在 Python 脚本中必须使用 `shutil.which("openclaw")`。
