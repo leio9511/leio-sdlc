@@ -4,6 +4,7 @@ import shutil
 import argparse
 import subprocess
 from pathlib import Path
+import config
 
 def check_vcs(target_dir):
     git_dir = os.path.join(target_dir, ".git")
@@ -105,7 +106,7 @@ def main():
                     os.chmod(pre_commit_dest, 0o755)
     
     if not args.fix and issues:
-        print('[FATAL] Project is not SDLC compliant. Please run "python3 ~/.openclaw/skills/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
+        print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
         sys.exit(1)
         
 if __name__ == "__main__":

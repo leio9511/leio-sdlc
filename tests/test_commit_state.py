@@ -3,6 +3,9 @@ import subprocess
 import pytest
 import sys
 
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
+import config
+
 def test_commit_state_validates_files(tmp_path):
     # Setup mock git repo
     os.chdir(tmp_path)
@@ -32,7 +35,7 @@ def test_orchestrator_rejects_uncommitted_state(tmp_path):
     
     assert result.returncode == 1
     assert "Workspace contains uncommitted state files." in result.stdout
-    assert "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py" in result.stdout
+    assert f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py" in result.stdout
 
 def test_commit_state_success(tmp_path):
     # Setup mock git repo
@@ -77,10 +80,12 @@ def test_pre_commit_hook_output(tmp_path):
         f.write("test")
     subprocess.run(["git", "add", "test.txt"])
     
-    result = subprocess.run(["git", "commit", "-m", "test"], capture_output=True, text=True)
+    env = os.environ.copy()
+    env["SDLC_SKILLS_ROOT"] = config.SDLC_SKILLS_ROOT
+    result = subprocess.run(["git", "commit", "-m", "test"], capture_output=True, text=True, env=env)
     
     assert result.returncode == 1
-    assert "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stdout or "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stderr
+    assert f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stdout or f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stderr
     # Setup mock git repo
     os.chdir(tmp_path)
     subprocess.run(["git", "init"])
