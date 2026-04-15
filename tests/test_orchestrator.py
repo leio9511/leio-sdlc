@@ -171,3 +171,51 @@ def test_parse_review_verdict_success():
 def test_parse_review_verdict_failure():
     content = 'invalid json'
     assert orchestrator.parse_review_verdict(content) is None
+
+@patch('orchestrator.drun')
+@patch('orchestrator.dpopen')
+@patch('orchestrator.validate_prd_is_committed')
+@patch('orchestrator.acquire_global_locks', return_value=([], []))
+@patch('orchestrator.parse_affected_projects', return_value=[])
+@patch('git_utils.check_git_boundary')
+@patch('orchestrator.notify_channel')
+def test_orchestrator_cli_engine_args(mock_notify, mock_check, mock_parse, mock_acquire, mock_validate, mock_dpopen, mock_drun, mock_workdir):
+    def dummy_drun(cmd, *args, **kwargs):
+        mock_res = MagicMock()
+        mock_res.stdout = "master\n" if isinstance(cmd, list) and "branch" in cmd else ""
+        mock_res.returncode = 0
+        return mock_res
+    mock_drun.side_effect = dummy_drun
+
+    with patch.dict(os.environ, {}, clear=True):
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--engine', 'gemini', '--model', 'my-model', '--test-sleep']):
+                orchestrator.main()
+        except SystemExit as e:
+            pass
+        assert os.environ.get("LLM_DRIVER") == "gemini"
+        assert os.environ.get("SDLC_MODEL") == "my-model"
+
+@patch('orchestrator.drun')
+@patch('orchestrator.dpopen')
+@patch('orchestrator.validate_prd_is_committed')
+@patch('orchestrator.acquire_global_locks', return_value=([], []))
+@patch('orchestrator.parse_affected_projects', return_value=[])
+@patch('git_utils.check_git_boundary')
+@patch('orchestrator.notify_channel')
+def test_orchestrator_environment_fallback(mock_notify, mock_check, mock_parse, mock_acquire, mock_validate, mock_dpopen, mock_drun, mock_workdir):
+    def dummy_drun(cmd, *args, **kwargs):
+        mock_res = MagicMock()
+        mock_res.stdout = "master\n" if isinstance(cmd, list) and "branch" in cmd else ""
+        mock_res.returncode = 0
+        return mock_res
+    mock_drun.side_effect = dummy_drun
+
+    with patch.dict(os.environ, {"LLM_DRIVER": "gemini", "SDLC_MODEL": "test-fallback"}):
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--test-sleep']):
+                orchestrator.main()
+        except SystemExit as e:
+            pass
+        assert os.environ.get("LLM_DRIVER") == "gemini"
+        assert os.environ.get("SDLC_MODEL") == "test-fallback"

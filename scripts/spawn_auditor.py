@@ -10,6 +10,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 import sys
 sys.path.insert(0, current_dir)
 import agent_driver
+import config
 from agent_driver import invoke_agent, build_prompt
 
 def main():
@@ -25,8 +26,15 @@ def main():
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--channel", required=True, help="Notification channel")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
+    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     
     args = parser.parse_args()
+    
+    if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
+        os.environ["LLM_DRIVER"] = args.engine
+    if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
+        os.environ["SDLC_MODEL"] = args.model
     
     # Ignition Handshake
     cmd_handshake = ["openclaw", "message", "send"]

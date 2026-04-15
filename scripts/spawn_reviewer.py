@@ -3,6 +3,7 @@ import tempfile
 import os
 import sys
 from agent_driver import invoke_agent, build_prompt
+import config
 import subprocess
 import uuid
 import fnmatch
@@ -57,9 +58,16 @@ def main():
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     parser.add_argument("--system-alert", help="Send a system alert to the existing reviewer session", default=None)
+    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
+
+    if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
+        os.environ["LLM_DRIVER"] = args.engine
+    if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
+        os.environ["SDLC_MODEL"] = args.model
 
     session_file = os.path.join(args.run_dir, ".reviewer_session")
 

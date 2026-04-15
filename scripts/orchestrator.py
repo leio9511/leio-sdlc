@@ -25,6 +25,7 @@ from utils_json import extract_and_parse_json
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
 import json
+import config
 
 def load_or_merge_config(sdlc_root):
     template_path = os.path.join(sdlc_root, "config", "sdlc_config.json.template")
@@ -208,20 +209,30 @@ def main():
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
+    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     args = parser.parse_args()
+    
+    if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
+        os.environ["LLM_DRIVER"] = args.engine
+    if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
+        os.environ["SDLC_MODEL"] = args.model
+
+    execution_log_msg = f"Orchestrator Engine Configured -> Engine: {args.engine}, Model: {args.model}"
+    print(execution_log_msg)
 
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
 
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     sdlc_root = os.path.dirname(RUNTIME_DIR)
-    config = load_or_merge_config(sdlc_root)
+    app_config = load_or_merge_config(sdlc_root)
     
     resolved_global_dir = None
     if args.global_dir:
         resolved_global_dir = os.path.abspath(args.global_dir)
-    elif config.get("GLOBAL_RUN_DIR"):
-        resolved_global_dir = os.path.abspath(config.get("GLOBAL_RUN_DIR"))
+    elif app_config.get("GLOBAL_RUN_DIR"):
+        resolved_global_dir = os.path.abspath(app_config.get("GLOBAL_RUN_DIR"))
         
     global_dir = resolved_global_dir if resolved_global_dir else os.path.abspath(args.workdir)
 
@@ -504,9 +515,9 @@ def main():
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r") as f:
-                    config = json.load(f)
-                    yellow_retry_limit = config.get("YELLOW_RETRY_LIMIT", 3)
-                    red_retry_limit = config.get("RED_RETRY_LIMIT", 2)
+                    app_config_data = json.load(f)
+                    yellow_retry_limit = app_config_data.get("YELLOW_RETRY_LIMIT", 3)
+                    red_retry_limit = app_config_data.get("RED_RETRY_LIMIT", 2)
             except Exception:
                 pass
                 
