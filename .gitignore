@@ -45,3 +45,5 @@ audit_prompt.txt
 .sdlc_runs/
 tests/test_lock_run/
 sdlc_runs_symlink
+.sdlc_repo.lock
+.sdlc_lock_manifest.json
