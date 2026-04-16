@@ -74,10 +74,7 @@ done
 
 # 2. Python Tests Discovery
 if [ -d "tests" ]; then
-    test_files=(tests/test_*.py)
-    if [ ${#test_files[@]} -gt 0 ]; then
-        run_test "python3 -m unittest discover -s tests -p \"test_*.py\"" "Python Unittest tests/"
-    fi
+    run_test "pytest tests/" "Pytest functional & unittest suite"
 fi
 
 for f in scripts/test_*.py; do
