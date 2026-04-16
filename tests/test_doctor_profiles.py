@@ -2,11 +2,12 @@ import os
 import tempfile
 import subprocess
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from scripts.doctor import check_vcs, apply_overlay
 
 import pytest
-
-@pytest.mark.xfail(reason="CI blindspot debt")
 def test_doctor_apply_skill_profile():
     with tempfile.TemporaryDirectory() as tmpdir:
         overlay = Path(tmpdir) / "overlay"
@@ -30,9 +31,6 @@ def test_doctor_apply_skill_profile():
         with open(target / ".release_ignore", "r") as f:
             assert "tests/" in f.read()
 
-import pytest
-
-@pytest.mark.xfail(reason="CI blindspot debt")
 def test_doctor_enforce_git_lock():
     # Since enforce_git_lock is handled in main, we can invoke doctor as a subprocess
     # or just test the logic directly
