@@ -5,12 +5,15 @@ import pytest
 import time
 from unittest.mock import patch, MagicMock
 
+@pytest.fixture(autouse=True)
+def reset_cwd():
+    os.chdir("/root/projects/leio-sdlc")
+
 # Assuming orchestrator is importable or we can test it using subprocess / module import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
 def test_invalid_strategy():
     result = subprocess.run(
         [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--coder-session-strategy", "invalid-strategy"],
@@ -21,7 +24,6 @@ def test_invalid_strategy():
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
 def test_missing_workdir():
     result = subprocess.run(
         [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md"],
@@ -32,7 +34,6 @@ def test_missing_workdir():
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
 @patch('orchestrator.teardown_coder_session')
 @patch('orchestrator.subprocess.run')
 @patch('orchestrator.safe_git_checkout')
@@ -40,17 +41,26 @@ import pytest
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
 @patch('fcntl.flock')
+@patch('shutil.rmtree')
 @patch('shutil.copytree')
 @patch('orchestrator.open')
 @patch('git_utils.check_git_boundary')
-def test_always_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def test_always_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
     
     mock_exists.return_value = True
     mock_glob.return_value = ["dummy_pr.md"]
-    mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
+    import builtins
+    original_open = builtins.open
+    def mock_open_impl(file, *args, **kwargs):
+        if str(file).endswith('.md'):
+            m = MagicMock()
+            m.__enter__.return_value.read.return_value = "status: in_progress\n"
+            return m
+        return original_open(file, *args, **kwargs)
+    mock_open.side_effect = mock_open_impl
     
     def mock_run_impl(*args, **kwargs):
         if "status" in args[0] and "--porcelain" in args[0]:
@@ -68,11 +78,10 @@ def test_always_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, m
         except SystemExit:
             pass
             
-    mock_teardown.assert_called_with(os.path.abspath("."))
-    
+    from unittest.mock import ANY
+    mock_teardown.assert_called_with(os.path.abspath("."), ANY)    
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
 @patch('orchestrator.teardown_coder_session')
 @patch('orchestrator.subprocess.run')
 @patch('orchestrator.safe_git_checkout')
@@ -80,17 +89,26 @@ import pytest
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
 @patch('fcntl.flock')
+@patch('shutil.rmtree')
 @patch('shutil.copytree')
 @patch('orchestrator.open')
 @patch('git_utils.check_git_boundary')
-def test_per_pr_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def test_per_pr_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
     
     mock_exists.return_value = True
     mock_glob.return_value = ["dummy_pr.md"]
-    mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
+    import builtins
+    original_open = builtins.open
+    def mock_open_impl(file, *args, **kwargs):
+        if str(file).endswith('.md'):
+            m = MagicMock()
+            m.__enter__.return_value.read.return_value = "status: in_progress\n"
+            return m
+        return original_open(file, *args, **kwargs)
+    mock_open.side_effect = mock_open_impl
     
     def mock_run_impl(*args, **kwargs):
         if "status" in args[0] and "--porcelain" in args[0]:
@@ -106,11 +124,10 @@ def test_per_pr_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, m
         except SystemExit:
             pass
             
-    mock_teardown.assert_called_with(os.path.abspath("."))
-
+    from unittest.mock import ANY
+    mock_teardown.assert_called_with(os.path.abspath("."), ANY)
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
 @patch('orchestrator.teardown_coder_session')
 @patch('orchestrator.subprocess.run')
 @patch('orchestrator.safe_git_checkout')
@@ -118,17 +135,26 @@ import pytest
 @patch('orchestrator.os.path.exists')
 @patch('orchestrator.set_pr_status')
 @patch('fcntl.flock')
+@patch('shutil.rmtree')
 @patch('shutil.copytree')
 @patch('orchestrator.open')
 @patch('git_utils.check_git_boundary')
-def test_on_escalation_strategy(mock_check_git, mock_open, mock_copytree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def test_on_escalation_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
     
     mock_exists.return_value = True
     mock_glob.return_value = ["dummy_pr.md"]
-    mock_open.return_value.__enter__.return_value.read.return_value = "status: in_progress\n"
+    import builtins
+    original_open = builtins.open
+    def mock_open_impl(file, *args, **kwargs):
+        if str(file).endswith('.md'):
+            m = MagicMock()
+            m.__enter__.return_value.read.return_value = "status: in_progress\n"
+            return m
+        return original_open(file, *args, **kwargs)
+    mock_open.side_effect = mock_open_impl
     
     def mock_run_impl(*args, **kwargs):
         if "status" in args[0] and "--porcelain" in args[0]:
@@ -147,4 +173,5 @@ def test_on_escalation_strategy(mock_check_git, mock_open, mock_copytree, mock_f
         except SystemExit:
             pass
             
-    mock_teardown.assert_called_with(os.path.abspath("."))
+    from unittest.mock import ANY
+    mock_teardown.assert_called_with(os.path.abspath("."), ANY)
