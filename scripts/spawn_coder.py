@@ -18,8 +18,8 @@ def extract_pr_id(pr_file_path):
     return basename.split(".")[0]
 def send_feedback(session_key, message, workdir='.', run_dir="."):
     """Function to append reviewer feedback to the existing session."""
-    invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir)
-    print(f"Sent feedback to session {session_key}")
+    result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir)
+    print(f"Sent feedback to session {result.session_key}")
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
     session_file = os.path.join(run_dir, ".coder_session")
     try:
@@ -55,11 +55,11 @@ def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir=
             import uuid
             session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
             task_string += msg
-            invoke_agent(task_string, session_key=session_key, role="coder", run_dir=run_dir)
+            result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=run_dir)
             with open(session_file, "w") as f:
-                f.write(session_key)
-            print(f"Spawned new session {session_key} with feedback")
-            return False, session_key
+                f.write(result.session_key)
+            print(f"Spawned new session {result.session_key} with feedback")
+            return False, result.session_key
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
@@ -152,19 +152,19 @@ def main():
                 send_feedback(session_key, msg, workdir=workdir, run_dir=args.run_dir)
             else:
                 task_string += msg
-                invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
+                result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
                 with open(session_file, "w") as f:
-                    f.write(session_key)
-                print(f"Spawned new session {session_key} with system alert")
+                    f.write(result.session_key)
+                print(f"Spawned new session {result.session_key} with system alert")
         elif args.feedback_file:
             handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id, args.run_dir)
         else:
             if not os.path.exists(session_file):
-                invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
+                result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
                 with open(session_file, "w") as f:
-                    f.write(session_key)
-                print(f"Spawned new session {session_key}")
+                    f.write(result.session_key)
+                print(f"Spawned new session {result.session_key}")
             else:
-                invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
+                result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
 if __name__ == "__main__":
     main()

@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 # Add scripts dir to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
 import spawn_coder
+from agent_driver import AgentResult
 
 class TestSpawnCoderRefactor(unittest.TestCase):
     def setUp(self):
@@ -18,6 +19,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
     @patch('spawn_coder.os.path.exists')
     def test_spawn_coder_uses_invoke_agent(self, mock_exists, mock_check_output, mock_chdir, mock_invoke):
         mock_check_output.return_value = "feature-branch\n"
+        mock_invoke.return_value = AgentResult(session_key="mocked-session-key", stdout="")
         
         # Create real temp files to avoid patching builtins.open
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -60,6 +62,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
     @patch('spawn_coder.os.path.exists')
     def test_spawn_coder_rejection_feedback_loop(self, mock_exists, mock_check_output, mock_chdir, mock_invoke):
         mock_check_output.return_value = "feature-branch\n"
+        mock_invoke.return_value = AgentResult(session_key="session-1234", stdout="")
         
         with tempfile.TemporaryDirectory() as tmp_dir:
             pr_file = os.path.join(tmp_dir, 'PR_001.md')

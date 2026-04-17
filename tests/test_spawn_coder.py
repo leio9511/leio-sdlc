@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
 
 import spawn_coder
+from agent_driver import AgentResult
 
 class TestSpawnCoder(unittest.TestCase):
     def test_extract_pr_id(self):
@@ -18,6 +19,7 @@ class TestSpawnCoder(unittest.TestCase):
 
     @patch('spawn_coder.invoke_agent')
     def test_send_feedback(self, mock_call):
+        mock_call.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
         spawn_coder.send_feedback("sdlc_coder_PR_001", "feedback message")
         mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".")
 
@@ -38,6 +40,7 @@ class TestSpawnCoder(unittest.TestCase):
 
         with patch('builtins.open', side_effect=mock_file_open):
             with patch.dict(os.environ, {"SDLC_FORCE_NEW_CODER_SESSION": "0"}):
+                mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
                 is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", "feedback.txt", "task string", "PR_001")
 
             self.assertTrue(is_existing)
@@ -66,6 +69,8 @@ class TestSpawnCoder(unittest.TestCase):
                 mock_run.return_value = MagicMock()
                 mock_run.return_value.stdout = "feature/test"
                 mock_run.return_value.returncode = 0
+                
+                mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
         
                 m_open = mock_open(read_data="playbook content")
                 with patch('builtins.open', m_open):

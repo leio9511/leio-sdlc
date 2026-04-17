@@ -47,7 +47,7 @@ def main():
         print(f"🚀 Launching Agentic UAT Verifier...")
         session_id = f"uat_verifier_{int(time.time())}"
         # The verifier agent is instructed in the prompt to use the 'write' tool to save the JSON directly.
-        invoke_agent(task_string, session_key=session_id, role="verifier")
+        result = invoke_agent(task_string, session_key=session_id, role="verifier")
         
         # Verify that the output file was actually created by the agent
         if not os.path.exists(os.path.abspath(args.out_file)):
