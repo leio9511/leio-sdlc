@@ -33,7 +33,7 @@ def main():
     )
     
     session_id = f"mgr-{uuid.uuid4().hex[:8]}"
-    invoke_agent(task_string, session_key=session_id, role="manager")
+    result = invoke_agent(task_string, session_key=session_id, role="manager")
 
 if __name__ == "__main__":
     main()

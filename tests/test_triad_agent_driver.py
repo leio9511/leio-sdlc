@@ -16,7 +16,7 @@ else:
     # Fallback to relative if somehow root is different
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'skills/pm-skill/scripts')))
 
-from agent_driver import build_prompt
+from agent_driver import build_prompt, AgentResult
 
 class TestAgentDriverTriad(unittest.TestCase):
     def setUp(self):
@@ -36,6 +36,7 @@ class TestAgentDriverTriad(unittest.TestCase):
     def test_spawn_coder_payload_injection(self, mock_check_output, mock_agent_call):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
+        mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
         
         pr_file = os.path.join(self.workdir, "PR_001.md")
         prd_file = os.path.join(self.workdir, "PRD.md")
@@ -58,6 +59,7 @@ class TestAgentDriverTriad(unittest.TestCase):
     def test_spawn_coder_feedback_injection(self, mock_check_output, mock_agent_call):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
+        mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
         
         pr_file = os.path.join(self.workdir, "PR_001.md")
         prd_file = os.path.join(self.workdir, "PRD.md")
@@ -95,6 +97,7 @@ class TestAgentDriverTriad(unittest.TestCase):
     @patch('spawn_planner.invoke_agent')
     def test_spawn_planner_payload_injection(self, mock_invoke_agent):
         import spawn_planner
+        mock_invoke_agent.return_value = AgentResult(session_key='subtask-planner', stdout='dummy')
         
         prd_file = os.path.join(self.workdir, "PRD.md")
         with open(prd_file, "w") as f:
@@ -119,6 +122,7 @@ class TestAgentDriverTriad(unittest.TestCase):
             # simulate agent writing the artifact
             with open(os.path.join(self.workdir, "review_report.json"), "w") as f:
                 f.write("mock review report content")
+            return AgentResult(session_key='subtask-reviewer', stdout='dummy')
         mock_invoke_agent.side_effect = mock_reviewer_invoke
 
         pr_file = os.path.join(self.workdir, "PR_001.md")
@@ -149,6 +153,7 @@ class TestAgentDriverTriad(unittest.TestCase):
             # simulate agent writing the artifact
             with open(os.path.join(self.workdir, "arbitration_report.txt"), "w") as f:
                 f.write("mock arbitration report content")
+            return AgentResult(session_key='subtask-arbitrator', stdout='dummy')
         mock_invoke_agent.side_effect = mock_arbitrator_invoke
 
         pr_file = os.path.join(self.workdir, "PR_001.md")
@@ -172,6 +177,7 @@ class TestAgentDriverTriad(unittest.TestCase):
     @patch('spawn_manager.invoke_agent')
     def test_spawn_manager_payload_injection(self, mock_invoke_agent):
         import spawn_manager
+        mock_invoke_agent.return_value = AgentResult(session_key='subtask-manager', stdout='dummy')
         
         test_args = ["spawn_manager.py", "--job-dir", "/tmp/job", "--workdir", self.workdir]
         

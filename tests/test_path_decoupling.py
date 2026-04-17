@@ -9,7 +9,7 @@ class TestPathDecoupling(unittest.TestCase):
 
     @patch("agent_driver.open", create=True)
     def test_spawn_scripts_template_resolution(self, mock_open):
-        from agent_driver import build_prompt, RUNTIME_DIR
+        from agent_driver import build_prompt, RUNTIME_DIR, AgentResult
         build_prompt("planner")
         
         # SDLC_ROOT is os.path.dirname(RUNTIME_DIR)
@@ -37,6 +37,7 @@ class TestPathDecoupling(unittest.TestCase):
     @patch("spawn_planner.os.makedirs")
     @patch("sys.argv", ["spawn_planner.py", "--prd-file", "dummy.md", "--workdir", ".", "--run-dir", "/tmp/run"])
     def test_spawn_scripts_output_isolation(self, mock_makedirs, mock_open, mock_invoke, mock_build, mock_getsize, mock_isfile):
+        mock_invoke.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
         from spawn_planner import main
         try:
             main()
