@@ -158,7 +158,7 @@ def main():
         import time
         print("Calling OpenClaw real API...")
         session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-        invoke_agent(task_string, session_key=session_id, role="planner")
+        result = invoke_agent(task_string, session_key=session_id, role="planner")
 
 if __name__ == "__main__":
     main()

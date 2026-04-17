@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
 import spawn_reviewer
+from agent_driver import AgentResult
 
 def test_spawn_reviewer_uses_baseline_if_present():
     with tempfile.TemporaryDirectory() as td:
@@ -39,7 +40,7 @@ def test_spawn_reviewer_uses_baseline_if_present():
         with patch("sys.argv", test_args), \
              patch("subprocess.run") as mock_run, \
              patch("spawn_reviewer.check_guardrails", return_value=None), \
-             patch("spawn_reviewer.invoke_agent", return_value='{"status":"APPROVED"}'), \
+             patch("spawn_reviewer.invoke_agent", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
              patch("sys.exit", side_effect=fake_exit):
             
             try:
@@ -85,7 +86,7 @@ def test_spawn_reviewer_uses_fallback_if_missing():
         with patch("sys.argv", test_args), \
              patch("subprocess.run") as mock_run, \
              patch("spawn_reviewer.check_guardrails", return_value=None), \
-             patch("spawn_reviewer.invoke_agent", return_value='{"status":"APPROVED"}'), \
+             patch("spawn_reviewer.invoke_agent", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
              patch("sys.exit", side_effect=fake_exit):
             
             try:
@@ -132,7 +133,7 @@ def test_spawn_reviewer_creates_session_file():
         with patch("sys.argv", test_args), \
              patch("subprocess.run"), \
              patch("spawn_reviewer.check_guardrails", return_value=None), \
-             patch("spawn_reviewer.invoke_agent", return_value='{"status":"APPROVED"}'), \
+             patch("spawn_reviewer.invoke_agent", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
              patch("sys.exit", side_effect=fake_exit):
             
             try:

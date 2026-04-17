@@ -178,9 +178,12 @@ def main():
     with open(session_file, "w") as sf:
         sf.write(session_id)
         
-    invoke_agent(task_string, session_key=session_id, role="reviewer")
+    result = invoke_agent(task_string, session_key=session_id, role="reviewer")
 
     review_report_path = os.path.join(args.run_dir, args.out_file)
+    with open(review_report_path, "w") as f:
+        f.write(result.stdout)
+
     if not os.path.exists(review_report_path):
         print(f"[FATAL] The Reviewer agent failed to generate the physical '{args.out_file}'. This is a severe process violation.", file=sys.stderr)
         sys.exit(1)
