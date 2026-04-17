@@ -7,9 +7,32 @@ import json
 # Add scripts directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../scripts")))
 import config
-from agent_driver import invoke_agent
+from agent_driver import invoke_agent, AgentResult
 
 class TestGeminiAgentDriver(unittest.TestCase):
+    @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.subprocess.run")
+    @patch("agent_driver.resolve_cmd")
+    def test_invoke_agent_returns_agentresult(self, mock_resolve_cmd, mock_run, mock_exists):
+        mock_resolve_cmd.return_value = "/mock/bin/gemini"
+        mock_run.return_value = MagicMock(returncode=0, stdout="test stdout", stderr="test stderr")
+        mock_exists.return_value = False
+        
+        env = os.environ.copy()
+        env["LLM_DRIVER"] = "gemini"
+        
+        with patch.dict(os.environ, env):
+            with patch("agent_driver.tempfile.mkstemp", return_value=(3, "/tmp/fake.txt")):
+                with patch("agent_driver.os.fdopen", mock_open()):
+                    with patch("agent_driver.os.chmod"):
+                        with patch("agent_driver.os.remove"):
+                            result = invoke_agent("test task", session_key="test-session")
+                            
+        self.assertIsInstance(result, AgentResult)
+        self.assertEqual(result.session_key, "test-session")
+        self.assertEqual(result.stdout, "test stdout")
+        self.assertEqual(result.stderr, "test stderr")
+        self.assertEqual(result.return_code, 0)
     @patch("agent_driver.os.path.exists")
     @patch("agent_driver.subprocess.run")
     @patch("agent_driver.resolve_cmd")
@@ -99,7 +122,10 @@ class TestGeminiAgentDriver(unittest.TestCase):
             with patch("agent_driver.os.fdopen", mock_open()):
                 with patch("agent_driver.os.chmod"):
                     with patch("agent_driver.os.remove"):
-                        invoke_agent("test task", session_key="test-session", run_dir="/mock/run_dir")
+                        result = invoke_agent("test task", session_key="test-session", run_dir="/mock/run_dir")
+                        
+        self.assertIsInstance(result, AgentResult)
+        self.assertEqual(result.session_key, "test-session")
                         
         mock_makedirs.assert_any_call("/mock/run_dir/.tmp", exist_ok=True)
         mock_mkstemp.assert_called_with(suffix=".txt", prefix="sdlc_prompt_test-session_", dir="/mock/run_dir/.tmp", text=True)
@@ -124,7 +150,10 @@ class TestGeminiAgentDriver(unittest.TestCase):
             with patch("agent_driver.os.fdopen", mock_open()):
                 with patch("agent_driver.os.chmod"):
                     with patch("agent_driver.os.remove"):
-                        invoke_agent("test task", session_key="test-session", run_dir="/mock/nonexistent")
+                        result = invoke_agent("test task", session_key="test-session", run_dir="/mock/nonexistent")
+                        
+        self.assertIsInstance(result, AgentResult)
+        self.assertEqual(result.session_key, "test-session")
                         
         mock_makedirs.assert_any_call("/mock/system/tmp", exist_ok=True)
         mock_mkstemp.assert_called_with(suffix=".txt", prefix="sdlc_prompt_test-session_", dir="/mock/system/tmp", text=True)

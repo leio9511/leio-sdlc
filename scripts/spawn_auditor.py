@@ -110,7 +110,8 @@ def main():
     else:
         print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
         session_id = f"prd_auditor_{int(time.time())}"
-        _, output = invoke_agent(task_string, session_key=session_id, role="auditor", return_output=True)
+        result = invoke_agent(task_string, session_key=session_id, role="auditor")
+        output = result.stdout
 
     status = "UNKNOWN"
     if '{"status": "APPROVED"' in output or '"status":"APPROVED"' in output or '"status": "APPROVED"' in output:

@@ -7,8 +7,16 @@ import sys
 import uuid
 import shutil
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class AgentResult:
+    session_key: str
+    stdout: str
+    stderr: str = ""
+    return_code: int = 0
 
 # Dynamic module resolution for monorepo development vs production deployment
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -64,7 +72,7 @@ def resolve_cmd(cmd_name):
         
     return cmd_name
 
-def invoke_agent(task_string, session_key=None, role=None, return_output=False, run_dir=None):
+def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
     Supports dynamic path resolution and isolated E2E testing integration.
@@ -150,9 +158,7 @@ def invoke_agent(task_string, session_key=None, role=None, return_output=False, 
                     with open(session_map_file, "w") as f:
                         json.dump({"actual_id": session_key}, f)
 
-                if return_output:
-                    return session_key, result.stdout
-                return session_key
+                return AgentResult(session_key=session_key, stdout=result.stdout, stderr=result.stderr, return_code=result.returncode)
             else:
                 if attempt < 2:
                     time.sleep(3 * (2 ** attempt))
