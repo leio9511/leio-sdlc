@@ -54,3 +54,27 @@ def test_independent_symmetrical_rollbacks():
             elif skill_name == "pm-skill":
                 assert os.path.exists(os.path.join(skill_path, "scripts", "pm.py"))
             
+
+def test_rollback_no_restart_with_mock():
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    with tempfile.TemporaryDirectory() as mock_home:
+        env = os.environ.copy()
+        env["HOME_MOCK"] = mock_home
+        
+        # 1. Run first deployment
+        deploy_script = os.path.join(repo_root, "kit-deploy.sh")
+        res = subprocess.run(["bash", deploy_script], env=env, cwd=repo_root, capture_output=True, text=True)
+        assert res.returncode == 0, f"kit-deploy.sh failed: {res.stderr}"
+
+        # 2. Run second deployment to create the backup
+        res = subprocess.run(["bash", deploy_script], env=env, cwd=repo_root, capture_output=True, text=True)
+        assert res.returncode == 0, f"Second kit-deploy.sh failed: {res.stderr}"
+        
+        # 3. Run rollback
+        script_path = os.path.join(repo_root, "scripts", "rollback.sh")
+        res = subprocess.run(["bash", script_path], env=env, cwd=repo_root, capture_output=True, text=True)
+        assert res.returncode == 0, f"Rollback failed: {res.stderr}"
+        
+        # Verify that it skipped restarting OpenClaw
+        assert "Skipping OpenClaw gateway restart (mock environment detected)..." in res.stdout, "Gateway restart was not skipped"

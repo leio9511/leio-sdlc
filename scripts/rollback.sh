@@ -45,8 +45,12 @@ perform_hard_copy_rollback() {
 
     # 3. Gateway Reload
     if command -v openclaw >/dev/null 2>&1; then
-        echo "🔄 Restarting OpenClaw gateway..."
-        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+        if [ -z "$HOME_MOCK" ]; then
+            echo "🔄 Restarting OpenClaw gateway..."
+            openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+        else
+            echo "🔄 Skipping OpenClaw gateway restart (mock environment detected)..."
+        fi
     fi
 
     echo "✅ ROLLBACK SUCCESS: $SLUG restored from backup."
