@@ -41,7 +41,7 @@ class TestOrchestratorCLI(unittest.TestCase):
 
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
+    
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
@@ -79,7 +79,7 @@ class TestOrchestratorCLI(unittest.TestCase):
 
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
+    
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
@@ -121,7 +121,7 @@ class TestOrchestratorCLI(unittest.TestCase):
 
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
+    
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
