@@ -142,7 +142,6 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
 
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
     @patch('argparse.ArgumentParser.parse_args')
     @patch('sys.exit')
     @patch('subprocess.run')

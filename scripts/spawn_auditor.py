@@ -24,6 +24,11 @@ def main():
     
     args = parser.parse_args()
     
+    from handoff_prompter import HandoffPrompter
+    if not args.enable_exec_from_workspace and not sys.argv[0].startswith(os.path.expanduser("~/.openclaw")):
+        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        sys.exit(1)
+    
     if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
         os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
