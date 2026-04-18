@@ -114,3 +114,12 @@ Once approved by the Auditor, start the multi-agent pipeline:
 python3 ~/.openclaw/skills/leio-sdlc/scripts/orchestrator.py --prd-file <Path_to_PRD.md> --workdir . --channel <your_channel>
 ```
 *(Ensure your `GLOBAL_RUN_DIR` is configured in `sdlc_config.json` or pass `--global-dir` explicitly.)*
+
+## Best Practices
+
+### ⚠️ Manual Blast Radius Control (Emergency Protocol)
+Current SDLC versions cannot automatically handle massive test failures (context collapse). 
+Until ISSUE-1141 is implemented, if a PRD is expected to break many tests:
+1. Manually identify all affected files.
+2. Explicitly list each file in the PRD.
+3. Force the Planner to limit each PR slice to a maximum of 2 files.
