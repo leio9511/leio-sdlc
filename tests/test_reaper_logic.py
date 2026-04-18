@@ -3,15 +3,11 @@ import subprocess
 import signal
 import time
 import sys
-
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
-def test_reaper():
-    test_script = os.path.join(os.getcwd(), 'tests', 'reaper_dummy.py')
-    with open(test_script, 'w') as f:
-        f.write("""
-import os
+def test_reaper(tmp_path):
+    test_script = tmp_path / "reaper_dummy.py"
+    test_script.write_text("""import os
 import subprocess
 import signal
 import time
@@ -34,7 +30,7 @@ finally:
             pass
 """)
 
-    proc = subprocess.Popen([sys.executable, test_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen([sys.executable, str(test_script)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     out, err = proc.communicate()
     
     child_pid = None
@@ -42,17 +38,14 @@ finally:
         if "CHILD_PID:" in line:
             child_pid = int(line.split(":")[1])
     
-    if child_pid:
-        time.sleep(0.5)
-        try:
-            os.kill(child_pid, 0)
-            print(f"FAILURE: Child process {child_pid} still alive.")
-            sys.exit(1)
-        except OSError:
-            print(f"SUCCESS: Child process {child_pid} reaped.")
-    else:
-        print("FAILURE: Could not determine child PID.")
-        sys.exit(1)
+    assert child_pid is not None, "Could not determine child PID."
+    
+    time.sleep(0.5)
+    try:
+        os.kill(child_pid, 0)
+        pytest.fail(f"Child process {child_pid} still alive.")
+    except OSError:
+        pass  # Process is reaped successfully
 
 if __name__ == '__main__':
-    test_reaper()
+    pytest.main([__file__])
