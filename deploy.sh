@@ -49,7 +49,7 @@ perform_hard_copy_deployment() {
         bash "scripts/build_release.sh" || exit 1
     else
         mkdir -p .dist
-        cp -r * .dist/ 2>/dev/null || true
+        rsync -a --exclude='.git' --exclude='.gitignore' . .dist/
     fi
 
     if [ "$DRY_RUN" = true ]; then

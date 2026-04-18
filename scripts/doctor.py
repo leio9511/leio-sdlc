@@ -73,6 +73,8 @@ def main():
     
     parser.add_argument("--check", action="store_true", help="Check compliance without making changes")
     
+    import json
+    
     args = parser.parse_args()
     
     target_dir = os.path.abspath(args.target_dir)
@@ -83,6 +85,19 @@ def main():
     script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
     base_overlay = script_dir.parent / "TEMPLATES" / "scaffold" / "base"
     
+    config_file = script_dir.parent / "config" / "sdlc_config.json"
+    enforce_lock = True
+    if config_file.exists():
+        try:
+            with open(config_file, 'r') as f:
+                cfg = json.load(f)
+                enforce_lock = cfg.get("ENFORCE_GIT_LOCK", True)
+        except Exception:
+            pass
+    
+    if args.enforce_git_lock:
+        enforce_lock = True
+    
     issues = apply_overlay(target_dir, base_overlay, check_only=not args.fix)
     
     if args.profile:
@@ -90,9 +105,8 @@ def main():
         profile_issues = apply_overlay(target_dir, profile_overlay, check_only=not args.fix)
         issues.extend(profile_issues)
         
-    if args.enforce_git_lock:
-        hooks_overlay = script_dir.parent / "TEMPLATES" / "scaffold" / "optional_hooks"
-        pre_commit_src = hooks_overlay / "pre-commit"
+    if enforce_lock:
+        pre_commit_src = script_dir.parent / ".sdlc_hooks" / "pre-commit"
         pre_commit_dest = Path(target_dir) / ".git" / "hooks" / "pre-commit"
         
         if pre_commit_src.exists():
@@ -101,12 +115,12 @@ def main():
                     issues.append("Missing file .git/hooks/pre-commit")
             else:
                 pre_commit_dest.parent.mkdir(parents=True, exist_ok=True)
-                if not pre_commit_dest.exists():
-                    shutil.copy2(pre_commit_src, pre_commit_dest)
-                    os.chmod(pre_commit_dest, 0o755)
+                shutil.copy2(pre_commit_src, pre_commit_dest)
+                os.chmod(pre_commit_dest, 0o755)
     
     if not args.fix and issues:
-        print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
+        print('[FATAL] Project is not SDLC compliant.')
+        print('[JIT] To fix: Execute the `doctor.py --fix` script from the active SDLC runtime on the current <workdir>.')
         sys.exit(1)
         
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 {
   "YELLOW_RETRY_LIMIT": 3,
   "RED_RETRY_LIMIT": 2,
-  "GLOBAL_RUN_DIR": ""
+  "GLOBAL_RUN_DIR": "",
+  "ENFORCE_GIT_LOCK": true
 }
