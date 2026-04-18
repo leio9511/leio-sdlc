@@ -12,23 +12,30 @@ We have successfully migrated `leio-sdlc` to use `pytest`, but discovered 20 tes
 - **User Story 1:** As a developer, I want all `@pytest.mark.xfail` markers removed and the underlying test logic fixed so that the codebase has 100% genuine green tests.
 - **User Story 2:** As an Architect, I want the project's `README.md` updated with the "Manual Blast Radius Control" protocol to guide future large-scale refactorings.
 
+- **User Story 3 (HOTFIX):** As an SDLC Operator, I want the `rollback.sh` script to respect the `$HOME_MOCK` environment variable, so that E2E tests do not trigger real Gateway restarts and kill the pipeline.
+
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 > **[CRITICAL INSTRUCTION FOR PLANNER]**
 > You MUST slice this PRD into multiple PRs (Micro-Slicing). 
-> **Constraint:** Each PR MUST NOT attempt to fix more than **2 test files** at a time.
-> **Target Files (The Debt List):**
-> 1. `tests/test_reaper_logic.py`
-> 2. `tests/test_pr_003_1_debug_cli.py`
-> 3. `tests/test_path_decoupling.py`
-> 4. `tests/test_pr_004_rollback.py`
-> 5. `tests/test_orchestrator_resilience.py`
-> 6. `tests/test_singleton_lock.py`
-> 7. `tests/test_spawn_auditor.py`
-> 8. `tests/test_orchestrator_handoff.py`
-> 9. `tests/test_spawn_reviewer_history.py`
-> 10. `tests/test_orchestrator_cli.py`
-> 11. `tests/test_orchestrator_doctor.py`
-> 12. `README.md` (Documentation update)
+> **Constraint:** Each PR MUST NOT attempt to fix more than **2 files** at a time.
+> **Target Files (The Debt List - STRICT ORDER):**
+> 1. `scripts/rollback.sh` (HOTFIX - MUST be the first PR)
+> 2. `tests/test_reaper_logic.py`
+> 3. `tests/test_pr_003_1_debug_cli.py`
+> 4. `tests/test_path_decoupling.py`
+> 5. `tests/test_pr_004_rollback.py`
+> 6. `tests/test_orchestrator_resilience.py`
+> 7. `tests/test_singleton_lock.py`
+> 8. `tests/test_spawn_auditor.py`
+> 9. `tests/test_orchestrator_handoff.py`
+> 10. `tests/test_spawn_reviewer_history.py`
+> 11. `tests/test_orchestrator_cli.py`
+> 12. `tests/test_orchestrator_doctor.py`
+> 13. `README.md` (Documentation update)
+
+### 3.1 Hotfix Rationale (For Auditor & Planner)
+The `test_pr_004_rollback.py` test is currently causing a fatal side-effect: it calls `rollback.sh` which unconditionally restarts the OpenClaw Gateway. This SIGTERM kills the entire SDLC pipeline, making it impossible to even reach the test itself. Therefore, the **very first PR** must patch `scripts/rollback.sh` to add the standard `if [ -z "$HOME_MOCK" ]; then` guardrail around its `openclaw gateway restart` command. This will stabilize the CI environment, allowing the subsequent test fixes to run safely.
+
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1: Debt Clearance**
@@ -42,12 +49,19 @@ We have successfully migrated `leio-sdlc` to use `pytest`, but discovered 20 tes
   - **When** the documentation PR is merged.
   - **Then** the file contains the "Manual Blast Radius Control" protocol as defined in Section 7.
 
+- **Scenario 3: Rollback Restart Guardrail (HOTFIX)**
+  - **Given** an environment where `HOME_MOCK` is set to a temporary directory.
+  - **When** `scripts/rollback.sh` is executed.
+  - **Then** the script must NOT execute `openclaw gateway restart`.
+  - **And** the SDLC pipeline must continue running without being terminated by a SIGTERM from the gateway.
+
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 - **Phased TDD:** Remove markers -> Run failed tests -> Analyze logs -> Fix logic/mocks -> Verify Green -> Merge.
 - **Isolation:** Each PR slice handles only 1-2 files to keep the Coder agent focused and prevent log overflow.
 
 ## 6. Framework Modifications (框架防篡改声明)
 - `README.md`: Authorized for documentation update.
+- `scripts/rollback.sh`: Authorized for HOTFIX (Restart guardrail).
 - All files in `tests/`: Authorized for logic fixes.
 
 ---
