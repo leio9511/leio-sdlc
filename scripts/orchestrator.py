@@ -170,11 +170,13 @@ def validate_prd_is_committed(prd_file, workdir):
             drun(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
             print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path>")
+            print('[JIT] To fix: Ensure your PRD path is within the Git repository boundaries.\nIf it is, use the official gateway script (commit_state.py) from the active SDLC runtime to baseline it.')
             sys.exit(1)
 
         status_out = drun(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
             print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path>")
+            print('[JIT] To fix: Ensure your PRD path is within the Git repository boundaries.\nIf it is, use the official gateway script (commit_state.py) from the active SDLC runtime to baseline it.')
             sys.exit(1)
 
 from utils_json import extract_and_parse_json
@@ -374,6 +376,7 @@ def main():
     if status_output.strip(): dlog(f"Dirty status detected: {repr(status_output)}")
     if status_output.strip():
         print("[FATAL] Dirty Git Workspace detected!")
+        print('[JIT] To fix: Execute `git stash push -m "sdlc pre-flight stash" --include-untracked` to safely preserve state.')
         print(HandoffPrompter.get_prompt("dirty_workspace"))
         sys.exit(1)
 
