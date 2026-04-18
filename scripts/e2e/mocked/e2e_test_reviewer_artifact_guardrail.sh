@@ -28,14 +28,7 @@ mkdir -p "$RUN_DIR"
 export PATH="$TEMP_DIR/bin:$PATH"
 
 echo "=== T1: Agent writes output to artifact ==="
-# Mock openclaw to output something
-cat << 'EOF' > "$TEMP_DIR/bin/openclaw"
-#!/bin/bash
-echo "Agent executed and output something"
-exit 0
-EOF
-chmod +x "$TEMP_DIR/bin/openclaw"
-cp "$TEMP_DIR/bin/openclaw" "$TEMP_DIR/bin/gemini"
+export SDLC_MOCK_LLM_RESPONSE="Agent executed and output something"
 
 if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
     echo "❌ T1 Failed"
@@ -52,15 +45,7 @@ else
 fi
 
 echo "=== T2: Agent creates artifact ==="
-# Mock openclaw to create the file
-cat << EOF > "$TEMP_DIR/bin/openclaw"
-#!/bin/bash
-echo "Agent executed and wrote file"
-touch "$RUN_DIR/review_report.json"
-exit 0
-EOF
-chmod +x "$TEMP_DIR/bin/openclaw"
-cp "$TEMP_DIR/bin/openclaw" "$TEMP_DIR/bin/gemini"
+export SDLC_MOCK_LLM_RESPONSE="Agent executed and wrote file"
 
 if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL"; then
     echo "❌ T2 Failed: python script should have exited with 0"

@@ -11,6 +11,7 @@ source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 export LLM_DRIVER="gemini"
 export TEST_MODEL="${1:-${TEST_MODEL:-gemini-2.5-flash}}"
+export SDLC_MOCK_LLM_RESPONSE="OK mocked response"
 
 echo "==========================================="
 echo "Running Isolated E2E Test for Gemini Driver"

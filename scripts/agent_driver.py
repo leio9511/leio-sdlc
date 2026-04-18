@@ -80,6 +80,9 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
     if not session_key:
         session_key = f"subtask-{uuid.uuid4().hex[:8]}"
 
+    if "SDLC_MOCK_LLM_RESPONSE" in os.environ:
+        return AgentResult(session_key=session_key, stdout=os.environ["SDLC_MOCK_LLM_RESPONSE"], return_code=0)
+
     # Safety Guardrails: JIT (Just-In-Time) Prompt guardrails enforcing the File System API.
     jit_guardrail = (
         "\n\n## MANDATORY FILE I/O POLICY\n"
