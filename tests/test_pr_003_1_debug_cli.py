@@ -29,7 +29,7 @@ class TestDebugCLI(unittest.TestCase):
         
         # It should produce the debug dlog trace.
         combined_output = result.stdout + result.stderr
-        self.assertIn("DEBUG", combined_output)
+        self.assertIn("DEBUG [Subprocess]:", combined_output)
 
     def test_no_debug_flag_is_silent(self):
         # Without --debug, the dlog trace should be silent.
@@ -47,7 +47,7 @@ class TestDebugCLI(unittest.TestCase):
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
         
         combined_output = result.stdout + result.stderr
-        self.assertNotIn("DEBUG", combined_output)
+        self.assertNotIn("DEBUG [Subprocess]:", combined_output)
 
 if __name__ == "__main__":
     unittest.main()

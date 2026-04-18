@@ -31,7 +31,12 @@ finally:
 """)
 
     proc = subprocess.Popen([sys.executable, str(test_script)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    out, err = proc.communicate()
+    try:
+        out, err = proc.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        pytest.fail("Test script hung and had to be killed.")
     
     child_pid = None
     for line in out.splitlines():
