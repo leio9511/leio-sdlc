@@ -17,7 +17,7 @@ def mock_workdir():
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
+
 def test_blast_radius_clears_sessions(mock_workdir):
     # Create some dummy .coder_session files
     session1 = os.path.join(mock_workdir, ".coder_session")
@@ -35,7 +35,6 @@ def test_blast_radius_clears_sessions(mock_workdir):
     # We patch everything so orchestrator main just does blast radius and stops
     with patch('orchestrator.drun') as mock_drun, \
          patch('git_utils.check_git_boundary'), \
-         patch('orchestrator.initialize_sandbox'), \
          patch('orchestrator.validate_prd_is_committed'), \
          patch('orchestrator.parse_affected_projects', return_value=[]), \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--test-sleep', '--enable-exec-from-workspace', '--global-dir', mock_workdir]):
@@ -64,15 +63,14 @@ def test_blast_radius_clears_sessions(mock_workdir):
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
+
 def test_yellow_path_preserves_session(mock_workdir):
     with patch('orchestrator.teardown_coder_session') as mock_teardown, \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
          patch('orchestrator.drun') as mock_drun, \
          patch('orchestrator.dpopen') as mock_dpopen, \
-         patch('orchestrator.parse_review_verdict', side_effect=["ACTION_REQUIRED", "APPROVED"]), \
+         patch('orchestrator.extract_and_parse_json', side_effect=[{"overall_assessment": "NEEDS_ATTENTION"}, {"overall_assessment": "EXCELLENT"}]), \
          patch('git_utils.check_git_boundary'), \
-         patch('orchestrator.initialize_sandbox'), \
          patch('orchestrator.validate_prd_is_committed'), \
          patch('orchestrator.parse_affected_projects', return_value=[]), \
          patch('orchestrator.safe_git_checkout'), \
@@ -125,15 +123,14 @@ def test_yellow_path_preserves_session(mock_workdir):
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
+
 def test_red_path_hard_resets(mock_workdir):
     with patch('orchestrator.teardown_coder_session') as mock_teardown, \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
          patch('orchestrator.drun') as mock_drun, \
          patch('orchestrator.dpopen') as mock_dpopen, \
-         patch('orchestrator.parse_review_verdict', side_effect=["ACTION_REQUIRED", "ACTION_REQUIRED", "ACTION_REQUIRED", "ACTION_REQUIRED", "APPROVED"]), \
+         patch('orchestrator.extract_and_parse_json', side_effect=[{"overall_assessment": "NEEDS_ATTENTION"}, {"overall_assessment": "NEEDS_ATTENTION"}, {"overall_assessment": "NEEDS_ATTENTION"}, {"overall_assessment": "NEEDS_ATTENTION"}, {"overall_assessment": "EXCELLENT"}]), \
          patch('git_utils.check_git_boundary'), \
-         patch('orchestrator.initialize_sandbox'), \
          patch('orchestrator.validate_prd_is_committed'), \
          patch('orchestrator.parse_affected_projects', return_value=[]), \
          patch('orchestrator.safe_git_checkout'), \

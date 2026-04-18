@@ -5,7 +5,7 @@ from utils.singleton_lock import acquire_lock, ConcurrentExecutionError
 class TestSingletonLock(unittest.TestCase):
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
+    
     def test_acquire_lock_success(self):
         lock_file = ".test_success.lock"
         fd = acquire_lock(lock_file)
@@ -17,7 +17,7 @@ class TestSingletonLock(unittest.TestCase):
 
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
+    
     def test_acquire_lock_failure(self):
         lock_file = ".test_failure.lock"
         # Acquire first lock
