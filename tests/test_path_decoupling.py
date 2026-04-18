@@ -28,7 +28,7 @@ class TestPathDecoupling(unittest.TestCase):
 
     import pytest
     
-    @pytest.mark.xfail(reason="CI blindspot debt")
+    
     @patch("spawn_planner.os.path.isfile", return_value=True)
     @patch("spawn_planner.os.path.getsize", return_value=100)
     @patch("spawn_planner.build_prompt", return_value="mock prompt")
@@ -37,6 +37,7 @@ class TestPathDecoupling(unittest.TestCase):
     @patch("spawn_planner.os.makedirs")
     @patch("sys.argv", ["spawn_planner.py", "--prd-file", "dummy.md", "--workdir", ".", "--run-dir", "/tmp/run"])
     def test_spawn_scripts_output_isolation(self, mock_makedirs, mock_open, mock_invoke, mock_build, mock_getsize, mock_isfile):
+        from agent_driver import AgentResult
         mock_invoke.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
         from spawn_planner import main
         try:

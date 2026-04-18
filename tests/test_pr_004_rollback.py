@@ -5,7 +5,7 @@ import pytest
 
 import pytest
 
-@pytest.mark.xfail(reason="CI blindspot debt")
+
 def test_independent_symmetrical_rollbacks():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
@@ -32,7 +32,7 @@ def test_independent_symmetrical_rollbacks():
                 
         # 3. Run rollbacks
         scripts = [
-            ("leio-sdlc", os.path.join(repo_root, "rollback.sh")),
+            ("leio-sdlc", os.path.join(repo_root, "scripts", "rollback.sh")),
             ("pm-skill", os.path.join(repo_root, "skills", "pm-skill", "rollback.sh")),
             
         ]
@@ -52,8 +52,7 @@ def test_independent_symmetrical_rollbacks():
             if skill_name == "leio-sdlc":
                 assert os.path.exists(os.path.join(skill_path, "scripts", "orchestrator.py"))
             elif skill_name == "pm-skill":
-                assert os.path.exists(os.path.join(skill_path, "scripts", "pm.py"))
-            
+                assert os.path.exists(os.path.join(skill_path, "scripts", "init_prd.py"))            
 
 def test_rollback_no_restart_with_mock():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
