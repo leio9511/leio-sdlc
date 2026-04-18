@@ -80,9 +80,6 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
     if not session_key:
         session_key = f"subtask-{uuid.uuid4().hex[:8]}"
 
-    if "SDLC_MOCK_LLM_RESPONSE" in os.environ:
-        return AgentResult(session_key=session_key, stdout=os.environ["SDLC_MOCK_LLM_RESPONSE"], return_code=0)
-
     # Safety Guardrails: JIT (Just-In-Time) Prompt guardrails enforcing the File System API.
     jit_guardrail = (
         "\n\n## MANDATORY FILE I/O POLICY\n"
@@ -105,6 +102,12 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
             tmp.write(task_string)
         
         secure_msg = f"Read your complete task instructions from {path}. Do not modify this file."
+
+        if "SDLC_MOCK_LLM_RESPONSE" in os.environ:
+            if os.environ.get("SDLC_MOCK_INSPECT_FILE_PERMS") == "1":
+                perms = oct(os.stat(path).st_mode)[-3:]
+                print(f"FILE:{path}:PERMS:{perms}")
+            return AgentResult(session_key=session_key, stdout=os.environ["SDLC_MOCK_LLM_RESPONSE"], return_code=0)
         
     # Determine LLM driver
         llm_driver = os.environ.get("LLM_DRIVER", "openclaw").lower()
