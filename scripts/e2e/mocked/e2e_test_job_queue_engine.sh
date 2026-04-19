@@ -87,7 +87,7 @@ echo "--------------------------------------"
 echo "Test 3: Negative - update_status on file without status field"
 NO_STATUS_FILE="$SANDBOX/no_status.md"
 echo "This file has no status field." > "$NO_STATUS_FILE"
-assert_fail "$UPDATE_PR_STATUS --pr-file $NO_STATUS_FILE --status closed" "No valid YAML frontmatter found"
+assert_fail "$UPDATE_PR_STATUS --pr-file $NO_STATUS_FILE --status closed" "[FATAL_FORMAT] No valid YAML frontmatter delimiters (---) found in file:"
 
 echo "--------------------------------------"
 echo "Test 4: Positive Flow"
