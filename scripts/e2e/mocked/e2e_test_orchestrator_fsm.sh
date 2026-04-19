@@ -85,6 +85,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" $RUN_DIR/dummy_prd/PR_001_Test.md; then
@@ -135,6 +140,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: blocked_fatal" $RUN_DIR/dummy_prd/PR_002_Test.md; then
@@ -175,6 +185,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: superseded" $RUN_DIR/dummy_prd/PR_003_Test.md; then
@@ -266,6 +281,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Target_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" $RUN_DIR/Target_Project/Target_PR.md; then
@@ -292,6 +312,11 @@ function run_test_missing_directory() {
     
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Empty_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if grep -q "Traceback" orchestrator.log; then
@@ -338,6 +363,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "State 0: Auto-slicing PRD" orchestrator.log; then
@@ -386,6 +416,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "State 0: Existing PRs detected. Resuming queue..." orchestrator.log; then
@@ -471,6 +506,11 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
+    mkdir -p "$RUN_DIR/dummy_prd" "$RUN_DIR/Target_Project" "$RUN_DIR/MyProject" "$RUN_DIR/Empty_Project"
+    git rev-parse HEAD > "$RUN_DIR/dummy_prd/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
+    git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "\[FATAL\] Planner failed to generate any PRs." orchestrator.log; then

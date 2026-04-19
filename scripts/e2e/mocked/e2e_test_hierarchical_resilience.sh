@@ -114,6 +114,7 @@ INNER_EOF
     rm -f /tmp/coder_runs.log
     
     echo "Starting orchestrator..."
+    git rev-parse HEAD > "$RUN_DIR/baseline_commit.txt"
     python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
     mv ../orchestrator.log orchestrator.log
 

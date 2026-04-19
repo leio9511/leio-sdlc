@@ -64,6 +64,7 @@ export MOCK_VERIFIER_RESULT='invalid json'
 # Force empty queue so orchestrator enters state 6 directly
 mkdir -p "$WORK_DIR/.sdlc_runs/workdir/test_prd"
 touch "$WORK_DIR/.sdlc_runs/workdir/test_prd/.queue_empty_force"
+    git -C "$WORK_DIR" rev-parse HEAD > "$WORK_DIR/.sdlc_runs/workdir/test_prd/baseline_commit.txt" 2>/dev/null || true
 
 # Clean workspace before orchestrator runs
 git reset --hard HEAD >/dev/null 2>&1

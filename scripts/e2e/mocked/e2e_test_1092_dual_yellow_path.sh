@@ -31,6 +31,7 @@ fi
 
 echo "Testing orchestrator.py without --global-dir..."
 python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR" --fix
+git rev-parse HEAD > "$TEST_DIR/.sdlc_runs/$(basename $TEST_DIR)/PRD/baseline_commit.txt"
 python3 "$SDLC_ROOT/scripts/orchestrator.py" --workdir "$TEST_DIR" --prd-file PRD.md --force-replan false --test-sleep --enable-exec-from-workspace --channel test_channel
 
 echo "PASS: orchestrator.py did not raise RuntimeError"
@@ -96,6 +97,7 @@ setup_fake_pr() {
     git branch -m master 2>/dev/null || true
     git commit --allow-empty -m "init" > /dev/null
     mkdir -p .sdlc_runs/mock2/PRD
+    git rev-parse HEAD > .sdlc_runs/mock2/PRD/baseline_commit.txt
     echo ".sdlc_repo.lock" > .gitignore
     echo ".tmp/" >> .gitignore
     echo "---
