@@ -1,7 +1,7 @@
 import re
 import os
 
-VALID_STATES = {"open", "in_progress", "closed", "blocked"}
+VALID_STATES = {"open", "in_progress", "closed", "blocked", "blocked_fatal", "superseded"}
 
 def get_status(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:

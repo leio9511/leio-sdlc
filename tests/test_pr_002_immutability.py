@@ -17,7 +17,7 @@ class TestPR002Immutability(unittest.TestCase):
         # PRD 1060: Verification that set_pr_status no longer calls git add/commit
         pr_file = "/tmp/dummy_pr.md"
         with open(pr_file, "w") as f:
-            f.write("status: open\nslice_depth: 1")
+            f.write("---\nstatus: open\nslice_depth: 1\n---\n")
     
         try:
             orchestrator.set_pr_status(pr_file, "in_progress")

@@ -133,12 +133,10 @@ def acquire_global_locks(projects, workdir):
         
     return acquired_locks, fds
 
+from structured_state_parser import update_status as _update_status
+
 def set_pr_status(pr_file, new_status):
-    with open(pr_file, 'r', encoding='utf-8') as f:
-        content = f.read()
-    updated = re.sub(r'^status:\s*\S+', f'status: {new_status}', content, count=1, flags=re.MULTILINE)
-    with open(pr_file, 'w', encoding='utf-8') as f:
-        f.write(updated)
+    _update_status(pr_file, new_status)
     # PRD 1060: PR status updates are now untracked artifacts to prevent pollution
     # subprocess.run(["git", "add", pr_file], check=False)
     # subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
@@ -246,6 +244,7 @@ def main():
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
     parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart")
+    parser.add_argument("--withdraw", action="store_true", help="Atomic State Restoration and Withdrawal")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
@@ -327,7 +326,90 @@ def main():
 
         sys.exit(0)
 
-    if not args.test_sleep and getattr(args, "force_replan", None) is None and not getattr(args, "resume", False):
+    if getattr(args, "withdraw", False) is True:
+        lock_path = os.path.join(args.workdir, ".sdlc_repo.lock")
+        try:
+            f_lock = open(lock_path, "w")
+            fcntl.flock(f_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (BlockingIOError, IOError):
+            print("[FATAL_LOCK] Cannot clean up while another SDLC pipeline is active.")
+            sys.exit(1)
+
+        os.chdir(args.workdir)
+        branch_res = drun(["git", "branch", "--show-current"], capture_output=True, text=True)
+        branch_output = branch_res.stdout.strip()
+
+        prd_filename = os.path.basename(args.prd_file)
+        base_name, _ = os.path.splitext(prd_filename)
+        target_project_name = os.path.basename(os.path.abspath(args.workdir))
+        job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+        
+        withdrawn_dir = f"{job_dir}.withdrawn"
+        if os.path.exists(withdrawn_dir) and not os.path.exists(job_dir):
+            print(f"[INFO] PRD {base_name} has already been withdrawn. Ignoring.")
+            sys.exit(0)
+
+        baseline_file = os.path.join(job_dir, "baseline_commit.txt")
+        if not os.path.exists(job_dir) or not os.path.exists(baseline_file):
+            print("Handoff_Metadata_Missing: [FATAL_METADATA] Critical SDLC anchors (baseline_commit.txt) are missing. Automatic recovery is impossible. You must manually verify the repository state or use --force-replan true.")
+            sys.exit(1)
+
+        with open(baseline_file, "r") as f:
+            baseline_hash = f.read().strip()
+
+        log_res = drun(["git", "log", f"{baseline_hash}..HEAD", "--oneline"], capture_output=True, text=True)
+        if log_res.stdout.strip():
+            print("[WARNING] Unauthorized external commits detected between baseline and HEAD. These changes are NOT protected by SDLC and will be overwritten to ensure baseline integrity.")
+
+        if branch_output in ["master", "main"]:
+            drun(["git", "stash", "push", "-m", "SDLC Withdrawal Emergency Stash"], check=False)
+        else:
+            drun(["git", "add", "-A"], check=False)
+            drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+            timestamp = int(time.time())
+            drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
+            drun(["git", "checkout", "master"], check=False)
+
+        interrupted_hash_res = drun(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+        interrupted_hash = interrupted_hash_res.stdout.strip()
+
+        drun(["git", "reset", "--hard", baseline_hash], check=True)
+        drun(["git", "reset", "--soft", interrupted_hash], check=True)
+        
+        diff_check = drun(["git", "diff", "--cached", "--quiet"])
+        if diff_check.returncode != 0:
+            commit_msg = f"chore: force baseline alignment of PRD {base_name} to baseline"
+            drun(["git", "commit", "-m", commit_msg], check=True)
+
+        withdrawn_dir = f"{job_dir}.withdrawn"
+        if os.path.exists(job_dir):
+            import shutil
+            shutil.move(job_dir, withdrawn_dir)
+
+        manifest_path = os.path.join(args.workdir, ".sdlc_lock_manifest.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest_data = json.load(f)
+                for lock_path in manifest_data.get("locks", []):
+                    try:
+                        if os.path.exists(lock_path):
+                            os.remove(lock_path)
+                    except OSError:
+                        pass
+                os.remove(manifest_path)
+            except Exception:
+                pass
+                
+        for lockfile in [".coder_session", ".sdlc_repo.lock"]:
+            try:
+                os.remove(os.path.join(args.workdir, lockfile))
+            except OSError:
+                pass
+
+        sys.exit(0)
+
+    if not args.test_sleep and getattr(args, "force_replan", None) is None and not getattr(args, "resume", False) and not getattr(args, "withdraw", False):
         print("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.")
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
