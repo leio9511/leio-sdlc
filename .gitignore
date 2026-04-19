@@ -47,3 +47,6 @@ tests/test_lock_run/
 sdlc_runs_symlink
 .sdlc_repo.lock
 .sdlc_lock_manifest.json
+tmp_job_dir
+docs/PRs/mock_prd_070/
+tests/sandbox_070/

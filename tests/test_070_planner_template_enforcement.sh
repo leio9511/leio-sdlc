@@ -18,9 +18,15 @@ for pr_file in "$OUT_DIR"/*.md; do
         exit 1
     fi
 
-    # Check status: open
-    if ! head -n 1 "$pr_file" | grep -q "^status: open$"; then
-        echo "FAIL: PR file $pr_file does not start with 'status: open'"
+    # Check YAML boundary
+    if ! head -n 1 "$pr_file" | grep -q "^---$"; then
+        echo "FAIL: PR file $pr_file does not start with '---'"
+        exit 1
+    fi
+
+    # Check status: open exists
+    if ! grep -q "^status: open$" "$pr_file"; then
+        echo "FAIL: PR file $pr_file does not contain 'status: open'"
         exit 1
     fi
 
