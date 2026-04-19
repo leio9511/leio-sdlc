@@ -118,3 +118,58 @@ def test_withdraw_job_teardown(repo_env):
     assert not os.path.exists(job_dir)
     assert os.path.exists(job_dir + ".withdrawn")
 
+
+@pytest.fixture
+def repo_env_main(tmp_path):
+    workdir = tmp_path / "workdir_main"
+    workdir.mkdir()
+    
+    run_git(["init"], cwd=workdir)
+    (workdir / "file.txt").write_text("v1")
+    run_git(["add", "file.txt"], cwd=workdir)
+    run_git(["commit", "-m", "init"], cwd=workdir)
+    run_git(["branch", "-m", "main"], cwd=workdir)
+    
+    baseline_hash = run_git(["rev-parse", "HEAD"], cwd=workdir).stdout.strip()
+    
+    global_dir = tmp_path / "global_main"
+    global_dir.mkdir()
+    
+    prd_name = "PRD_Test_Main"
+    project_name = "workdir_main"
+    
+    job_dir = global_dir / ".sdlc_runs" / project_name / prd_name
+    job_dir.mkdir(parents=True)
+    
+    (job_dir / "baseline_commit.txt").write_text(baseline_hash)
+    
+    return {
+        "workdir": str(workdir),
+        "global_dir": str(global_dir),
+        "job_dir": str(job_dir),
+        "prd_name": prd_name,
+        "baseline_hash": baseline_hash
+    }
+
+def test_withdraw_baseline_alignment_main(repo_env_main, capsys):
+    workdir = repo_env_main["workdir"]
+    
+    # Switch to feature branch
+    run_git(["checkout", "-b", "feature_branch"], cwd=workdir)
+    
+    # Introduce some changes and commit
+    with open(os.path.join(workdir, "file.txt"), "w") as f:
+        f.write("v2")
+    run_git(["add", "file.txt"], cwd=workdir)
+    run_git(["commit", "-m", "interrupted WIP"], cwd=workdir)
+    
+    run_orchestrator_withdraw(workdir, repo_env_main["global_dir"], repo_env_main["prd_name"])
+    
+    # Verify working tree is aligned to v1 (baseline)
+    with open(os.path.join(workdir, "file.txt"), "r") as f:
+        assert f.read() == "v1"
+
+    # Current branch should be main
+    branch = run_git(["branch", "--show-current"], cwd=workdir).stdout.strip()
+    assert branch == "main"
+

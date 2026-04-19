@@ -62,3 +62,18 @@ def check_git_boundary(workdir):
     if os.path.abspath(toplevel) != os.path.abspath(workdir):
         print(f"[FATAL] Git boundary violation: workdir '{workdir}' is not the root of the git repository.")
         sys.exit(1)
+
+def get_mainline_branch(cwd=None):
+    """
+    Returns 'main' if it exists in the repository, otherwise returns 'master'.
+    """
+    try:
+        res = subprocess.run(["git", "branch", "--format=%(refname:short)"], cwd=cwd, capture_output=True, text=True, check=True)
+        branches = [b.strip() for b in res.stdout.split('\n') if b.strip()]
+        if "main" in branches:
+            return "main"
+        if "master" in branches:
+            return "master"
+        return "master" # Default fallback
+    except Exception:
+        return "master"

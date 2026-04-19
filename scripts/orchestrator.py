@@ -17,7 +17,7 @@ import traceback
 os.environ["SDLC_ORCHESTRATOR_RUNNING"] = "1"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from git_utils import safe_git_checkout, GitCheckoutError
+from git_utils import safe_git_checkout, GitCheckoutError, get_mainline_branch
 from notification_formatter import format_notification
 from handoff_prompter import HandoffPrompter
 from utils_json import extract_and_parse_json
@@ -300,7 +300,7 @@ def main():
         drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
         timestamp = int(time.time())
         drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
-        drun(["git", "checkout", "master"], check=False)
+        drun(["git", "checkout", get_mainline_branch(args.workdir)], check=False)
         
         # 8. Targeted Artifact Obliteration (os.remove for daemon locks)
         for lockfile in [".coder_session", ".sdlc_repo.lock"]:
@@ -368,7 +368,7 @@ def main():
             drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
             timestamp = int(time.time())
             drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
-            drun(["git", "checkout", "master"], check=False)
+            drun(["git", "checkout", get_mainline_branch(args.workdir)], check=False)
 
         interrupted_hash_res = drun(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
         interrupted_hash = interrupted_hash_res.stdout.strip()
@@ -482,7 +482,7 @@ def main():
                 drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
                 timestamp = int(time.time())
                 drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
-                drun(["git", "checkout", "master"], check=False)
+                drun(["git", "checkout", get_mainline_branch(workdir)], check=False)
                 
         args.force_replan = "false"
 
@@ -844,7 +844,7 @@ def main():
                     logger.info(f"State 4: Spawning Reviewer for {current_pr}")
                     dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True)
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True)
                     proc.wait()
                     
                     json_retry_count = 0
@@ -874,13 +874,13 @@ def main():
                                 break
                                 
                             sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", "master", "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True)
                             proc.wait()
                                 
                     if verdict == "APPROVED":
                         drun(["git", "reset", "--hard", "HEAD"])
                         drun(["git", "clean", "-fd"])
-                        safe_git_checkout("master")
+                        safe_git_checkout(get_mainline_branch(workdir))
                         merge_result = drun([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
                         if merge_result.returncode == 0:
                             drun(["git", "branch", "-D", branch_name], check=True)
@@ -928,7 +928,7 @@ def main():
                         dlog(f"State 5 Escalation: Red Path reset triggered. Resetting {branch_name}")
                         drun(["git", "reset", "--hard"], check=False)
                         drun(["git", "clean", "-fd"], check=False)
-                        safe_git_checkout("master")
+                        safe_git_checkout(get_mainline_branch(workdir))
                         drun(["git", "branch", "-D", branch_name], check=False)
                         
                         # RED PATH ENFORCEMENT: Force a NEW Session ID
@@ -937,7 +937,7 @@ def main():
                         red_counter += 1
                         continue
                     else:
-                        drun(["git", "checkout", "master"], check=False)
+                        drun(["git", "checkout", get_mainline_branch(workdir)], check=False)
                         
                         # In test mode, we might delete the file or branch. Just skip the slice if we can't find it.
                         if not os.path.exists(current_pr):
