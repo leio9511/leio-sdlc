@@ -160,20 +160,10 @@ def main():
         pr_file=os.path.abspath(args.pr_file) if args.pr_file else "",
         prd_file=os.path.abspath(args.prd_file) if args.prd_file else "",
         diff_file=diff_file,
-        out_file=args.out_file, run_dir=args.run_dir,
+        out_file=os.path.abspath(os.path.join(args.run_dir, args.out_file)), run_dir=args.run_dir,
         template_content=template_content
     )
     
-
-    if os.environ.get("SDLC_TEST_MODE") == "true":
-        os.makedirs("tests", exist_ok=True)
-        with open("tests/tool_calls.log", "w") as tf:
-            tf.write(task_string)
-        # Mock LLM writing the report
-        with open(os.path.join(args.run_dir, args.out_file), "w") as rf:
-            rf.write('```json\n{"status": "APPROVED", "comments": "Mock LGTM"}\n```')
-        print('{"status": "mock_success", "role": "reviewer"}')
-        sys.exit(0)
 
     import time
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
@@ -181,22 +171,48 @@ def main():
     
     # SCAFFOLDING
     review_report_path = os.path.join(args.run_dir, args.out_file)
-    with open(review_report_path, "w") as f:
-        f.write('''{
-  "overall_assessment": "NOT_STARTED",
-  "executive_summary": "Waiting for agent processing...",
-  "findings": []
-}''')
-
-    with open(session_file, "w") as sf:
-        sf.write(session_id)
+    template_file_path = os.path.join(SDLC_ROOT, "TEMPLATES", "Review_Report.json.template")
+    if os.path.exists(template_file_path):
+        with open(template_file_path, "r") as tf:
+            scaffold_content = tf.read()
+    else:
+        scaffold_content = '{\n  "overall_assessment": "NOT_STARTED",\n  "executive_summary": "Waiting for agent processing...",\n  "findings": []\n}'
         
-    result = invoke_agent(task_string, session_key=session_id, role="reviewer")
+    with open(review_report_path, "w") as f:
+        f.write(scaffold_content)
+
+    if os.environ.get("SDLC_TEST_MODE") == "true":
+        os.makedirs("tests", exist_ok=True)
+        with open("tests/tool_calls.log", "w") as tf:
+            tf.write(task_string)
+        # Mock LLM writing the report (we only do this if we are not testing failure scenarios)
+        # Wait, if we mock it directly here, we might bypass the rigid verification tests if the test wants to check failures.
+        # Actually, let's keep the mock writing but only if a test env var like SDLC_MOCK_REVIEWER_FAILURE is not set.
+        if os.environ.get("SDLC_MOCK_REVIEWER_FAILURE") == "true":
+            # Don't update the file, leave it as NOT_STARTED
+            pass
+        elif os.environ.get("SDLC_MOCK_REVIEWER_INVALID_JSON") == "true":
+            with open(review_report_path, "w") as rf:
+                rf.write('invalid json')
+        else:
+            with open(review_report_path, "w") as rf:
+                rf.write('{"overall_assessment": "APPROVED", "comments": "Mock LGTM"}')
+        print('{"status": "mock_success", "role": "reviewer"}')
+        # We DO NOT sys.exit(0) here, we want verification to run!
+    else:
+        with open(session_file, "w") as sf:
+            sf.write(session_id)
+            
+        result = invoke_agent(task_string, session_key=session_id, role="reviewer")
 
     # Removed stdout overwrite as agent writes directly to file
 
     # VERIFICATION
     import json
+    if not os.path.exists(review_report_path):
+        print(f"[FATAL] The Reviewer agent failed to generate the physical '{args.out_file}'. This is a severe process violation.", file=sys.stderr)
+        sys.exit(1)
+
     try:
         with open(review_report_path, "r") as f:
             data = json.load(f)
@@ -207,10 +223,8 @@ def main():
         print(f"[FATAL] Invalid JSON in review report: {e}", file=sys.stderr)
         sys.exit(1)
 
-
-    if not os.path.exists(review_report_path):
-        print(f"[FATAL] The Reviewer agent failed to generate the physical '{args.out_file}'. This is a severe process violation.", file=sys.stderr)
-        sys.exit(1)
+    if os.environ.get("SDLC_TEST_MODE") == "true":
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
