@@ -67,6 +67,9 @@ run_live_llm_test() {
 
 shopt -s nullglob
 
+# 0. Structural Gates
+run_test "pytest tests/test_template_compliance.py" "Template Compliance Gate"
+
 # 1. Bash Tests Discovery
 for f in scripts/test_*.sh; do
     run_test "bash $f" "Bash Test: $f"
