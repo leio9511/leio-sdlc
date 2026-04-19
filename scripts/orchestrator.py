@@ -243,8 +243,8 @@ def main():
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass # Reaper safety check: process already reaped or pgid not found the workspace path check")
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
-    parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart")
-    parser.add_argument("--withdraw", action="store_true", help="Atomic State Restoration and Withdrawal")
+    parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart. Use this flag if the SDLC was interrupted and you need to resume or continue from the last successful checkpoint.")
+    parser.add_argument("--withdraw", action="store_true", help="Atomic State Restoration and Withdrawal. Use this flag if the user's intent is to 'withdraw', 'rollback', or 'cancel' the entire PRD execution.")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")

@@ -22,6 +22,20 @@ Your ONLY job is to start the Orchestrator.
    
 2. Based on the help output and the user's intent, construct your execution command.
 
+### Intent Mapping (Guidance for Agents)
+
+- **Scenario: Normal Start**
+  If starting a fresh PRD or restarting a failed one from scratch:
+  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --prd-file <path> --workdir <path> --force-replan true`
+
+- **Scenario: Resume/Continue**
+  If the process was interrupted (e.g., timeout, crash) and you need to continue:
+  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --prd-file <path> --workdir <path> --resume --force-replan false`
+
+- **Scenario: Withdraw/Rollback**
+  If the user says "withdraw", "rollback", "cancel", or "revert" the PRD changes:
+  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --prd-file <path> --workdir <path> --withdraw`
+
 3. Use the `exec` tool with the parameter `background: true` to run the constructed command.
 
 4. **Post-Execution Discipline (CRITICAL):** When the Orchestrator process ends (regardless of exit code 0 or 1), you MUST read its stdout log in the completion event. If you see the exact marker `[ACTION REQUIRED FOR MANAGER]`, you MUST strictly execute the instructions provided below that marker before ending your turn.

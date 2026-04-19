@@ -35,6 +35,16 @@ LEIO SDLC is a multi-agent Software Development Life Cycle (SDLC) engine for Ope
 - 如果一切符合预期，它会给出 `PASS`。
 - 如果发现漏了需求或者实现有偏差，它会给出 `MISS`。对于 `MISS` 的结果，你需要回到 **第 2 步**，和小龙虾聊一聊 MISS 在了哪里，让它写一份专门的 Fix PRD，然后再让流水线跑一遍补丁。
 
+### 5. 异常恢复与“后悔药” (Exception Recovery & Reversal)
+在自动化过程中，如果遇到突发情况，你可以通过以下指令引导小龙虾：
+
+- **中途断了，如何恢复？**
+  - **指令**：“继续执行之前的 PRD” 或 “Resume SDLC”。
+  - **原理**：系统会执行 `--resume` 模式，自动定位到上次中断的 PR 节点，清理现场并断点续传。
+- **我想反悔了，能退回吗？**
+  - **指令**：“撤回这次 PRD” 或 “Rollback SDLC”。
+  - **原理**：系统执行 `--withdraw` 模式，利用 `baseline_commit.txt` 记录的锚点，通过 Hard/Soft Reset 组合拳实现代码库的原子化回退，且不破坏 Git 提交历史。
+
 ---
 
 ## 🤖 Agent Runtime Instructions (系统核心运行说明)
