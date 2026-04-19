@@ -3,7 +3,10 @@ import argparse
 import os
 import glob
 import sys
-import re
+
+# Ensure scripts directory is in path so we can import structured_state_parser
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import structured_state_parser
 
 class SecurityError(Exception):
     pass
@@ -31,11 +34,10 @@ def main():
     for md_file in md_files:
         pass # path traversal logic relaxed for global dir
         try:
-            with open(md_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-                if re.search(r'^status:\s*open\b', content, re.MULTILINE):
-                    print(md_file)
-                    sys.exit(0)
+            status = structured_state_parser.get_status(md_file)
+            if status == "open":
+                print(md_file)
+                sys.exit(0)
         except Exception:
             pass
     

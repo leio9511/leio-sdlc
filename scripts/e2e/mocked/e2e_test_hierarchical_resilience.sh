@@ -54,7 +54,9 @@ function test_e2e_hierarchical_resilience() {
     RUN_DIR="$MOCK_GLOBAL_DIR/.sdlc_runs/$PROJECT_NAME/TestProject"
     mkdir -p "$RUN_DIR"
     cat << 'INNER_EOF' > "$RUN_DIR/PR_001_Test.md"
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 

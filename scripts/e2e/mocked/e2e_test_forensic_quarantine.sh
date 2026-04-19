@@ -39,7 +39,11 @@ PROJECT_NAME=$(basename "$SANDBOX_DIR")
 RUN_DIR="$MOCK_GLOBAL_DIR/.sdlc_runs/$PROJECT_NAME"
 mkdir -p "$RUN_DIR"
 cat << 'INNER_EOF' > "$RUN_DIR/PR_001_Test.md"
+---
+---
 status: open
+---
+---
 slice_depth: 0
 INNER_EOF
 

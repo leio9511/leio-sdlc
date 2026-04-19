@@ -57,7 +57,9 @@ fi
 # 4. Test Reviewer Pre-flight
 echo "Testing Reviewer Pre-flight..."
 # Create a dummy PR file to satisfy file check, but it should still fail status check or logic
-echo "status: open" > PR.md
+echo "---
+status: open
+---" > PR.md
 set +e
 output=$(python3 scripts/spawn_reviewer.py --pr-file PR.md --diff-target HEAD --workdir . --global-dir . 2>&1)
 exit_code=$?

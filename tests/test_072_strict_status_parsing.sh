@@ -5,7 +5,9 @@ DIR="/tmp/test_072_workspace_$$"
 mkdir -p "$DIR/docs/PRs/mock_072"
 
 cat << 'FILEEOF' > "$DIR/docs/PRs/mock_072/PR_001_Mock.md"
-status: completed
+---
+status: closed
+---
 
 # PR-001
 This PR fixes the `status: open` bug.
@@ -26,9 +28,9 @@ fi
 echo "Running Assertion 2..."
 python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/update_pr_status.py --pr-file "$DIR/docs/PRs/mock_072/PR_001_Mock.md" --status in_progress
 
-HEAD_LINE=$(head -n 1 "$DIR/docs/PRs/mock_072/PR_001_Mock.md")
+HEAD_LINE=$(head -n 2 "$DIR/docs/PRs/mock_072/PR_001_Mock.md" | tail -n 1)
 if [ "$HEAD_LINE" != "status: in_progress" ]; then
-    echo "Assertion 2 failed. First line is: $HEAD_LINE"
+    echo "Assertion 2 failed. Status line is: $HEAD_LINE"
     exit 1
 fi
 

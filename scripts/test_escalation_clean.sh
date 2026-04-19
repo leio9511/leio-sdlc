@@ -27,6 +27,8 @@ cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
 cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
 cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
+cp "${PROJECT_ROOT}/scripts/structured_state_parser.py" scripts/
+cp "${PROJECT_ROOT}/scripts/update_pr_status.py" scripts/
 cp "${PROJECT_ROOT}/scripts/config.py" scripts/
 cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
 cp "${PROJECT_ROOT}/scripts/utils_json.py" scripts/
@@ -49,7 +51,9 @@ git add .gitignore scripts
 git commit -m "setup" > /dev/null 2>&1
 
 cat << 'INNER_EOF' > $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd/PR_001_Test.md
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 

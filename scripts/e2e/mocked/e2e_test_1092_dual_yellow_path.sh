@@ -98,7 +98,9 @@ setup_fake_pr() {
     mkdir -p .sdlc_runs/mock2/PRD
     echo ".sdlc_repo.lock" > .gitignore
     echo ".tmp/" >> .gitignore
-    echo "status: in_progress" > .sdlc_runs/mock2/PRD/PR_001.md
+    echo "---
+status: in_progress
+---" > .sdlc_runs/mock2/PRD/PR_001.md
     git add .
     git commit -m "add pr" > /dev/null
     python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR/mock2" --fix

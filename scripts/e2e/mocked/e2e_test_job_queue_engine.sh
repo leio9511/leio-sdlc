@@ -87,22 +87,28 @@ echo "--------------------------------------"
 echo "Test 3: Negative - update_status on file without status field"
 NO_STATUS_FILE="$SANDBOX/no_status.md"
 echo "This file has no status field." > "$NO_STATUS_FILE"
-assert_fail "$UPDATE_PR_STATUS --pr-file $NO_STATUS_FILE --status closed" "does not contain a 'status:"
+assert_fail "$UPDATE_PR_STATUS --pr-file $NO_STATUS_FILE --status closed" "No valid YAML frontmatter found"
 
 echo "--------------------------------------"
 echo "Test 4: Positive Flow"
 JOB_DIR="$SANDBOX/feature_x"
 mkdir -p "$JOB_DIR"
 cat << 'EOF' > "$JOB_DIR/01_DB.md"
+---
 status: closed
+---
 EOF
 
 cat << 'EOF' > "$JOB_DIR/02_API.md"
+---
 status: open
+---
 EOF
 
 cat << 'EOF' > "$JOB_DIR/03_UI.md"
+---
 status: open
+---
 EOF
 
 # Run get_next_pr.py -> expect 02_API.md

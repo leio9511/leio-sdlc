@@ -23,7 +23,9 @@ cat << 'EOF' > docs/PRDs/dummy.md
 # dummy
 EOF
 cat << 'EOF' > docs/PRs/dummy/PR_001.md
+---
 status: open
+---
 slice_depth: 0
 EOF
 git add docs

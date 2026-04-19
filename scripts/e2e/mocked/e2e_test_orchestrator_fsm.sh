@@ -61,7 +61,9 @@ function run_test_green_path() {
     setup_sandbox
     
     cat << 'INNER_EOF' > $RUN_DIR/dummy_prd/PR_001_Test.md
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 
@@ -102,7 +104,9 @@ function run_test_red_path_blocked_fatal() {
     setup_sandbox
     
     cat << 'INNER_EOF' > $RUN_DIR/dummy_prd/PR_002_Test.md
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 
@@ -145,7 +149,9 @@ function run_test_red_path_slice() {
     setup_sandbox
     
     cat << 'INNER_EOF' > $RUN_DIR/dummy_prd/PR_003_Test.md
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 
@@ -161,9 +167,9 @@ INNER_EOF
     cat << 'INNER_EOF' > scripts/spawn_planner.py
 import sys, os
 import os
-with open(os.environ["RUN_DIR"] + "/dummy_prd/PR_003_Test.1.md", "w") as f: f.write("status: open\nslice_depth: 1\n")
+with open(os.environ["RUN_DIR"] + "/dummy_prd/PR_003_Test.1.md", "w") as f: f.write("---\nstatus: open\n---\nslice_depth: 1\n")
 import os
-with open(os.environ["RUN_DIR"] + "/dummy_prd/PR_003_Test.2.md", "w") as f: f.write("status: open\nslice_depth: 1\n")
+with open(os.environ["RUN_DIR"] + "/dummy_prd/PR_003_Test.2.md", "w") as f: f.write("---\nstatus: open\n---\nslice_depth: 1\n")
 INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
@@ -206,7 +212,7 @@ parser.add_argument("--content-file")
 args = parser.parse_args()
 import os
 with open(os.path.join(args.job_dir, "PR_Dummy.md"), "w") as f:
-    f.write("status: open\n")
+    f.write("---\nstatus: open\n---\n")
 INNER_EOF
 
     export SDLC_TEST_MODE=true
@@ -229,12 +235,16 @@ function run_test_orchestrator_noise_injection() {
     
     mkdir -p $RUN_DIR/Target_Project
     cat << 'INNER_EOF' > $RUN_DIR/Poison_PR.md
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 
     cat << 'INNER_EOF' > $RUN_DIR/Target_Project/Target_PR.md
+---
 status: open
+---
 slice_depth: 0
 INNER_EOF
 
@@ -310,7 +320,7 @@ import os
 os.makedirs(os.environ["RUN_DIR"] + "/MyProject", exist_ok=True)
 import os
 with open(os.environ["RUN_DIR"] + "/MyProject/PR_001_Mock.md", "w") as f:
-    f.write("status: open\n")
+    f.write("---\nstatus: open\n---\n")
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py
@@ -347,7 +357,9 @@ function run_test_state_0_idempotency() {
     echo "dummy" > docs/PRDs/MyProject.md
     mkdir -p $RUN_DIR/MyProject
     cat << 'INNER_EOF' > $RUN_DIR/MyProject/PR_001_Existing.md
+---
 status: open
+---
 INNER_EOF
 
     git add .
@@ -397,7 +409,9 @@ function run_test_state_0_force_replan() {
     echo "dummy" > docs/PRDs/MyProject.md
     mkdir -p $RUN_DIR/MyProject
     cat << 'INNER_EOF' > $RUN_DIR/MyProject/PR_Old.md
+---
 status: open
+---
 INNER_EOF
 
     git add .
@@ -409,7 +423,7 @@ import os
 os.makedirs(os.environ["RUN_DIR"] + "/MyProject", exist_ok=True)
 import os
 with open(os.environ["RUN_DIR"] + "/MyProject/PR_New.md", "w") as f:
-    f.write("status: open\n")
+    f.write("---\nstatus: open\n---\n")
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py

@@ -2,12 +2,15 @@
 import argparse
 import os
 import sys
-import re
+
+# Ensure scripts directory is in path so we can import structured_state_parser
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import structured_state_parser
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pr-file", dest="pr_file", required=True)
-    parser.add_argument("--status", choices=["open", "closed", "blocked", "in_progress", "completed"], required=True)
+    parser.add_argument("--status", choices=["open", "closed", "blocked", "in_progress"], required=True)
     args = parser.parse_args()
 
     pr_file = args.pr_file
@@ -18,23 +21,9 @@ def main():
         sys.exit(1)
 
     try:
-        with open(pr_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        structured_state_parser.update_status(pr_file, new_status)
     except Exception as e:
-        print(f"Error reading file: {e}")
-        sys.exit(1)
-
-    if not re.search(r'^status:\s*\S+', content, re.MULTILINE):
-        print(f"[Pre-flight Failed] File '{pr_file}' does not contain a 'status: ...' field.")
-        sys.exit(1)
-
-    updated_content = re.sub(r'^status:\s*\S+', f'status: {new_status}', content, count=1, flags=re.MULTILINE)
-
-    try:
-        with open(pr_file, 'w', encoding='utf-8') as f:
-            f.write(updated_content)
-    except Exception as e:
-        print(f"Error writing file: {e}")
+        print(f"Error: {e}")
         sys.exit(1)
 
     print(f"[STATUS_UPDATED] {pr_file} is now {new_status}.")
