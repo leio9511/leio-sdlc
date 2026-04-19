@@ -64,7 +64,8 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         mock_exit.side_effect = SystemExit(1)
 
         try:
-            orchestrator.main()
+            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                orchestrator.main()
         except SystemExit:
             pass
         
@@ -121,7 +122,8 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         mock_exit.side_effect = SystemExit(1)
 
         try:
-            orchestrator.main()
+            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                orchestrator.main()
         except SystemExit:
             pass
             
@@ -188,7 +190,8 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
 
         with patch('builtins.open', side_effect=m_open_side_effect):
             try:
-                orchestrator.main()
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
             except SystemExit:
                 pass
                 

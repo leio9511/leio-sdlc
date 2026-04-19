@@ -14,7 +14,7 @@ def mock_workdir():
         yield temp_dir
 
 def test_orchestrator_json_retry_framework_success(mock_workdir):
-    with patch('orchestrator.teardown_coder_session'), \
+    with patch('orchestrator.SanityContext.perform_healthy_check'), patch('orchestrator.teardown_coder_session'), \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
          patch('orchestrator.drun') as mock_drun, \
          patch('orchestrator.dpopen') as mock_dpopen, \
@@ -38,6 +38,7 @@ def test_orchestrator_json_retry_framework_success(mock_workdir):
         target_project_name = os.path.basename(os.path.abspath(mock_workdir))
         job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
         os.makedirs(job_dir, exist_ok=True)
+
         
         mock_dpopen.return_value.returncode = 0
         pr_file = os.path.join(mock_workdir, "PR_001_test.md")
@@ -60,7 +61,7 @@ def test_orchestrator_json_retry_framework_success(mock_workdir):
         assert mock_extract.call_count == 2
 
 def test_orchestrator_json_retry_framework_failure(mock_workdir):
-    with patch('orchestrator.teardown_coder_session') as mock_teardown, \
+    with patch('orchestrator.SanityContext.perform_healthy_check'), patch('orchestrator.teardown_coder_session') as mock_teardown, \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
          patch('orchestrator.drun') as mock_drun, \
          patch('orchestrator.dpopen') as mock_dpopen, \
@@ -85,6 +86,7 @@ def test_orchestrator_json_retry_framework_failure(mock_workdir):
         target_project_name = os.path.basename(os.path.abspath(mock_workdir))
         job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
         os.makedirs(job_dir, exist_ok=True)
+
         
         mock_dpopen.return_value.returncode = 0
         pr_file = os.path.join(mock_workdir, "PR_001_test.md")
@@ -111,7 +113,7 @@ def test_orchestrator_json_retry_framework_failure(mock_workdir):
         assert mock_teardown.call_count > 0
 
 def test_orchestrator_system_alert_invocation(mock_workdir):
-    with patch('orchestrator.teardown_coder_session'), \
+    with patch('orchestrator.SanityContext.perform_healthy_check'), patch('orchestrator.teardown_coder_session'), \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
          patch('orchestrator.drun') as mock_drun, \
          patch('orchestrator.dpopen') as mock_dpopen, \
@@ -135,6 +137,7 @@ def test_orchestrator_system_alert_invocation(mock_workdir):
         target_project_name = os.path.basename(os.path.abspath(mock_workdir))
         job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
         os.makedirs(job_dir, exist_ok=True)
+
         
         mock_dpopen.return_value.returncode = 0
         pr_file = os.path.join(mock_workdir, "PR_001_test.md")

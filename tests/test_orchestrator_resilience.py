@@ -53,7 +53,9 @@ def test_blast_radius_clears_sessions(mock_workdir):
         mock_drun.side_effect = dummy_drun
         
         try:
-            orchestrator.main()
+            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
         except SystemExit as e:
             assert e.code == 0
             
@@ -111,7 +113,8 @@ def test_yellow_path_preserves_session(mock_workdir):
         try:
             # We run max 1 PR to process
             with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
-                orchestrator.main()
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
         except SystemExit:
             pass
             
@@ -177,7 +180,8 @@ def test_red_path_hard_resets(mock_workdir):
         
         try:
             with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
-                orchestrator.main()
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
         except SystemExit:
             pass
             

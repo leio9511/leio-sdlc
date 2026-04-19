@@ -74,7 +74,9 @@ def test_always_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, 
     
     with patch('sys.argv', ['orchestrator.py', '--force-replan', 'true', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'always', '--max-prs-to-process', '1']):
         try:
-            orchestrator.main()
+            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
         except SystemExit:
             pass
             
@@ -120,7 +122,9 @@ def test_per_pr_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, 
 
     with patch('sys.argv', ['orchestrator.py', '--force-replan', 'true', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'per-pr', '--max-prs-to-process', '1']):
         try:
-            orchestrator.main()
+            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
         except SystemExit:
             pass
             
@@ -169,7 +173,9 @@ def test_on_escalation_strategy(mock_check_git, mock_open, mock_copytree, mock_r
     
     with patch('sys.argv', ['orchestrator.py', '--force-replan', 'true', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'on-escalation', '--max-prs-to-process', '1']):
         try:
-            orchestrator.main()
+            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    orchestrator.main()
         except SystemExit:
             pass
             

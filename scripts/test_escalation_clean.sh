@@ -50,6 +50,7 @@ echo "config/" >> .gitignore
 git add .gitignore scripts
 git commit -m "setup" > /dev/null 2>&1
 
+git rev-parse HEAD > $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd/baseline_commit.txt
 cat << 'INNER_EOF' > $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd/PR_001_Test.md
 ---
 status: open

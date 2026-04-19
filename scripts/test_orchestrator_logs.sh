@@ -24,6 +24,7 @@ git commit -m "init" > /dev/null
 
 # Create .sdlc_runs/dummy/PR_001.md with in_progress status
 mkdir -p /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy
+git rev-parse HEAD > /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy/baseline_commit.txt
 echo -e "status: in_progress\nslice_depth: 1" > /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy/PR_001.md
 
 # Run orchestrator

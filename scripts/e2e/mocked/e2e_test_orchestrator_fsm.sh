@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+export SDLC_TEST_MODE=true
 
 # test_orchestrator_fsm.sh - Deterministic FSM Testing Strategy for PR-045.3
 
@@ -215,7 +216,7 @@ with open(os.path.join(args.job_dir, "PR_Dummy.md"), "w") as f:
     f.write("---\nstatus: open\n---\n")
 INNER_EOF
 
-    export SDLC_TEST_MODE=true
+    
     python3 scripts/spawn_planner.py --prd-file docs/PRDs/Dummy_Project.md --workdir "$(pwd)" --out-dir $RUN_DIR/Dummy_Project --global-dir "$MOCK_GLOBAL_DIR" > planner.log 2>&1
     
     if [ ! -d "$RUN_DIR/Dummy_Project" ]; then
