@@ -41,10 +41,10 @@ class TestReviewerContextIsolation(unittest.TestCase):
             prompt_content = f.read()
             
         # Verify the headers exist and are separated
-        self.assertIn("--- TARGET FOR REVIEW (CURRENT CODE CHANGES) ---", prompt_content)
-        self.assertIn("--- READ-ONLY REFERENCE HISTORY (PREVIOUSLY MERGED) ---", prompt_content)
-        self.assertIn("strictly read-only reference material", prompt_content)
-        self.assertIn("All security checks, redlines, and logic validations MUST be strictly applied ONLY to this file", prompt_content)
+        self.assertIn("@PRD_PATH:", prompt_content)
+        self.assertIn("@CONTRACT_PATH:", prompt_content)
+        self.assertIn("@DIFF_PATH:", prompt_content)
+        self.assertIn("@OUT_FILE_PATH:", prompt_content)
 
 if __name__ == '__main__':
     unittest.main()

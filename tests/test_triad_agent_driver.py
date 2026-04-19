@@ -121,7 +121,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         def mock_reviewer_invoke(*args, **kwargs):
             # simulate agent writing the artifact
             with open(os.path.join(self.workdir, "review_report.json"), "w") as f:
-                f.write("mock review report content")
+                f.write('{"overall_assessment": "EXCELLENT", "executive_summary": "mock summary", "findings": []}')
             return AgentResult(session_key='subtask-reviewer', stdout='dummy')
         mock_invoke_agent.side_effect = mock_reviewer_invoke
 
@@ -140,7 +140,8 @@ class TestAgentDriverTriad(unittest.TestCase):
             
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for reviewer")
         args, kwargs = mock_invoke_agent.call_args
-        self.assertIn("mock_pr_content_for_reviewer", args[0])
+        self.assertIn("@CONTRACT_PATH:", args[0])
+        self.assertIn("@DIFF_PATH:", args[0])
         self.assertEqual(kwargs.get("role"), "reviewer")
 
 

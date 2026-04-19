@@ -50,6 +50,7 @@ def check_guardrails(workdir, pr_content, diff_files):
 def main():
     parser = argparse.ArgumentParser(description="Spawn a reviewer agent.")
     parser.add_argument("--pr-file", required=False, help="Path to the PR Contract file")
+    parser.add_argument("--prd-file", required=False, default="PRD.md", help="Path to the PRD file")
     parser.add_argument("--diff-target", required=False, help="Git diff target range (e.g., base_hash..latest_hash)")
     parser.add_argument("--override-diff-file", help="Override the diff file and skip git diff", default=None)
     parser.add_argument("--job-dir", required=False, default=".", help="Working directory for the Reviewer to generate artifacts")
@@ -156,6 +157,8 @@ def main():
         workdir=workdir,
         playbook_content=playbook_content,
         pr_content=pr_content,
+        pr_file=os.path.abspath(args.pr_file) if args.pr_file else "",
+        prd_file=os.path.abspath(args.prd_file) if args.prd_file else "",
         diff_file=diff_file,
         out_file=args.out_file, run_dir=args.run_dir,
         template_content=template_content
@@ -175,14 +178,35 @@ def main():
     import time
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
     
+    
+    # SCAFFOLDING
+    review_report_path = os.path.join(args.run_dir, args.out_file)
+    with open(review_report_path, "w") as f:
+        f.write('''{
+  "overall_assessment": "NOT_STARTED",
+  "executive_summary": "Waiting for agent processing...",
+  "findings": []
+}''')
+
     with open(session_file, "w") as sf:
         sf.write(session_id)
         
     result = invoke_agent(task_string, session_key=session_id, role="reviewer")
 
-    review_report_path = os.path.join(args.run_dir, args.out_file)
-    with open(review_report_path, "w") as f:
-        f.write(result.stdout)
+    # Removed stdout overwrite as agent writes directly to file
+
+    # VERIFICATION
+    import json
+    try:
+        with open(review_report_path, "r") as f:
+            data = json.load(f)
+            if data.get("overall_assessment") == "NOT_STARTED":
+                print("[FATAL] The Reviewer agent failed to change overall_assessment from NOT_STARTED. Audit failed.", file=sys.stderr)
+                sys.exit(1)
+    except Exception as e:
+        print(f"[FATAL] Invalid JSON in review report: {e}", file=sys.stderr)
+        sys.exit(1)
+
 
     if not os.path.exists(review_report_path):
         print(f"[FATAL] The Reviewer agent failed to generate the physical '{args.out_file}'. This is a severe process violation.", file=sys.stderr)
