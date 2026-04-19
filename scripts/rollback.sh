@@ -13,6 +13,16 @@ perform_hard_copy_rollback() {
     local SKILLS_DIR="$OPENCLAW_DIR"
     local RELEASES_DIR="$HOME_DIR/.openclaw/.releases/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
+    
+    local NO_RESTART=false
+    for arg in "$@"; do
+        case $arg in
+            --no-restart)
+            NO_RESTART=true
+            shift
+            ;;
+        esac
+    done
 
     echo "[$(date '+%H:%M:%S')] Starting hard-copy rollback flow for $SLUG"
 
@@ -30,6 +40,12 @@ perform_hard_copy_rollback() {
 
     echo "📦 Found latest backup: $LATEST_BACKUP"
 
+    # Orchestrator standard guardrails: Prevent rollback during active SDLC sessions
+    if [ -f "$PROD_DIR/.sdlc_repo.lock" ] || [ -f "$PROD_DIR/.coder_session" ]; then
+        echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock or .coder_session found)."
+        exit 1
+    fi
+
     # 1. Clear current production directory safely
     local OLD_DIR="$SKILLS_DIR/.old_$SLUG"
     rm -rf "$OLD_DIR"
@@ -44,13 +60,17 @@ perform_hard_copy_rollback() {
     rm -rf "$OLD_DIR"
 
     # 3. Gateway Reload
-    if command -v openclaw >/dev/null 2>&1; then
-        if [ -z "$HOME_MOCK" ]; then
-            echo "🔄 Restarting OpenClaw gateway..."
-            openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
-        else
-            echo "🔄 Skipping OpenClaw gateway restart (mock environment detected)..."
+    if [ "$NO_RESTART" != "true" ]; then
+        if command -v openclaw >/dev/null 2>&1; then
+            if [ -z "$HOME_MOCK" ]; then
+                echo "🔄 Restarting OpenClaw gateway..."
+                openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
+            else
+                echo "🔄 Skipping OpenClaw gateway restart (mock environment detected)..."
+            fi
         fi
+    else
+        echo "🔄 Skipping OpenClaw gateway restart (--no-restart passed)..."
     fi
 
     echo "✅ ROLLBACK SUCCESS: $SLUG restored from backup."

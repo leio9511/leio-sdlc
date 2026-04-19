@@ -22,6 +22,12 @@ if [ -z "$LATEST_BACKUP" ]; then
     exit 1
 fi
 
+# Orchestrator standard guardrails: Prevent rollback during active SDLC sessions
+if [ -f "$PROD_DIR/.sdlc_repo.lock" ] || [ -f "$PROD_DIR/.coder_session" ]; then
+    echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock or .coder_session found)."
+    exit 1
+fi
+
 echo "Rolling back $SLUG from $LATEST_BACKUP..."
 rm -rf "$PROD_DIR"
 tar -xzf "$LATEST_BACKUP" -C "$OPENCLAW_DIR"
