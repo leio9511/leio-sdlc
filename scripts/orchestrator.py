@@ -208,7 +208,7 @@ class SanityContext:
         self.force_replan = force_replan
 
     def perform_healthy_check(self):
-        if self.force_replan is not False:
+        if self.force_replan != "false":
             return
 
         import os, sys, subprocess
@@ -332,7 +332,7 @@ def main():
         sys.exit(1)
 
     if getattr(args, "force_replan", None) is not None:
-        args.force_replan = (args.force_replan == "true")
+        args.force_replan = str(args.force_replan).lower()
 
     # SDLC_TEST_MODE Leakage Guardrail
     if os.environ.get("SDLC_TEST_MODE") == "true":
@@ -382,9 +382,9 @@ def main():
             sys.exit(1)
         
         branch_output = drun(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
-        force_replan_val = getattr(args, "force_replan", False)
+        force_replan_val = getattr(args, "force_replan", "false")
         
-        if force_replan_val is not False:
+        if force_replan_val != "false":
             if branch_output not in ["master", "main"]:
                 print(f"[FATAL] Orchestrator must be started from the master or main branch. Current: {branch_output}")
                 print(HandoffPrompter.get_prompt("invalid_git_boundary"))
@@ -459,10 +459,10 @@ def main():
     job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
     run_dir = job_dir
 
-    sanity = SanityContext(workdir, job_dir, base_name, getattr(args, "force_replan", False))
+    sanity = SanityContext(workdir, job_dir, base_name, getattr(args, "force_replan", "false"))
     sanity.perform_healthy_check()
 
-    if os.path.exists(job_dir) and not args.force_replan:
+    if os.path.exists(job_dir) and args.force_replan == "false":
         md_files = glob.glob(os.path.join(job_dir, "*.md"))
         if len(md_files) > 0 and not os.path.exists(os.path.join(job_dir, ".queue_empty_force")):
             import shlex
@@ -473,7 +473,7 @@ def main():
         elif os.path.exists(os.path.join(job_dir, ".queue_empty_force")):
             pass
         else:
-            if args.force_replan and os.path.exists(job_dir):
+            if args.force_replan == "true" and os.path.exists(job_dir):
                 import shutil
                 shutil.rmtree(job_dir)
             import shlex
@@ -498,7 +498,7 @@ def main():
                 sys.exit(1)
             notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
     else:
-        if args.force_replan and os.path.exists(job_dir):
+        if args.force_replan == "true" and os.path.exists(job_dir):
             import shutil
             shutil.rmtree(job_dir)
         import shlex

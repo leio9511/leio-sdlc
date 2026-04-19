@@ -25,7 +25,7 @@ def test_sanity_audit_pass(tmp_path):
         
         mock_run.side_effect = [mock_branch, mock_merge]
         
-        ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", False)
+        ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", "false")
         ctx.perform_healthy_check()  # Should not raise
         
 def test_sanity_audit_missing_baseline(tmp_path, capsys):
@@ -34,7 +34,7 @@ def test_sanity_audit_missing_baseline(tmp_path, capsys):
     job_dir = tmp_path / "job_dir"
     job_dir.mkdir()
     
-    ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", False)
+    ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", "false")
     with pytest.raises(SystemExit):
         ctx.perform_healthy_check()
     out, err = capsys.readouterr()
@@ -45,7 +45,7 @@ def test_sanity_audit_missing_job_dir(tmp_path, capsys):
         del os.environ['SDLC_TEST_MODE']
     job_dir = tmp_path / "job_dir"
     
-    ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", False)
+    ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", "false")
     with pytest.raises(SystemExit):
         ctx.perform_healthy_check()
     out, err = capsys.readouterr()
@@ -69,7 +69,7 @@ def test_sanity_audit_unreachable_head(tmp_path, capsys):
         
         mock_run.side_effect = [mock_branch, mock_merge]
         
-        ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", False)
+        ctx = SanityContext(str(tmp_path), str(job_dir), "PRD_Test", "false")
         with pytest.raises(SystemExit):
             ctx.perform_healthy_check()
         out, err = capsys.readouterr()

@@ -90,7 +90,7 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         args.workdir = "/dummy"
         args.prd_file = "dummy.md"
         args.job_dir = "docs/PRs/dummy"
-        args.force_replan = False
+        args.force_replan = "false"
         args.channel = "slack:C123"
         args.notify_target = None
         args.cleanup = False
@@ -145,7 +145,7 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
         args.workdir = "/dummy"
         args.prd_file = "dummy.md"
         args.job_dir = "docs/PRs/dummy"
-        args.force_replan = False
+        args.force_replan = "false"
         args.channel = "slack:C123"
         args.notify_target = None
         args.max_prs_to_process = 0
