@@ -34,22 +34,24 @@ Before entering the state machine, the orchestrator MUST build a `SanityContext`
 ### 3.2 Logic for --resume (Checkpoint-based Task Restart)
 If `--resume` is provided:
 1.  **Context Discovery**: The orchestrator utilizes the `StructuredStateParser` to scan the job directory.
-2.  **Workspace Purification (PRE-CONDITION)**: If the workspace is dirty: Execute the `--cleanup` logic (Stage everything -> WIP Commit -> Rename branch -> Checkout master). This MUST be done before modifying any metadata to preserve the broken state.
+2.  **Workspace Purification (PRE-CONDITION)**: If the workspace is dirty: Execute the `--cleanup` logic (Stage everything -> WIP Commit -> **SAFE Branch Isolation** -> Checkout master). 
+    - **SAFE Branch Isolation**: If current branch is `master/main`, DO NOT rename. Use `git stash push` as the evacuation layer.
 3.  **State Reset (MANDATORY)**: If any PR is found in `in_progress` state, its YAML frontmatter MUST be reset to `status: open`.
 4.  **Task Re-ignition**: Set `force_replan = false` internally and proceed to `State 0`.
 
 ### 3.3 Atomic Withdrawal (Target Tree Snapshot with Audit)
 If `--withdraw` is provided:
-1.  **Safety Check**: Verify the user is on `master/main`.
+1.  **Safety Context**: Identify current branch.
 2.  **Lineage Audit (Non-blocking)**: 
     - Execute `git log {baseline_hash}..HEAD --oneline`.
     - If non-SDLC commits exist, output a **GOVERNANCE WARNING** log.
-3.  **Workspace Purification**: Reuse the `--resume` logic to safely stage and quarantine any dirty state into a WIP commit and isolated branch. This MUST be done before the hard reset to prevent data loss.
+3.  **Workspace Purification (Non-destructive)**: 
+    - Always use the non-destructive purification logic defined in 3.2 to evacuate dirty state into a WIP stash or branch, ensuring `master/main` is never renamed.
 4.  **State Capture**: Capture current HEAD hash as `{interrupted_hash}`.
 5.  **Baseline Retrieval**: Read `baseline_commit.txt` to get `{baseline_hash}`.
-6.  **Target Tree Snapshot Restoration (Force Baseline Alignment)**: 
-    - Execute `git reset --hard {baseline_hash}`.
-    - Execute `git reset --soft {interrupted_hash}`.
+6.  **Force Baseline Alignment (Atomic)**: 
+    - If on `master/main`: Perform the Hard/Soft reset combo to align the current tree with the baseline.
+    - If on a Feature Branch: Force checkout `master/main` first, then perform the alignment.
     - **Idempotency Guard**: Execute `git diff --cached --quiet`. Only if changes exist, proceed.
     - Execute `git commit -m "chore: force baseline alignment of PRD {prd_name} to baseline"`.
 7.  **Job Teardown**: Mark the PRD job directory with the `.withdrawn` suffix.
@@ -97,6 +99,7 @@ Refactor `get_next_pr.py` and `update_pr_status.py` to use a dedicated parser ut
 - YAML_States: ["status: open", "status: in_progress", "status: closed", "status: blocked"]
 - Directory_Markers: [".withdrawn", ".sdlc_runs"]
 - Rollback_Message: "chore: force baseline alignment of PRD {prd_name} to baseline"
+- Stash_Message: "SDLC Withdrawal Emergency Stash"
 
 ---
 
