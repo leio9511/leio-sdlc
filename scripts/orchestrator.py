@@ -245,6 +245,7 @@ def main():
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass # Reaper safety check: process already reaped or pgid not found the workspace path check")
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
+    parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
@@ -326,7 +327,7 @@ def main():
 
         sys.exit(0)
 
-    if not args.test_sleep and getattr(args, "force_replan", None) is None:
+    if not args.test_sleep and getattr(args, "force_replan", None) is None and not getattr(args, "resume", False):
         print("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.")
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
@@ -372,6 +373,36 @@ def main():
             sys.exit(1)
 
     os.chdir(workdir)
+
+    if getattr(args, "resume", False):
+        from structured_state_parser import get_status, update_status
+        
+        prd_filename = os.path.basename(args.prd_file)
+        base_name, _ = os.path.splitext(prd_filename)
+        target_project_name = os.path.basename(os.path.abspath(workdir))
+        resume_job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+        
+        if os.path.exists(resume_job_dir):
+            for pr_file in glob.glob(os.path.join(resume_job_dir, "PR_*.md")):
+                try:
+                    if get_status(pr_file) == "in_progress":
+                        update_status(pr_file, "open")
+                except ValueError:
+                    pass
+                    
+        status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+        if status_output.strip():
+            branch_output = drun(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
+            if branch_output in ["master", "main"]:
+                drun(["git", "stash", "push", "-m", "SDLC Withdrawal Emergency Stash"], check=False)
+            else:
+                drun(["git", "add", "-A"], check=False)
+                drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+                timestamp = int(time.time())
+                drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
+                drun(["git", "checkout", "master"], check=False)
+                
+        args.force_replan = "false"
 
     validate_prd_is_committed(args.prd_file, workdir)
     dlog("Checking branch guardrail...")
