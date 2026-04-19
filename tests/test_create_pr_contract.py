@@ -35,7 +35,7 @@ class TestCreatePrContract(unittest.TestCase):
         with open(pr_file, "r") as f:
             content = f.read()
             
-        self.assertTrue(content.startswith("status: open"))
+        self.assertTrue(content.startswith("---\nstatus: open\n---"))
         self.assertIn("PR-001: Test PR", content)
 
     def test_config_template_contains_retry_limits(self):
