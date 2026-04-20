@@ -62,8 +62,16 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - `scripts/spawn_arbitrator.py`
 - `scripts/spawn_manager.py`
 - `scripts/utils_api_key.py` (New file)
+- `tests/test_utils_api_key.py` (New file)
 - `tests/test_orchestrator_load_balancing.py`
 - `tests/test_orchestrator.py`
+- `tests/test_spawn_auditor.py`
+- `tests/test_spawn_coder.py`
+- `tests/test_spawn_reviewer.py`
+- `tests/test_spawn_verifier.py`
+- `tests/test_spawn_arbitrator.py`
+- `tests/test_spawn_manager.py`
+- `tests/test_spawn_planner.py`
 - `tests/test_spawn_planner_uat.py` (New file)
 - `config/sdlc_config.json.template`
 
@@ -85,6 +93,8 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **v8.0 Revision Rationale**: Added `max_uat_recovery_attempts` to Section 7 and `config/sdlc_config.json.template` to Section 6.
 - **Audit Rejection (v8.0)**: Rejected by Auditor due to Blast Radius leakage (missing unit test files like `tests/test_orchestrator.py` in Section 6) and String Determinism (`STATE_UAT_RECOVERY` missing from Section 7).
 - **v9.0 Revision Rationale**: Added `tests/test_orchestrator.py` and a new `tests/test_spawn_planner_uat.py` to Section 6. Added `STATE_UAT_RECOVERY` and `STATE_PLANNING_EVAL` to Section 7.
+- **Audit Rejection (v9.0)**: Rejected due to implicit blast radius (missing test files for all `spawn_*.py` scripts and `utils_api_key.py`) and String Determinism (`UAT_BLOCKED` missing from Section 7).
+- **v10.0 Revision Rationale**: Added all relevant test files to Section 6. Added `UAT_BLOCKED` and `UAT_ERROR` to Section 7 explicitly.
 
 ---
 
@@ -118,6 +128,16 @@ PASS
 - **`config_keys` (For sdlc_config.json)**:
 ```text
 max_uat_recovery_attempts
+```
+
+- **`uat_blocked_state` (For orchestrator.py - STATE.md payload)**:
+```text
+UAT_BLOCKED
+```
+
+- **`uat_error_state` (For orchestrator.py - STATE.md payload)**:
+```text
+UAT_ERROR
 ```
 
 - **`fsm_states` (For orchestrator.py - Logging and state tracking)**:
