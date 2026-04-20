@@ -115,6 +115,16 @@ def main():
     else:
         print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
         session_id = f"prd_auditor_{int(time.time())}"
+        
+        from utils_api_key import get_api_keys_from_config, assign_gemini_api_key
+        config_path = os.path.join(SDLC_ROOT, "config", "sdlc_config.json")
+        gemini_api_keys = get_api_keys_from_config(config_path)
+        if gemini_api_keys:
+            state_file_path = os.path.join(os.path.abspath(args.workdir), ".sdlc_runs", ".session_keys.json")
+            assigned_key = assign_gemini_api_key(session_id, gemini_api_keys, state_file_path)
+            if assigned_key:
+                os.environ["GEMINI_API_KEY"] = assigned_key
+
         result = invoke_agent(task_string, session_key=session_id, role="auditor")
         output = result.stdout
 
