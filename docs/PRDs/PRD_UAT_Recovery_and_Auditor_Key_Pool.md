@@ -14,7 +14,7 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 2. **Dedicated Recovery Interface for Planner:** Add a new parameter `--replan-uat-failures <uat_report.json>` to `spawn_planner.py`, accompanied by a specialized Recovery Prompt focused exclusively on fulfilling `MISSING` requirements without rewriting existing functionality.
 3. **UAT Circuit Breaker & Finite Agentic Loop:** Implement a strict 3-tier error handling routing in `orchestrator.py` for UAT states:
    - **Business Success (`PASS`)**: Finish pipeline.
-   - **Business Failure (`MISSING`)**: Trigger automatic Planner recovery. **Crucially, implement a `max_uat_recovery_attempts` limit (configurable in `sdlc_config.json`, defaulting to 5). If this limit is exceeded, trigger a Hard Stop to prevent infinite agentic loops and token exhaustion.**
+   - **Business Failure (`MISSING`)**: Trigger automatic Planner recovery. **Crucially, implement a `max_uat_recovery_attempts` limit (configurable in `sdlc_config.json`, defaulting to 5). If this limit is exceeded, trigger a Hard Stop to prevent infinite agentic loops and token exhaustion.** To accurately determine if items are missing, the orchestrator MUST parse the `verification_details` array from the `uat_report.json` (not an arbitrary "missing" field) and filter for items where `"status" == "MISSING"`.
    - **System Error (Malformed JSON, Timeout, Exception)**: Implement a 3-strike retry loop. If it still fails, perform a **Hard Stop** (Circuit Breaker), send a Slack escalation alert, freeze the workspace, and update state to `UAT_ERROR` or `UAT_BLOCKED`.
 4. **Auditor Load-Balancing:** Refactor `spawn_auditor.py` to integrate the existing `assign_gemini_api_key` logic. It must read keys from `sdlc_config.json` and persist fingerprint mappings in `.sdlc_runs/.session_keys.json` to leverage session stickiness.
 
@@ -28,9 +28,9 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 
 - **Scenario 1: UAT Detects Missing Requirements (Within Retries)**
-  - **Given** The pipeline reaches the UAT phase, `uat_recovery_count` is below the limit, and the UAT verifier outputs `{"status": "NEEDS_FIX", "missing": ["Log output missing"]}`.
+  - **Given** The pipeline reaches the UAT phase, `uat_recovery_count` is below the limit, and the UAT verifier outputs `{"status": "NEEDS_FIX", "verification_details": [{"status": "MISSING", "requirement": "Log output", "evidence": "Not found"}]}`.
   - **When** `orchestrator.py` processes this result.
-  - **Then** It explicitly transitions to `STATE_UAT_RECOVERY`, invokes `spawn_planner.py` with `--replan-uat-failures`, increments the counter, formally loads the new patch PRs, and transitions back to execution.
+  - **Then** It extracts the missing items from `verification_details`, explicitly transitions to `STATE_UAT_RECOVERY`, invokes `spawn_planner.py` with `--replan-uat-failures`, increments the counter, formally loads the new patch PRs, and transitions back to execution.
 
 - **Scenario 1B: UAT Missing Requirements (Exceeds Retries)**
   - **Given** UAT detects missing requirements but `uat_recovery_count` has reached `max_uat_recovery_attempts` (default 5).
@@ -66,6 +66,7 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **v2.0 Revision Rationale**: Moved prompt to Section 7. Mandated extraction of API key logic into `utils_api_key.py` to adhere to DRY principles.
 - **Audit Rejection (v2.0)**: Rejected by Auditor due to Infinite Agentic Loop risk (no max retries for UAT recovery) and Implicit Queue Mutation (appending to queue instead of formal FSM transition).
 - **v3.0 Revision Rationale**: Introduced `max_uat_recovery_attempts` config (default 5) and explicit FSM states (`STATE_UAT_RECOVERY`, `STATE_UAT_BLOCKED`) to ensure finite loops and deterministic execution.
+- **v4.0 Revision Rationale**: Boss mandated rollback. Corrected the PRD design flaw where it assumed an incorrect UAT JSON schema. Ensured the BDD scenario and requirements explicitly instruct the orchestrator to parse the `verification_details` array from `uat_report.json` to extract missing items, matching the actual data contract of `spawn_verifier.py`.
 
 ---
 
