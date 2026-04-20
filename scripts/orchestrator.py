@@ -83,6 +83,67 @@ def dpopen(cmd, **kwargs):
     logger.debug(f"DEBUG [Subprocess Popen]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     return subprocess.Popen(cmd, **kwargs)
 
+
+import hashlib
+
+def assign_gemini_api_key(session_key, gemini_api_keys, state_file_path):
+    if not gemini_api_keys:
+        return None
+        
+    os.makedirs(os.path.dirname(state_file_path), exist_ok=True)
+    try:
+        fd = os.open(state_file_path, os.O_CREAT | os.O_RDWR)
+    except Exception:
+        # Graceful degradation if file cannot be opened
+        return None
+        
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        
+        state = {}
+        try:
+            file_size = os.fstat(fd).st_size
+            if file_size > 0:
+                os.lseek(fd, 0, os.SEEK_SET)
+                content = os.read(fd, file_size).decode('utf-8')
+                state = json.loads(content)
+        except Exception:
+            pass
+            
+        fingerprint = state.get(session_key)
+        
+        if fingerprint:
+            for key in gemini_api_keys:
+                if key.endswith(fingerprint):
+                    return key
+                    
+        idx = int(hashlib.md5(session_key.encode("utf-8")).hexdigest(), 16) % len(gemini_api_keys)
+        selected_key = gemini_api_keys[idx]
+        new_fingerprint = selected_key[-8:] if len(selected_key) >= 8 else selected_key
+        
+        state[session_key] = new_fingerprint
+        
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, json.dumps(state, indent=2).encode('utf-8'))
+        
+        return selected_key
+        
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+def get_env_with_gemini_key(session_key, gemini_api_keys, global_dir):
+    env = os.environ.copy()
+    if not gemini_api_keys:
+        return env
+        
+    state_file_path = os.path.join(global_dir, ".sdlc_runs", ".session_keys.json")
+    assigned_key = assign_gemini_api_key(session_key, gemini_api_keys, state_file_path)
+    if assigned_key:
+        env["GEMINI_API_KEY"] = assigned_key
+    return env
+
 def parse_affected_projects(prd_file):
     if not os.path.exists(prd_file):
         return []
@@ -264,6 +325,7 @@ def main():
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     sdlc_root = os.path.dirname(RUNTIME_DIR)
     app_config = load_or_merge_config(sdlc_root)
+    gemini_api_keys = app_config.get('gemini_api_keys', [])
     
     resolved_global_dir = None
     if args.global_dir:
@@ -596,7 +658,7 @@ def main():
             notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
             notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
             try:
-                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
+                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                 proc.wait()
                 if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
             except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -621,7 +683,7 @@ def main():
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
-            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
+            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
             proc.wait()
             if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -721,7 +783,7 @@ def main():
                     if args.enable_exec_from_workspace:
                         uat_cmd.append("--enable-exec-from-workspace")
                         
-                    res = drun(uat_cmd, capture_output=True, text=True)
+                    res = drun(uat_cmd, capture_output=True, text=True, env=get_env_with_gemini_key(f"{base_name}_verifier", gemini_api_keys, global_dir))
                     if hasattr(args, "debug") and args.debug:
                         logger.debug(f"UAT Verifier returned {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
 
@@ -795,7 +857,7 @@ def main():
                         coder_cmd.extend(["--system-alert", system_alert_text])
                         system_alert_text = None
                         
-                    proc = dpopen(coder_cmd, start_new_session=True)
+                    proc = dpopen(coder_cmd, start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_coder", gemini_api_keys, global_dir))
                     try:
                         proc.wait(timeout=MAX_RUNTIME)
                     except subprocess.TimeoutExpired:
@@ -844,7 +906,7 @@ def main():
                     logger.info(f"State 4: Spawning Reviewer for {current_pr}")
                     dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True)
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                     proc.wait()
                     
                     json_retry_count = 0
@@ -874,7 +936,7 @@ def main():
                                 break
                                 
                             sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                             proc.wait()
                                 
                     if verdict == "APPROVED":
@@ -948,7 +1010,7 @@ def main():
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True)
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before
