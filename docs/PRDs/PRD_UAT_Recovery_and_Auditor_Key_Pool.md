@@ -20,22 +20,22 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Target Files:** `scripts/orchestrator.py`, `scripts/spawn_planner.py`, `scripts/spawn_auditor.py`.
-- **Orchestrator UAT Loop (FSM Transition):** Inside the orchestrator's main flow, when UAT returns `NEEDS_FIX` with `MISSING` items, it must check the `uat_recovery_count` against `max_uat_recovery_attempts` (from `sdlc_config.json`, default 5). If within limit, transition explicitly to a new state `STATE_UAT_RECOVERY`. In this state, it calls `subprocess.run(["python3", "spawn_planner.py", "--prd-file", prd_file, "--replan-uat-failures", uat_report_path])`. Rather than implicitly mutating the active queue, it explicitly transitions back to `STATE_PLANNING_EVAL` or `STATE_EXECUTING_PRS` by formally loading the new PRs from the workspace and resetting the execution cursor, ensuring a deterministic FSM flow. If the retry limit is hit, transition to `STATE_UAT_BLOCKED` and escalate.
+- **Orchestrator UAT Loop (FSM Transition):** Inside the orchestrator's main flow, when UAT returns `NEEDS_FIX` with `MISSING` items, it must check the `uat_recovery_count` against `max_uat_recovery_attempts` (from `sdlc_config.json`, default 5). If within limit, transition explicitly to a new state (e.g. log "State 7: UAT Recovery"). In this state, it calls `subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", prd_file, "--replan-uat-failures", uat_report_path])` ensuring the absolute path via `RUNTIME_DIR` is used to prevent boundary bypasses. Rather than implicitly mutating the active queue, it explicitly transitions back to the execution state by formally loading the new PRs from the workspace and resetting the execution cursor, ensuring a deterministic FSM flow. If the retry limit is hit, transition to a blocked state and escalate.
 - **Circuit Breaker:** Wrap the UAT verification call in `orchestrator.py` with `utils_json.py` logic and a 3-strike retry loop. Raise a specific exception or set a `UAT_BLOCKED` state that breaks the main loop and triggers the Slack notification without cleaning the workspace.
 - **Planner Recovery Prompt:** In `spawn_planner.py`, if `--replan-uat-failures` is provided, load a dedicated system prompt. The prompt string MUST be exactly identical to the `planner_recovery_prompt` defined in Section 7 (Hardcoded Content).
-- **Auditor Key Integration (DRY Principle):** Do NOT replicate the API key assignment logic in `spawn_auditor.py`. Extract the existing key assignment logic from `orchestrator.py` and other scripts into a shared module (e.g., `scripts/utils_api_key.py`). Refactor all relevant scripts, including `spawn_auditor.py`, to import and call this shared utility to assign the sticky API key based on fingerprint mapping.
+- **Auditor Key Integration (DRY Principle):** Do NOT replicate the API key assignment logic in `spawn_auditor.py`. Extract the existing key assignment logic from `orchestrator.py` and other scripts into a shared module (e.g., `scripts/utils_api_key.py`). Refactor all relevant scripts, including `spawn_auditor.py`, to import and call this shared utility. MUST use `lock_utils.py` for concurrent-safe read/write access to `.session_keys.json` to prevent data races.
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 
 - **Scenario 1: UAT Detects Missing Requirements (Within Retries)**
   - **Given** The pipeline reaches the UAT phase, `uat_recovery_count` is below the limit, and the UAT verifier outputs `{"status": "NEEDS_FIX", "verification_details": [{"status": "MISSING", "requirement": "Log output", "evidence": "Not found"}]}`.
   - **When** `orchestrator.py` processes this result.
-  - **Then** It extracts the missing items from `verification_details`, explicitly transitions to `STATE_UAT_RECOVERY`, invokes `spawn_planner.py` with `--replan-uat-failures`, increments the counter, formally loads the new patch PRs, and transitions back to execution.
+  - **Then** It extracts the missing items, spawns a planner process to handle the failures, and resumes the execution pipeline by picking up the new PRs from the workspace.
 
 - **Scenario 1B: UAT Missing Requirements (Exceeds Retries)**
-  - **Given** UAT detects missing requirements but `uat_recovery_count` has reached `max_uat_recovery_attempts` (default 5).
-  - **When** `orchestrator.py` evaluates the FSM state.
-  - **Then** It performs a Hard Stop, transitions to `STATE_UAT_BLOCKED`, and sends an escalation alert to prevent infinite loops.
+  - **Given** UAT detects missing requirements but the recovery count has reached the configured maximum.
+  - **When** `orchestrator.py` evaluates the state.
+  - **Then** It performs a Hard Stop, writes `UAT_ERROR` to the workspace state file, and sends the hardcoded escalation alert.
 
 - **Scenario 2: UAT System Error Circuit Breaker**
   - **Given** The UAT verifier repeatedly times out or returns malformed, non-JSON output 3 times in a row.
@@ -73,7 +73,8 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **v3.0 Revision Rationale**: Introduced `max_uat_recovery_attempts` config (default 5) and explicit FSM states (`STATE_UAT_RECOVERY`, `STATE_UAT_BLOCKED`) to ensure finite loops and deterministic execution.
 - **v4.0 Revision Rationale**: Boss mandated rollback. Corrected the PRD design flaw where it assumed an incorrect UAT JSON schema. Ensured the BDD scenario and requirements explicitly instruct the orchestrator to parse the `verification_details` array from `uat_report.json` to extract missing items, matching the actual data contract of `spawn_verifier.py`.
 - **Audit Rejection (v4.0)**: Rejected by Auditor due to Blast Radius leakage (missing `spawn_coder.py`, `spawn_reviewer.py`, etc., in Section 6) and String Determinism violation (missing hardcoded escalation alert for UAT retries exceeded).
-- **v5.0 Revision Rationale**: Added all `spawn_*.py` scripts to Section 6 to safely authorize the DRY refactoring of API keys. Added `uat_retry_exceeded_alert` to Section 7 to prevent LLM hallucination during max-retries escalation.
+- **Audit Rejection (v5.0)**: Rejected by Auditor due to String Determinism violation (JSON schema keys and `UAT_ERROR` not listed in Section 7), BDD violation (source-level FSM variables exposed), and critical Anti-patterns (relative path invocation breaking sandboxes; concurrent I/O on JSON without `lock_utils.py`).
+- **v6.0 Revision Rationale**: Fixed BDD to test blackbox observable behavior only. Explicitly mandated `RUNTIME_DIR` for absolute path execution and mandated `lock_utils.py` for `.session_keys.json` data race prevention. Added JSON schema keys to Section 7.
 
 ---
 
@@ -88,6 +89,19 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **`uat_retry_exceeded_alert` (For orchestrator.py - Retries Exceeded)**:
 ```text
 🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。排查完毕后可使用 `--resume` 恢复执行。*
+```
+
+- **`uat_error_state` (For orchestrator.py - STATE.md payload)**:
+```text
+UAT_ERROR
+```
+
+- **`verification_json_keys` (For orchestrator.py - parsing uat_report.json)**:
+```text
+verification_details
+status
+MISSING
+NEEDS_FIX
 ```
 
 - **`planner_recovery_prompt` (For spawn_planner.py)**:
