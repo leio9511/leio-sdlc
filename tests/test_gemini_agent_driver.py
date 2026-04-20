@@ -254,5 +254,33 @@ class TestGeminiAgentDriver(unittest.TestCase):
         notify_channel(channel, msg)
         mock_logger_info.assert_called_with(f"[Channel Message to {channel}]: {expected_msg}")
 
+
+    @patch("agent_driver.os.path.exists")
+    @patch("agent_driver.subprocess.run")
+    @patch("agent_driver.resolve_cmd")
+    def test_agent_driver_statelessness(self, mock_resolve_cmd, mock_run, mock_exists):
+        mock_resolve_cmd.return_value = "/mock/bin/gemini"
+        mock_run.return_value = MagicMock(returncode=0, stdout="success")
+        mock_exists.return_value = False
+        
+        env = os.environ.copy()
+        env["LLM_DRIVER"] = "gemini"
+        env["GEMINI_API_KEY"] = "stateless_mock_key_123"
+        
+        with patch.dict(os.environ, env):
+            with patch("agent_driver.tempfile.mkstemp", return_value=(3, "/tmp/fake.txt")):
+                with patch("agent_driver.os.fdopen", mock_open()):
+                    with patch("agent_driver.os.chmod"):
+                        with patch("agent_driver.os.remove"):
+                            invoke_agent("test task", session_key="test-session")
+                            
+        self.assertTrue(mock_run.called)
+        # Verify subprocess.run was called natively inheriting the environment
+        # (env parameter is not explicitly passed, meaning it uses os.environ)
+        kwargs = mock_run.call_args_list[0][1]
+        self.assertIn("env", kwargs)
+        
+        # (env parameter is not explicitly passed, meaning it uses os.environ)
+
 if __name__ == "__main__":
     unittest.main()

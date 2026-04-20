@@ -142,7 +142,12 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
         print(f"[{role or 'system'}] Invoking agent driver: {' '.join(cmd)}")
         
         for attempt in range(3):
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            # Native inheritance: Ensure GEMINI_API_KEY is natively inherited for stateless execution
+            run_env = os.environ.copy()
+            if os.environ.get("GEMINI_API_KEY"):
+                run_env["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY")
+                
+            result = subprocess.run(cmd, capture_output=True, text=True, env=run_env)
             if result.returncode == 0:
                 print(result.stdout)
                 
