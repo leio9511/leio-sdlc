@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[ISSUE-1155] Gemini Load Balancing Architecture**: Implemented stateful key assignment in `orchestrator.py` with anti-drift fingerprints and stateless environment inheritance in `agent_driver.py`. Verified via high-concurrency E2E test harness. (v0.9.3)
 - [x] **[ISSUE-1107] Planner Slice Numbering Prompt Hardening**: Modified `config/prompts.json` to strictly enforce the static pass-through of the `--insert-after` argument, fixing the double-nested sub-numbering hallucination bug.
 - [x] **[ISSUE-1094] Deploy Path and Broadcast Fix**: Injected absolute path anchors to deploy scripts to prevent SLUG extraction drift. Injected CLI `shlex.join` full command broadcast into Orchestrator and Auditor Slack notifications to ensure immediate execution traceability.
 - [x] **[HOTFIX-1094] Config Pollution & Path Chaos Recovery**: Decoupled `RUNTIME_DIR`, `GLOBAL_DIR`, and `WORKDIR` across all engine scripts. Enforced `SDLC_TEST_MODE=true` strict guardrails to prevent `load_or_merge_config` from physically writing `config/sdlc_config.json` into the target source tree, fully eradicating false-positive dirty state pipeline crashes.
