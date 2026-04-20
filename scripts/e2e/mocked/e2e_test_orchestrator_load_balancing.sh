@@ -10,20 +10,33 @@ export PYTHONPATH="$ROOT_DIR/scripts:$PYTHONPATH"
 TMP_DIR=$(mktemp -d)
 trap "rm -rf $TMP_DIR" EXIT
 
-# The acceptance criteria wants us to verify file-lock stability for .sdlc_runs/.session_keys.json
-STATE_FILE="$TMP_DIR/.sdlc_runs/.session_keys.json"
-mkdir -p "$(dirname "$STATE_FILE")"
+CONFIG_DIR="$TMP_DIR/config"
+RUNS_DIR="$TMP_DIR/.sdlc_runs"
+mkdir -p "$CONFIG_DIR"
+mkdir -p "$RUNS_DIR"
 
-cat << 'PYEOF' > "$TMP_DIR/test_harness.py"
+CONFIG_FILE="$CONFIG_DIR/sdlc_config.json"
+STATE_FILE="$RUNS_DIR/.session_keys.json"
+
+cat << 'JSON' > "$CONFIG_FILE"
+{
+  "gemini_api_keys": ["KEY_1_00000001", "KEY_2_00000002", "KEY_3_00000003"]
+}
+JSON
+
+# Python harness
+HARNESS="$TMP_DIR/test_harness.py"
+cat << 'PYEOF' > "$HARNESS"
 import sys
 import json
 from orchestrator import assign_gemini_api_key
 
 def main():
     session_key = sys.argv[1]
-    keys = json.loads(sys.argv[2])
+    config_file = sys.argv[2]
     state_file = sys.argv[3]
-    
+    with open(config_file, "r") as f:
+        keys = json.load(f).get("gemini_api_keys", [])
     assigned = assign_gemini_api_key(session_key, keys, state_file)
     print(assigned)
 
@@ -31,58 +44,66 @@ if __name__ == "__main__":
     main()
 PYEOF
 
-echo "Scenario 1: Backward Compatibility (No Keys Configured)"
-EMPTY_ASSIGNED=$(python3 "$TMP_DIR/test_harness.py" "session_xyz" '[]' "$STATE_FILE")
+echo "Testing First Assignment & File-Lock Stability..."
+pids=""
+for i in {1..20}; do
+    python3 "$HARNESS" "sess_test" "$CONFIG_FILE" "$STATE_FILE" > "$TMP_DIR/out_$i" &
+    pids="$pids $!"
+done
+wait $pids
+
+# Verify all outputs are the same
+ASSIGNED=$(cat "$TMP_DIR/out_1")
+for i in {2..20}; do
+    out=$(cat "$TMP_DIR/out_$i")
+    if [ "$out" != "$ASSIGNED" ]; then
+        echo "FAIL: Concurrent invocations returned different keys ($out vs $ASSIGNED)"
+        exit 1
+    fi
+done
+echo "Concurrent assignment passed. Assigned: $ASSIGNED"
+
+echo "Testing Anti-Drift Stickiness..."
+# Modify config to change order
+cat << 'JSON' > "$CONFIG_FILE"
+{
+  "gemini_api_keys": ["KEY_X_99999999", "KEY_3_00000003", "KEY_2_00000002", "KEY_1_00000001"]
+}
+JSON
+NEW_ASSIGNED=$(python3 "$HARNESS" "sess_test" "$CONFIG_FILE" "$STATE_FILE")
+if [ "$NEW_ASSIGNED" != "$ASSIGNED" ]; then
+    echo "FAIL: Anti-Drift failed. Returned $NEW_ASSIGNED instead of $ASSIGNED"
+    exit 1
+fi
+echo "Anti-Drift passed."
+
+echo "Testing Graceful Degradation..."
+# Delete the assigned key from config
+cat << 'JSON' > "$CONFIG_FILE"
+{
+  "gemini_api_keys": ["KEY_X_99999999", "KEY_Y_88888888"]
+}
+JSON
+DEGRADED_ASSIGNED=$(python3 "$HARNESS" "sess_test" "$CONFIG_FILE" "$STATE_FILE")
+if [ "$DEGRADED_ASSIGNED" == "$ASSIGNED" ]; then
+    echo "FAIL: Graceful Degradation failed to return a new key"
+    exit 1
+fi
+if [[ "$DEGRADED_ASSIGNED" != "KEY_X_99999999" && "$DEGRADED_ASSIGNED" != "KEY_Y_88888888" ]]; then
+    echo "FAIL: Graceful Degradation returned invalid key $DEGRADED_ASSIGNED"
+    exit 1
+fi
+echo "Graceful Degradation passed. Assigned new key: $DEGRADED_ASSIGNED"
+
+echo "Testing Backward Compatibility..."
+cat << 'JSON' > "$CONFIG_FILE"
+{}
+JSON
+EMPTY_ASSIGNED=$(python3 "$HARNESS" "sess_test" "$CONFIG_FILE" "$STATE_FILE")
 if [ "$EMPTY_ASSIGNED" != "None" ]; then
     echo "FAIL: Empty config didn't return None. Returned: $EMPTY_ASSIGNED"
     exit 1
 fi
 echo "Backward Compatibility passed."
 
-echo "Scenario 2: First Execution (Stateful Persistence via Orchestrator)"
-for i in {1..20}; do
-  python3 "$TMP_DIR/test_harness.py" "session_xyz" '["key_0_A_11111111", "key_1_B_22222222", "key_2_C_33333333"]' "$STATE_FILE" > /dev/null &
-done
-wait
-
-cat "$STATE_FILE"
-echo ""
-FINGERPRINT=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('session_xyz', ''))")
-if [ -z "$FINGERPRINT" ]; then
-    echo "First Execution failed to persist"
-    exit 1
-fi
-echo "Persisted fingerprint: $FINGERPRINT"
-
-echo "Scenario 3: Anti-Drift Stickiness"
-RESULT=$(python3 "$TMP_DIR/test_harness.py" "session_xyz" '["key_2_C_33333333", "key_0_A_11111111", "key_1_B_22222222"]' "$STATE_FILE")
-echo "Returned key: $RESULT"
-
-if [[ "$RESULT" != *"$FINGERPRINT" ]]; then
-    echo "Anti-Drift Stickiness failed! Expected key ending with $FINGERPRINT, got $RESULT"
-    exit 1
-fi
-
-echo "Scenario 4: Graceful Degradation"
-NEW_KEYS=$(python3 -c "import json; print(json.dumps([k for k in ['key_0_A_11111111', 'key_1_B_22222222', 'key_2_C_33333333'] if not k.endswith('$FINGERPRINT')]))")
-echo "New keys: $NEW_KEYS"
-
-RESULT_DEG=$(python3 "$TMP_DIR/test_harness.py" "session_xyz" "$NEW_KEYS" "$STATE_FILE")
-echo "Returned key after degradation: $RESULT_DEG"
-
-NEW_FINGERPRINT=$(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('session_xyz', ''))")
-if [ -z "$NEW_FINGERPRINT" ]; then
-    echo "Graceful degradation failed to update state file"
-    exit 1
-fi
-
-if [[ "$RESULT_DEG" != *"$NEW_FINGERPRINT" ]]; then
-    echo "Graceful Degradation failed! Expected key ending with $NEW_FINGERPRINT, got $RESULT_DEG"
-    exit 1
-fi
-if [ "$NEW_FINGERPRINT" == "$FINGERPRINT" ]; then
-    echo "Graceful Degradation failed! Fingerprint didn't change"
-    exit 1
-fi
-
-echo "All tests passed."
+echo "All e2e mock tests passed."
