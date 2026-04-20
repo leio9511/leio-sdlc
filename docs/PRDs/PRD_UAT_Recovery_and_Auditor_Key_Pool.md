@@ -20,8 +20,8 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 - **Target Files:** `scripts/orchestrator.py`, `scripts/spawn_planner.py`, `scripts/spawn_auditor.py`.
-- **Orchestrator UAT Loop (FSM Transition):** Inside the orchestrator's main flow, when UAT returns `NEEDS_FIX` with `MISSING` items, it must check the `uat_recovery_count` against `max_uat_recovery_attempts` (from `sdlc_config.json`, default 5). If within limit, transition explicitly to a new state (e.g. log "State 7: UAT Recovery"). In this state, it calls `subprocess.run([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--replan-uat-failures", uat_out_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir])` ensuring the absolute path via `RUNTIME_DIR` is used to prevent boundary bypasses, and injecting API key environment variables via existing utility functions (e.g., `get_env_with_gemini_key`). Rather than implicitly mutating the active queue, it explicitly transitions back to the execution state by formally loading the new PRs from the workspace and resetting the execution cursor, ensuring a deterministic FSM flow. If the retry limit is hit, transition to a blocked state and escalate.
-- **Circuit Breaker:** Wrap the UAT verification call in `orchestrator.py` with `utils_json.py` logic and a 3-strike retry loop. Raise a specific exception or set a `UAT_BLOCKED` state that breaks the main loop and triggers the Slack notification without cleaning the workspace.
+- **Orchestrator UAT Loop (FSM Transition):** Inside the orchestrator's main flow, when UAT returns `NEEDS_FIX` with `MISSING` items, it must check the `uat_recovery_count` against `max_uat_recovery_attempts` (from `sdlc_config.json`, default 5). If within limit, transition explicitly to a new state (e.g. log "State 7: UAT Recovery"). In this state, it MUST use the framework's `dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--replan-uat-failures", uat_out_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(...))` ensuring process group isolation and absolute paths. Rather than implicitly mutating the active queue, it explicitly transitions back to the execution state by formally loading the new PRs from the workspace and resetting the execution cursor, ensuring a deterministic FSM flow. If the retry limit is hit, transition to a blocked state and escalate.
+- **Circuit Breaker & Strict JSON Contract:** Wrap the UAT verification call in `orchestrator.py` with a 3-strike retry loop. Do NOT use `utils_json.py` (Lossy Context Flattening) to scrape the UAT agent's output. The Verifier must output strict, compliant JSON that is parsed directly via `json.loads`. Raise a specific exception or set a `UAT_BLOCKED` state that breaks the main loop and triggers the Slack notification without cleaning the workspace if valid JSON is not received.
 - **Planner Recovery Prompt:** In `spawn_planner.py`, if `--replan-uat-failures` is provided, load a dedicated system prompt. The prompt string MUST be exactly identical to the `planner_recovery_prompt` defined in Section 7 (Hardcoded Content).
 - **Auditor Key Integration (DRY Principle):** Do NOT replicate the API key assignment logic in `spawn_auditor.py`. Extract the existing key assignment logic from `orchestrator.py` and other scripts into a shared module (e.g., `scripts/utils_api_key.py`). Refactor all relevant scripts, including `spawn_auditor.py`, to import and call this shared utility. MUST use `lock_utils.py` for concurrent-safe read/write access to `.session_keys.json` to prevent data races.
 
@@ -62,6 +62,7 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - `scripts/spawn_arbitrator.py`
 - `scripts/spawn_manager.py`
 - `scripts/utils_api_key.py` (New file)
+- `tests/test_orchestrator_load_balancing.py`
 
 ---
 
@@ -75,6 +76,8 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **Audit Rejection (v4.0)**: Rejected by Auditor due to Blast Radius leakage (missing `spawn_coder.py`, `spawn_reviewer.py`, etc., in Section 6) and String Determinism violation (missing hardcoded escalation alert for UAT retries exceeded).
 - **Audit Rejection (v5.0)**: Rejected by Auditor due to String Determinism violation (JSON schema keys and `UAT_ERROR` not listed in Section 7), BDD violation (source-level FSM variables exposed), and critical Anti-patterns (relative path invocation breaking sandboxes; concurrent I/O on JSON without `lock_utils.py`).
 - **v6.0 Revision Rationale**: Fixed BDD to test blackbox observable behavior only. Explicitly mandated `RUNTIME_DIR` for absolute path execution and mandated `lock_utils.py` for `.session_keys.json` data race prevention. Added JSON schema keys to Section 7.
+- **Audit Rejection (v6.0)**: Rejected by Auditor due to Lossy Context Flattening (use of `utils_json.py` instead of strict JSON parser), implicit blast radius (missing `tests/test_orchestrator_load_balancing.py` in Section 6), and breaking architecture isolation (using `subprocess.run` instead of `dpopen`).
+- **v7.0 Revision Rationale**: Replaced `subprocess.run` with `dpopen` to ensure process group isolation. Removed `utils_json.py` scraping to enforce strict JSON contracts. Appended `tests/test_orchestrator_load_balancing.py` to Section 6.
 
 ---
 
