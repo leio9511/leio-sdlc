@@ -132,8 +132,8 @@ def test_prd_template_contains_section_7():
 
 @patch("subprocess.run")
 @patch("spawn_auditor.invoke_agent")
-@patch("utils_api_key.assign_gemini_api_key")
-@patch("utils_api_key.get_api_keys_from_config")
+@patch("spawn_auditor.assign_gemini_api_key")
+@patch("spawn_auditor.get_api_keys_from_config")
 @patch("agent_driver.notify_channel")
 def test_spawn_auditor_load_balancing(mock_notify, mock_get_keys, mock_assign_key, mock_invoke, mock_run, capsys):
     mock_get_keys.return_value = ["key_1", "key_2"]
