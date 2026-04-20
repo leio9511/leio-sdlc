@@ -63,6 +63,7 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - `scripts/spawn_manager.py`
 - `scripts/utils_api_key.py` (New file)
 - `tests/test_orchestrator_load_balancing.py`
+- `config/sdlc_config.json.template`
 
 ---
 
@@ -78,6 +79,8 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **v6.0 Revision Rationale**: Fixed BDD to test blackbox observable behavior only. Explicitly mandated `RUNTIME_DIR` for absolute path execution and mandated `lock_utils.py` for `.session_keys.json` data race prevention. Added JSON schema keys to Section 7.
 - **Audit Rejection (v6.0)**: Rejected by Auditor due to Lossy Context Flattening (use of `utils_json.py` instead of strict JSON parser), implicit blast radius (missing `tests/test_orchestrator_load_balancing.py` in Section 6), and breaking architecture isolation (using `subprocess.run` instead of `dpopen`).
 - **v7.0 Revision Rationale**: Replaced `subprocess.run` with `dpopen` to ensure process group isolation. Removed `utils_json.py` scraping to enforce strict JSON contracts. Appended `tests/test_orchestrator_load_balancing.py` to Section 6.
+- **Audit Rejection (v7.0)**: Rejected by Auditor due to String Determinism violation (`max_uat_recovery_attempts` not in Section 7) and implicit blast radius (`config/sdlc_config.json.template` not in Section 6).
+- **v8.0 Revision Rationale**: Added `max_uat_recovery_attempts` to Section 7 and `config/sdlc_config.json.template` to Section 6.
 
 ---
 
@@ -106,6 +109,11 @@ status
 MISSING
 NEEDS_FIX
 PASS
+```
+
+- **`config_keys` (For sdlc_config.json)**:
+```text
+max_uat_recovery_attempts
 ```
 
 - **`uat_blocked_state` (For orchestrator.py - STATE.md payload)**:
