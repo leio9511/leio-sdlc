@@ -78,7 +78,7 @@ OUT=$(python3 "$ORCHESTRATOR" --max-prs-to-process 0 --workdir "$WORK_DIR" --prd
 echo "DEBUG: git status after orchestrator:"
 git status --porcelain
 
-if [[ "$OUT" != *"[ACTION REQUIRED FOR MANAGER] UAT Failed. uat_report.json is missing or invalid JSON."* ]]; then
+if [[ "$OUT" != *"🚨 *SDLC Pipeline Blocked: UAT Agent"* ]]; then
     echo "Fail Test Case 1: Did not print safe error message for invalid json"
     echo "$OUT"
     exit 1
