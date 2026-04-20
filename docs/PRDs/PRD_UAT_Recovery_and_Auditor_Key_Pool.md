@@ -56,6 +56,11 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - `scripts/orchestrator.py`
 - `scripts/spawn_planner.py`
 - `scripts/spawn_auditor.py`
+- `scripts/spawn_coder.py`
+- `scripts/spawn_reviewer.py`
+- `scripts/spawn_verifier.py`
+- `scripts/spawn_arbitrator.py`
+- `scripts/spawn_manager.py`
 - `scripts/utils_api_key.py` (New file)
 
 ---
@@ -67,15 +72,22 @@ Context_Workdir: /root/.openclaw/workspace/skills/leio-sdlc
 - **Audit Rejection (v2.0)**: Rejected by Auditor due to Infinite Agentic Loop risk (no max retries for UAT recovery) and Implicit Queue Mutation (appending to queue instead of formal FSM transition).
 - **v3.0 Revision Rationale**: Introduced `max_uat_recovery_attempts` config (default 5) and explicit FSM states (`STATE_UAT_RECOVERY`, `STATE_UAT_BLOCKED`) to ensure finite loops and deterministic execution.
 - **v4.0 Revision Rationale**: Boss mandated rollback. Corrected the PRD design flaw where it assumed an incorrect UAT JSON schema. Ensured the BDD scenario and requirements explicitly instruct the orchestrator to parse the `verification_details` array from `uat_report.json` to extract missing items, matching the actual data contract of `spawn_verifier.py`.
+- **Audit Rejection (v4.0)**: Rejected by Auditor due to Blast Radius leakage (missing `spawn_coder.py`, `spawn_reviewer.py`, etc., in Section 6) and String Determinism violation (missing hardcoded escalation alert for UAT retries exceeded).
+- **v5.0 Revision Rationale**: Added all `spawn_*.py` scripts to Section 6 to safely authorize the DRY refactoring of API keys. Added `uat_retry_exceeded_alert` to Section 7 to prevent LLM hallucination during max-retries escalation.
 
 ---
 
 ## 7. Hardcoded Content (硬编码内容)
 
 ### Exact Text Replacements:
-- **`uat_escalation_alert` (For orchestrator.py)**: 
+- **`uat_escalation_alert` (For orchestrator.py - System Error)**: 
 ```text
 🚨 *SDLC Pipeline Blocked: UAT Agent 发生系统级错误（如返回格式非法/超时）。现场已冻结，请人工介入排查。排查完毕后可使用 `--resume` 恢复执行。*
+```
+
+- **`uat_retry_exceeded_alert` (For orchestrator.py - Retries Exceeded)**:
+```text
+🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。排查完毕后可使用 `--resume` 恢复执行。*
 ```
 
 - **`planner_recovery_prompt` (For spawn_planner.py)**:
