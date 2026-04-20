@@ -32,7 +32,6 @@ cp "${PROJECT_ROOT}/scripts/update_pr_status.py" scripts/
 cp "${PROJECT_ROOT}/scripts/config.py" scripts/
 cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
 cp "${PROJECT_ROOT}/scripts/utils_json.py" scripts/
-cp "${PROJECT_ROOT}/scripts/utils_api_key.py" scripts/
 cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/

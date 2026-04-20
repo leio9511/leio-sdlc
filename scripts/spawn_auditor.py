@@ -4,19 +4,14 @@ import os
 import sys
 import uuid
 import time
-import subprocess
-import shlex
-import json
-import re
 
 # Dynamic module resolution for monorepo development vs production deployment
 current_dir = os.path.dirname(os.path.abspath(__file__))
+import sys
 sys.path.insert(0, current_dir)
 import agent_driver
 import config
-from agent_driver import invoke_agent, build_prompt, notify_channel
-from handoff_prompter import HandoffPrompter
-from utils_api_key import get_api_keys_from_config, assign_gemini_api_key
+from agent_driver import invoke_agent, build_prompt
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn an Auditor agent.")
@@ -29,6 +24,7 @@ def main():
     
     args = parser.parse_args()
     
+    from handoff_prompter import HandoffPrompter
     if not args.enable_exec_from_workspace and not sys.argv[0].startswith(os.path.expanduser("~/.openclaw")):
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
@@ -48,7 +44,10 @@ def main():
     else:
         cmd_handshake.extend(["-t", args.channel])
     
+    import subprocess
+    from agent_driver import notify_channel
     
+    import shlex
     full_cmd = shlex.join([sys.executable] + sys.argv)
     
     msg = "Auditor Ignition: Starting audit..."
@@ -115,17 +114,7 @@ def main():
         print(output)
     else:
         print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
-        base_name = os.path.splitext(os.path.basename(args.prd_file))[0]
-        session_id = f"{base_name}_auditor"
-        
-        config_path = os.path.join(SDLC_ROOT, "config", "sdlc_config.json")
-        gemini_api_keys = get_api_keys_from_config(config_path)
-        if gemini_api_keys:
-            state_file_path = os.path.join(os.path.abspath(args.workdir), ".sdlc_runs", ".session_keys.json")
-            assigned_key = assign_gemini_api_key(session_id, gemini_api_keys, state_file_path)
-            if assigned_key:
-                os.environ["GEMINI_API_KEY"] = assigned_key
-
+        session_id = f"prd_auditor_{int(time.time())}"
         result = invoke_agent(task_string, session_key=session_id, role="auditor")
         output = result.stdout
 
@@ -135,8 +124,10 @@ def main():
     elif '{"status": "REJECTED"' in output or '"status":"REJECTED"' in output or '"status": "REJECTED"' in output:
         status = "REJECTED"
 
+    import json
     try:
         # Try to parse exact json
+        import re
         json_match = re.search(r'```json\s*(\{.*?\})\s*```', output, re.DOTALL)
         if not json_match:
             json_match = re.search(r'(\{.*?\})', output, re.DOTALL)

@@ -84,7 +84,65 @@ def dpopen(cmd, **kwargs):
     return subprocess.Popen(cmd, **kwargs)
 
 
-from utils_api_key import assign_gemini_api_key, get_env_with_gemini_key
+import hashlib
+
+def assign_gemini_api_key(session_key, gemini_api_keys, state_file_path):
+    if not gemini_api_keys:
+        return None
+        
+    os.makedirs(os.path.dirname(state_file_path), exist_ok=True)
+    try:
+        fd = os.open(state_file_path, os.O_CREAT | os.O_RDWR)
+    except Exception:
+        # Graceful degradation if file cannot be opened
+        return None
+        
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        
+        state = {}
+        try:
+            file_size = os.fstat(fd).st_size
+            if file_size > 0:
+                os.lseek(fd, 0, os.SEEK_SET)
+                content = os.read(fd, file_size).decode('utf-8')
+                state = json.loads(content)
+        except Exception:
+            pass
+            
+        fingerprint = state.get(session_key)
+        
+        if fingerprint:
+            for key in gemini_api_keys:
+                if key.endswith(fingerprint):
+                    return key
+                    
+        idx = int(hashlib.md5(session_key.encode("utf-8")).hexdigest(), 16) % len(gemini_api_keys)
+        selected_key = gemini_api_keys[idx]
+        new_fingerprint = selected_key[-8:] if len(selected_key) >= 8 else selected_key
+        
+        state[session_key] = new_fingerprint
+        
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, json.dumps(state, indent=2).encode('utf-8'))
+        
+        return selected_key
+        
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+def get_env_with_gemini_key(session_key, gemini_api_keys, global_dir):
+    env = os.environ.copy()
+    if not gemini_api_keys:
+        return env
+        
+    state_file_path = os.path.join(global_dir, ".sdlc_runs", ".session_keys.json")
+    assigned_key = assign_gemini_api_key(session_key, gemini_api_keys, state_file_path)
+    if assigned_key:
+        env["GEMINI_API_KEY"] = assigned_key
+    return env
 
 def parse_affected_projects(prd_file):
     if not os.path.exists(prd_file):
@@ -669,7 +727,6 @@ def main():
         # Load Retry Config
         yellow_retry_limit = 3
         red_retry_limit = 2
-        max_uat_recovery_attempts = 5
         config_path = os.path.join(global_dir, "config", "sdlc_config.json")
         if os.path.exists(config_path):
             try:
@@ -677,11 +734,8 @@ def main():
                     app_config_data = json.load(f)
                     yellow_retry_limit = app_config_data.get("YELLOW_RETRY_LIMIT", 3)
                     red_retry_limit = app_config_data.get("RED_RETRY_LIMIT", 2)
-                    max_uat_recovery_attempts = app_config_data.get("max_uat_recovery_attempts", 5)
             except Exception:
                 pass
-                
-        uat_recovery_count = 0
                 
         while True:
             if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
@@ -729,37 +783,23 @@ def main():
                     if args.enable_exec_from_workspace:
                         uat_cmd.append("--enable-exec-from-workspace")
                         
-                    uat_retry_count = 0
-                    max_uat_retries = 3
-                    uat_status = "UNKNOWN"
-                    uat_data = None
+                    res = drun(uat_cmd, capture_output=True, text=True, env=get_env_with_gemini_key(f"{base_name}_verifier", gemini_api_keys, global_dir))
+                    if hasattr(args, "debug") and args.debug:
+                        logger.debug(f"UAT Verifier returned {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
+
                     
-                    while uat_retry_count < max_uat_retries:
-                        res = drun(uat_cmd, capture_output=True, text=True, env=get_env_with_gemini_key(f"{base_name}_verifier", gemini_api_keys, global_dir))
-                        if hasattr(args, "debug") and args.debug:
-                            logger.debug(f"UAT Verifier returned {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
-
-                        if os.path.exists(uat_out_file):
-                            try:
-                                with open(uat_out_file, "r") as f:
-                                    uat_content = f.read()
-                                    uat_data = extract_and_parse_json(uat_content)
-                                    uat_status = uat_data.get("status", "UNKNOWN") if isinstance(uat_data, dict) else "UNKNOWN"
-                            except Exception as e:
-                                dlog(f"Failed to parse uat_report.json: {e}")
-                                uat_status = "UNKNOWN"
-                        
-                        if uat_status in ["PASS", "NEEDS_FIX"]:
-                            break
-                        uat_retry_count += 1
-                        logger.warning(f"Failed to parse UAT JSON (Attempt {uat_retry_count}/{max_uat_retries}). Retrying.")
-
+                    uat_status = "UNKNOWN"
+                    if os.path.exists(uat_out_file):
+                        try:
+                            with open(uat_out_file, "r") as f:
+                                uat_data = json.load(f)
+                                uat_status = uat_data.get("status", "UNKNOWN")
+                        except Exception as e:
+                            dlog(f"Failed to parse uat_report.json: {e}")
+                            
                     if uat_status not in ["PASS", "NEEDS_FIX"]:
-                        with open(os.path.join(workdir, "STATE.md"), "w") as f:
-                            f.write("UAT_BLOCKED")
-                        alert_msg = "🚨 *SDLC Pipeline Blocked: UAT Agent 发生系统级错误（如返回格式非法/超时）。现场 已冻结，请人工介入 排查。排查完毕后可使用 `--resume` 恢复执行。*"
-                        print(alert_msg)
-                        notify_channel(effective_channel, alert_msg, "uat_error", {"prd_id": prd_filename})
+                        print("[ACTION REQUIRED FOR MANAGER] UAT Failed. uat_report.json is missing or invalid JSON.")
+                        notify_channel(effective_channel, "UAT Verification failed due to missing or invalid JSON report. Manager is reviewing...", "uat_error", {"prd_id": prd_filename})
                         sys.exit(1)
                         
                     msg = f"UAT Verification completed. Status: {uat_status}. Manager is reviewing..."
@@ -769,32 +809,8 @@ def main():
                         print("[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py.")
                         sys.exit(0)
                     else:
-                        missing_items = uat_data.get("missing", []) if isinstance(uat_data, dict) else []
-                        if missing_items:
-                            if uat_recovery_count < max_uat_recovery_attempts:
-                                logger.info(f"State UAT_RECOVERY: UAT missing requirements. Invoking planner ({uat_recovery_count + 1}/{max_uat_recovery_attempts}).")
-                                notify_channel(effective_channel, "UAT Verification failed with MISSING items. Triggering automated planner recovery...", "uat_recovery", {"prd_id": prd_filename})
-                                uat_recovery_count += 1
-                                proc = dpopen([
-                                    sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"),
-                                    "--prd-file", args.prd_file,
-                                    "--replan-uat-failures", uat_out_file,
-                                    "--workdir", workdir,
-                                    "--global-dir", global_dir,
-                                    "--run-dir", run_dir
-                                ], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
-                                proc.wait()
-                                continue
-                            else:
-                                with open(os.path.join(workdir, "STATE.md"), "w") as f:
-                                    f.write("UAT_BLOCKED")
-                                alert_msg = "🚨 *SDLC Pipeline Blocked: UAT Agent 发生系统级错误（如返回格式非法/超时）。现场 已冻结，请人工介入 排查。排查完毕后可使用 `--resume` 恢复执行。*"
-                                print(alert_msg)
-                                notify_channel(effective_channel, alert_msg, "uat_error", {"prd_id": prd_filename})
-                                sys.exit(1)
-                        else:
-                            print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo.")
-                            sys.exit(1)
+                        print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo.")
+                        sys.exit(1)
 
                 current_pr = output.split('\n')[-1].strip()
                 if not os.path.exists(current_pr):

@@ -195,7 +195,7 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
             except SystemExit:
                 pass
                 
-        any_match = any("🚨 *SDLC Pipeline Blocked: UAT Agent" in str(call) for call in mock_print.call_args_list)
+        any_match = any("[ACTION REQUIRED FOR MANAGER] UAT Failed" in str(call) for call in mock_print.call_args_list)
         self.assertTrue(any_match, f"Expected print not found in {mock_print.call_args_list}")
 
 if __name__ == '__main__':

@@ -15,7 +15,6 @@ def main():
     parser.add_argument("--run-dir", required=False, default=None, help="Absolute path to the isolated execution directory")
     parser.add_argument("--out-dir", required=False, default=None, help="Output directory for PRs")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
-    parser.add_argument("--replan-uat-failures", required=False, help="Path to UAT report to generate missing PRs")
     parser.add_argument("--slice-failed-pr", required=False, default=None, help="Path to a failed PR file to slice")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
@@ -108,24 +107,7 @@ def main():
         with open(playbook_path, "r") as f:
             playbook_content = f.read()
 
-    if args.replan_uat_failures:
-        try:
-            with open(args.replan_uat_failures, "r") as f:
-                uat_report_content = f.read()
-        except FileNotFoundError:
-            print(f"Error: UAT report not found: {args.replan_uat_failures}")
-            sys.exit(1)
-            
-        recovery_prompt = "作为一个架构师，不要重新规划已有的功能。请仔细阅读 UAT 报告中标记为 MISSING 的需求，生成专门针对这些遗漏点的新 Micro-PRs（例如 PR_UAT_Fix_1.md），确保不破坏现有代码。"
-        task_string = f"{recovery_prompt}\n\nUAT Report:\n{uat_report_content}\n\n" + build_prompt("planner",
-            workdir=workdir,
-            playbook_content=playbook_content,
-            prd_content=prd_content,
-            contract_script=contract_script,
-            out_dir=args.out_dir,
-            template_content=template_content
-        )
-    elif args.slice_failed_pr is not None:
+    if args.slice_failed_pr is not None:
         insert_after_flag = f" --insert-after {failed_pr_id}" if failed_pr_id else ""
         task_string = build_prompt("planner_slice",
             workdir=workdir,
@@ -151,7 +133,7 @@ def main():
 
     if test_mode:
         os.makedirs(os.path.join(args.run_dir or ".", "tests"), exist_ok=True)
-        log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': args.prd_file, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr, 'replan_uat_failures': args.replan_uat_failures}})
+        log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': args.prd_file, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr}})
         with open(os.path.join(args.run_dir or ".", "tests", "tool_calls.log"), "a") as f:
             f.write(log_entry + "\\n")
         
