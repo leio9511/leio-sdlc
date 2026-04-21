@@ -555,7 +555,13 @@ def main():
     # --- IGNITION GUARDRAIL ---
     if effective_channel:
         from agent_driver import send_ignition_handshake
-        send_ignition_handshake(effective_channel)
+        try:
+            send_ignition_handshake(effective_channel)
+        except SystemExit:
+            raise
+        except Exception as e:
+            print(f"[FATAL] Orchestrator ignition handshake failed: {e}", file=sys.stderr)
+            sys.exit(1)
     # --------------------------
 
     prd_filename = os.path.basename(args.prd_file)

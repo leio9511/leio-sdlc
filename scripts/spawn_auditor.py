@@ -37,9 +37,15 @@ def main():
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
     
-    # Ignition Handshake
+    # Ignition Handshake: Centralized helper that fails fast on error
     from agent_driver import notify_channel, send_ignition_handshake
-    send_ignition_handshake(args.channel)
+    try:
+        send_ignition_handshake(args.channel)
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"[FATAL] Auditor ignition handshake failed: {e}", file=sys.stderr)
+        sys.exit(1)
     
     import subprocess
     import shlex

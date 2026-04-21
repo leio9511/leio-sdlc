@@ -54,9 +54,16 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
         if not test_mode:
             subprocess.run(cmd, capture_output=True)
     else:
-        # New Strategy Layer
+        # New Strategy Layer: Delegate routing and delivery to NotificationRouter.
+        # Ensure routing failures propagate as a fatal runtime error.
         from utils_notification import NotificationRouter
-        NotificationRouter.send(effective_channel, msg)
+        try:
+            NotificationRouter.send(effective_channel, msg)
+        except SystemExit:
+            raise
+        except Exception as e:
+            print(f"[FATAL] Notification delivery failed: {e}", file=sys.stderr)
+            sys.exit(1)
 
 def send_ignition_handshake(channel: str) -> None:
     import config
@@ -66,7 +73,13 @@ def send_ignition_handshake(channel: str) -> None:
         notify_channel(channel, msg)
     else:
         from utils_notification import send_ignition_handshake as utils_handshake
-        utils_handshake(channel)
+        try:
+            utils_handshake(channel)
+        except SystemExit:
+            raise
+        except Exception as e:
+            print(f"[FATAL] Handshake delivery failed: {e}", file=sys.stderr)
+            sys.exit(1)
 
 def resolve_cmd(cmd_name):
     # Dynamic path resolution with $AGENT_SKILLS_DIR fallback
