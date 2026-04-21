@@ -20,7 +20,8 @@ def test_spawn_auditor_missing_channel(capsys):
         assert e.value.code == 2
 
 @patch("subprocess.run")
-def test_spawn_auditor_invalid_channel_handshake_fail(mock_run, capsys):
+@patch('shutil.which', return_value='/mock/openclaw')
+def test_spawn_auditor_invalid_channel_handshake_fail(mock_which, mock_run, capsys):
     # Simulate a failed handshake from the openclaw cli
     mock_run.return_value.returncode = 1
     mock_run.return_value.stdout = ""
@@ -30,11 +31,10 @@ def test_spawn_auditor_invalid_channel_handshake_fail(mock_run, capsys):
     with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md", "--workdir", ".", "--channel", "invalid_format"]):
         with pytest.raises(SystemExit) as e:
             spawn_auditor.main()
-        
+
         assert e.value.code == 1
         captured = capsys.readouterr()
-        assert "Invalid notification channel format or failed handshake." in captured.out
-
+        assert "[FATAL] Notification delivery failed" in captured.err
 import pytest
 
 def test_spawn_auditor_guardrail(capsys):

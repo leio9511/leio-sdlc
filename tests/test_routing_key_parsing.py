@@ -10,7 +10,11 @@ from orchestrator import notify_channel
 
 class TestNotificationParsing(unittest.TestCase):
     @patch('subprocess.run')
-    def test_routing_key_parsing(self, mock_run):
+    @patch('shutil.which', return_value='/mock/openclaw')
+    def test_routing_key_parsing(self, mock_which, mock_run):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
         # Format: (input_key, expected_channel_arg, expected_target_arg)
         test_cases = [
             ("slack:channel:C12345", "slack", "channel:C12345"),

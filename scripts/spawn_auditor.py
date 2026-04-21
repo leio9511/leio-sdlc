@@ -38,30 +38,13 @@ def main():
         os.environ["SDLC_MODEL"] = args.model
     
     # Ignition Handshake
-    cmd_handshake = ["openclaw", "message", "send"]
-    if ":" in args.channel:
-        parts = args.channel.split(":")
-        if len(parts) >= 2:
-            cmd_handshake.extend(["--channel", parts[0]])
-            cmd_handshake.extend(["-t", ":".join(parts[1:])])
-    else:
-        cmd_handshake.extend(["-t", args.channel])
+    from agent_driver import notify_channel, send_ignition_handshake
+    send_ignition_handshake(args.channel)
     
     import subprocess
-    from agent_driver import notify_channel
-    
     import shlex
     full_cmd = shlex.join([sys.executable] + sys.argv)
-    
-    msg = "Auditor Ignition: Starting audit..."
-    cmd_handshake.extend(["-m", msg])
-    
-    if os.environ.get("SDLC_TEST_MODE") != "true":
-        res = subprocess.run(cmd_handshake, capture_output=True, text=True)
-        if res.returncode != 0:
-            print(f"[FATAL_STARTUP]\n[ACTION REQUIRED FOR MANAGER]\nInvalid notification channel format or failed handshake. You MUST provide a valid OpenClaw channel string (e.g., `slack:CXXXXXX`) and ensure the gateway is running.")
-            sys.exit(1)
-            
+              
     notify_channel(args.channel, "Auditor Ignition: Starting audit...", "auditor_start", {"prd_file": args.prd_file, "command": full_cmd})
 
     workdir = os.path.abspath(args.workdir)

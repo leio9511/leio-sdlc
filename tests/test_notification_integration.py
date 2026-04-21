@@ -25,7 +25,7 @@ def test_notify_channel_integration(monkeypatch):
     assert len(calls) == 1
     called_args = calls[0]
     # Verify the command structure for a simple channel ID
-    assert called_args[0:5] == ["openclaw", "message", "send", "-t", "C123"]
+    assert called_args[1:5] == ["message", "send", "-t", "C123"]
     assert "🚀 1. [prd-081] SDLC 启动" in called_args[6]
 
     # Test with a complex routing key
@@ -33,5 +33,5 @@ def test_notify_channel_integration(monkeypatch):
     orchestrator.notify_channel("slack:channel:C456", "test message")
     assert len(calls) == 1
     called_args = calls[0]
-    assert called_args[0:7] == ["openclaw", "message", "send", "--channel", "slack", "-t", "channel:C456"]
+    assert called_args[1:7] == ["message", "send", "--channel", "slack", "-t", "channel:C456"]
     assert "test message" in called_args[8]

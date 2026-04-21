@@ -23,6 +23,7 @@ init_hermetic_sandbox() {
     cp "$PROJECT_ROOT/scripts/agent_driver.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/agent_llm.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/config.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/utils_notification.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/notification_formatter.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/handoff_prompter.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/setup_logging.py" "$target_dir/" 2>/dev/null || true

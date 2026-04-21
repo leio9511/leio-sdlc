@@ -181,14 +181,14 @@ def validate_prd_is_committed(prd_file, workdir):
         try:
             drun(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
-            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path>")
-            print('[JIT] To fix: Ensure your PRD path is within the Git repository boundaries.\nIf it is, use the official gateway script (commit_state.py) from the active SDLC runtime to baseline it.')
+            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files <path>")
+            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {{path}}".format(path="<path>"))
             sys.exit(1)
 
         status_out = drun(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
-            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path>")
-            print('[JIT] To fix: Ensure your PRD path is within the Git repository boundaries.\nIf it is, use the official gateway script (commit_state.py) from the active SDLC runtime to baseline it.')
+            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files <path>")
+            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {{path}}".format(path="<path>"))
             sys.exit(1)
 
 from utils_json import extract_and_parse_json
@@ -542,7 +542,7 @@ def main():
     if status_output.strip(): dlog(f"Dirty status detected: {repr(status_output)}")
     if status_output.strip():
         print("[FATAL] Dirty Git Workspace detected!")
-        print('[JIT] To fix: Execute `git stash push -m "sdlc pre-flight stash" --include-untracked` to safely preserve state.')
+        print('[JIT] To fix this, run: git stash push -m "sdlc pre-flight stash" --include-untracked')
         print(HandoffPrompter.get_prompt("dirty_workspace"))
         sys.exit(1)
 
@@ -554,31 +554,8 @@ def main():
 
     # --- IGNITION GUARDRAIL ---
     if effective_channel:
-        cmd_handshake = ["openclaw", "message", "send"]
-        if ":" in effective_channel:
-            parts = effective_channel.split(":")
-            if len(parts) >= 2:
-                cmd_handshake.extend(["--channel", parts[0]])
-                cmd_handshake.extend(["-t", ":".join(parts[1:])])
-        else:
-            cmd_handshake.extend(["-t", effective_channel])
-        
-        msg = format_notification("sdlc_handshake", {})
-        cmd_handshake.extend(["-m", msg])
-        
-        if os.environ.get("SDLC_TEST_MODE") != "true":
-            res = drun(cmd_handshake, capture_output=True, text=True)
-            if res.returncode != 0:
-                print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
-                if res.stderr: print(res.stderr.strip(), file=sys.stderr)
-                print(HandoffPrompter.get_prompt("missing_channel"))
-                sys.exit(1)
-        else:
-            print(f"DEBUG [Ignition Handshake]: {' '.join(cmd_handshake)}")
-        if "invalid" in effective_channel:
-            print(f"[FATAL] Invalid notification channel format. Failed to send handshake to '{effective_channel}'. Expected format e.g., slack:CXXXXXX", file=sys.stderr)
-            print(HandoffPrompter.get_prompt("missing_channel"))
-            sys.exit(1)
+        from agent_driver import send_ignition_handshake
+        send_ignition_handshake(effective_channel)
     # --------------------------
 
     prd_filename = os.path.basename(args.prd_file)

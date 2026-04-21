@@ -91,7 +91,8 @@ class TestOrchestratorHandoffIntegration(unittest.TestCase):
     @patch('os.open', return_value=99)
     @patch('fcntl.flock')
     @patch('git_utils.check_git_boundary')
-    def test_planner_failure(self, mock_check, mock_flock, mock_open, mock_chdir, mock_print, mock_glob, mock_exists, mock_run, mock_exit, mock_args):
+    @patch('shutil.which', return_value='/mock/openclaw')
+    def test_planner_failure(self, mock_which, mock_check, mock_flock, mock_open, mock_chdir, mock_print, mock_glob, mock_exists, mock_run, mock_exit, mock_args):
         args = MagicMock()
         args.workdir = "/dummy"
         args.prd_file = "dummy.md"

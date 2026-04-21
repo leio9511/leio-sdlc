@@ -251,8 +251,9 @@ class TestGeminiAgentDriver(unittest.TestCase):
         channel = "test_channel"
         msg = "test_msg"
         expected_msg = f"🤖 [SDLC Engine] {msg}"
-        notify_channel(channel, msg)
-        mock_logger_info.assert_called_with(f"[Channel Message to {channel}]: {expected_msg}")
+        with self.assertRaises(SystemExit) as cm:
+            notify_channel(channel, msg)
+        self.assertEqual(cm.exception.code, 1)
 
 
     @patch("agent_driver.os.path.exists")

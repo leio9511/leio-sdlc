@@ -120,7 +120,7 @@ def main():
     
     if not args.fix and issues:
         print('[FATAL] Project is not SDLC compliant.')
-        print('[JIT] To fix: Execute the `doctor.py --fix` script from the active SDLC runtime on the current <workdir>.')
+        print(f'[JIT] To fix: Execute `python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix {target_dir}`')
         sys.exit(1)
         
 if __name__ == "__main__":

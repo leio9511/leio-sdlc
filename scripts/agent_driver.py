@@ -34,10 +34,15 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
         msg = format_notification(event_type, context or {})
     else:
         msg = f"🤖 [SDLC Engine] {msg}"
-    if effective_channel:
+    
+    if not effective_channel:
+        return
+
+    import config
+    if getattr(config, "SDLC_NOTIFICATION_VERSION", 2) == 1:
+        # Legacy Path
         if not shutil.which("openclaw"):
-            channel = effective_channel
-            logger.info(f"[Channel Message to {channel}]: {msg}")
+            logger.info(f"[Channel Message to {effective_channel}]: {msg}")
             return
             
         cmd = ["openclaw", "message", "send"]
@@ -50,10 +55,32 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
             cmd.extend(["-t", effective_channel])
         cmd.extend(["-m", msg])
         
-        # When running in test mode, do not actually call openclaw message send
         test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
         if not test_mode:
             subprocess.run(cmd, capture_output=True)
+    else:
+        # New Strategy Layer
+        try:
+            from utils_notification import NotificationRouter
+            NotificationRouter.send(effective_channel, msg)
+        except ImportError:
+            # Fallback if utils_notification is missing in some weird environments
+            logger.error("utils_notification not found, falling back to legacy log")
+            logger.info(f"[Channel Message to {effective_channel}]: {msg}")
+
+def send_ignition_handshake(channel: str) -> None:
+    import config
+    if getattr(config, "SDLC_NOTIFICATION_VERSION", 2) == 1:
+        # Legacy Handshake (as it was in orchestrator.py/spawn_auditor.py)
+        msg = format_notification("sdlc_handshake", {})
+        notify_channel(channel, msg)
+    else:
+        try:
+            from utils_notification import send_ignition_handshake as utils_handshake
+            utils_handshake(channel)
+        except ImportError:
+            msg = format_notification("sdlc_handshake", {})
+            notify_channel(channel, msg)
 
 def resolve_cmd(cmd_name):
     # Dynamic path resolution with $AGENT_SKILLS_DIR fallback

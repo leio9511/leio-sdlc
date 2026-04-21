@@ -22,7 +22,7 @@ def test_orchestrator_dynamic_strings(tmp_path):
     
     env = os.environ.copy()
     custom_root = "/tmp/custom_skills_root"
-    env["SDLC_SKILLS_ROOT"] = custom_root
+    env["SDLC_RUNTIME_DIR"] = custom_root
 
     result = subprocess.run(
         ["python3", orchestrator_script, "--enable-exec-from-workspace", "--workdir", str(tmp_path), "--prd-file", "PRD_uncommitted.md", "--force-replan", "true"],
