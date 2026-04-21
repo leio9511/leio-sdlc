@@ -680,6 +680,7 @@ def main():
         # Load Retry Config
         yellow_retry_limit = 3
         red_retry_limit = 2
+        max_uat_recovery_attempts = 5
         config_path = os.path.join(global_dir, "config", "sdlc_config.json")
         if os.path.exists(config_path):
             try:
@@ -687,9 +688,11 @@ def main():
                     app_config_data = json.load(f)
                     yellow_retry_limit = app_config_data.get("YELLOW_RETRY_LIMIT", 3)
                     red_retry_limit = app_config_data.get("RED_RETRY_LIMIT", 2)
+                    max_uat_recovery_attempts = app_config_data.get("max_uat_recovery_attempts", 5)
             except Exception:
                 pass
                 
+        uat_recovery_count = 0
         while True:
             if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
                 print(f"Max runs reached. Exiting orchestrator.")
@@ -736,23 +739,35 @@ def main():
                     if args.enable_exec_from_workspace:
                         uat_cmd.append("--enable-exec-from-workspace")
                         
-                    res = drun(uat_cmd, capture_output=True, text=True, env=get_env_with_gemini_key(f"{base_name}_verifier", gemini_api_keys, global_dir))
-                    if hasattr(args, "debug") and args.debug:
-                        logger.debug(f"UAT Verifier returned {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
-
-                    
+                    uat_retry_count = 0
                     uat_status = "UNKNOWN"
-                    if os.path.exists(uat_out_file):
-                        try:
-                            with open(uat_out_file, "r") as f:
-                                uat_data = json.load(f)
-                                uat_status = uat_data.get("status", "UNKNOWN")
-                        except Exception as e:
-                            dlog(f"Failed to parse uat_report.json: {e}")
-                            
-                    if uat_status not in ["PASS", "NEEDS_FIX"]:
+                    uat_data = {}
+                    while uat_retry_count < 3:
+                        res = drun(uat_cmd, capture_output=True, text=True, env=get_env_with_gemini_key(f"{base_name}_verifier", gemini_api_keys, global_dir))
+                        if hasattr(args, "debug") and args.debug:
+                            logger.debug(f"UAT Verifier returned {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
+                        
+                        if os.path.exists(uat_out_file):
+                            try:
+                                with open(uat_out_file, "r") as f:
+                                    uat_data = json.loads(f.read())
+                                    uat_status = uat_data.get("status", "UNKNOWN")
+                                    if uat_status in ["PASS", "NEEDS_FIX"]:
+                                        break
+                            except Exception as e:
+                                dlog(f"Failed to parse uat_report.json: {e}")
+                        
+                        uat_retry_count += 1
+                        dlog(f"UAT System Error, retrying {uat_retry_count}/3")
+                        if os.path.exists(uat_out_file):
+                            try:
+                                os.remove(uat_out_file)
+                            except OSError:
+                                pass
+                    if uat_retry_count >= 3 and uat_status not in ["PASS", "NEEDS_FIX"]:
                         print("[ACTION REQUIRED FOR MANAGER] UAT Failed. uat_report.json is missing or invalid JSON.")
-                        notify_channel(effective_channel, "UAT Verification failed due to missing or invalid JSON report. Manager is reviewing...", "uat_error", {"prd_id": prd_filename})
+                        notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT Agent 发生系统级错误（如返回格式非法/超时）。现场 已冻结，请人工介入排查。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
+                        with open(os.path.join(workdir, "STATE.md"), "w") as f: f.write("UAT_ERROR\n")
                         sys.exit(1)
                         
                     msg = f"UAT Verification completed. Status: {uat_status}. Manager is reviewing..."
@@ -761,9 +776,33 @@ def main():
                     if uat_status == "PASS":
                         print("[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py.")
                         sys.exit(0)
-                    else:
-                        print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo.")
-                        sys.exit(1)
+                    elif uat_status == "NEEDS_FIX":
+                        missing_items = [item for item in uat_data.get("verification_details", []) if item.get("status") == "MISSING"]
+                        if missing_items:
+                            if uat_recovery_count < max_uat_recovery_attempts:
+                                logger.info("STATE_UAT_RECOVERY")
+                                uat_recovery_count += 1
+                                proc = dpopen([
+                                    sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"),
+                                    "--prd-file", args.prd_file,
+                                    "--replan-uat-failures", uat_out_file,
+                                    "--workdir", workdir,
+                                    "--global-dir", global_dir,
+                                    "--run-dir", run_dir
+                                ], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                                proc.wait()
+                                logger.info("STATE_PLANNING_EVAL")
+                                logger.info("STATE_EXECUTING_PRS")
+                                continue
+                            else:
+                                print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Retries exceeded.")
+                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
+                                with open(os.path.join(workdir, "STATE.md"), "w") as f: f.write("UAT_BLOCKED\n")
+                                logger.info("STATE_UAT_BLOCKED")
+                                sys.exit(1)
+                        else:
+                            print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo.")
+                            sys.exit(1)
 
                 current_pr = output.split('\n')[-1].strip()
                 if not os.path.exists(current_pr):
