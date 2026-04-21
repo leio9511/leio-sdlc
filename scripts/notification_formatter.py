@@ -18,27 +18,41 @@ def format_notification(event_type: str, context: dict) -> str:
         extracted = match.group(1).rstrip('_')
         pr_match = f"pr-{extracted.replace('_', '-')}"
 
-    if event_type == "sdlc_resume":
+    prd_file = context.get('prd_file', 'unknown')
+
+    # ISSUE-1166 Contract Strings
+    if event_type == "sdlc_handshake":
+        return f"🤝 [SDLC Engine] Initial Handshake successful. Channel linked."
+    elif event_type == "auditor_start":
+        return f"🚀 [Auditor] Starting PRD audit for: {prd_file}"
+    elif event_type == "slicing_start":
+        return f"🔪 [Planner] Slicing PRD into Micro-PRs..."
+    elif event_type == "slicing_end":
+        count = context.get('count', 0)
+        return f"✅ [Planner] Slicing complete. {count} PRs generated."
+    elif event_type == "coder_spawned":
+        return f"💻 [Coder] Implementing {pr_match}..."
+    elif event_type == "reviewer_spawned":
+        return f"🔍 [Reviewer] Auditing changes for {pr_match}..."
+    elif event_type == "pr_merged":
+        return f"✅ [Merge] {pr_match} merged to master."
+    elif event_type == "uat_start":
+        return f"🧪 [UAT] Starting final verification..."
+
+    # Legacy strings maintained for backward compatibility tests
+    elif event_type == "sdlc_resume":
         cmd = context.get("command", "unknown")
         return f"🚀 1. [{prd_match}] SDLC 恢复执行\n💻 Command: `{cmd}`"
     elif event_type == "sdlc_start":
         cmd = context.get("command", "unknown")
         return f"🚀 1. [{prd_match}] SDLC 启动\n💻 Command: `{cmd}`"
-    elif event_type == "auditor_start":
-        cmd = context.get("command", "unknown")
-        return f"🚀 [Auditor] 启动审批流程\n💻 Command: `{cmd}`"
-    elif event_type == "slicing_start":
-        return f"🔪 2. [{prd_match}] 切片中..."
-    elif event_type == "slicing_end":
-        count = context.get('count', 0)
-        return f"✅ 3. [{prd_match}] 切片结束，共生成 {count} 个切片"
     elif event_type == "pr_switch":
         branch = context.get('branch', 'unknown')
         return f"🔄 [{pr_match}] 切换分支：{branch}"
     elif event_type == "coder_start":
-        return f"👨💻 4. [{pr_match}] Coder 运行中..."
+        return f"💻 [Coder] Implementing {pr_match}..."
     elif event_type == "review_start":
-        return f"🧐 5. [{pr_match}] Coder 结束，Review 中..."
+        return f"🔍 [Reviewer] Auditing changes for {pr_match}..."
     elif event_type == "review_result":
         result = context.get('result', 'N/A')
         return f"📝 6. [{pr_match}] Review 结果：{result}"
@@ -46,17 +60,9 @@ def format_notification(event_type: str, context: dict) -> str:
         return f"🎉 [{prd_match}] SDLC 完成：所有 PR 执行完毕"
     elif event_type == "dead_end":
         return f"🛑 [{pr_match}] PR 需要人工介入"
-    elif event_type == "sdlc_handshake":
-        return f"🤝 [SDLC Engine] Initial Handshake successful. Channel linked."
-    elif event_type == "coder_spawned":
-        return f"Calling Coder for [{pr_match}]..."
-    elif event_type == "reviewer_spawned":
-        return f"Coder submitted changes. Reviewer is now auditing..."
     elif event_type == "review_rejected":
         summary = context.get('summary', 'No reason provided')
         return f"❌ Reviewer rejected changes. Reason: {summary}. Retrying..."
-    elif event_type == "pr_merged":
-        return f"✅ [{pr_match}] successfully merged to master."
     elif event_type == "github_sync_start":
         return f"Synchronizing code to GitHub..."
     elif event_type == "github_sync_complete":

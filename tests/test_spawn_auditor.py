@@ -161,3 +161,20 @@ def test_auditor_uses_shared_key_utility(mock_invoke_agent, mock_assign_api_key,
     finally:
         os.environ.clear()
         os.environ.update(original_environ)
+import pytest
+import sys
+import os
+from unittest.mock import patch
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+import spawn_auditor
+
+def test_spawn_auditor_fails_fast_on_handshake_failure():
+    # If handshake fails, sys.exit(1) should be called before audit execution
+    with patch("agent_driver.send_ignition_handshake", side_effect=SystemExit(1)) as mock_handshake:
+        with patch.object(sys, 'argv', ['spawn_auditor.py', '--prd-file', 'test.md', '--workdir', '.', '--channel', 'invalid:channel', '--enable-exec-from-workspace']):
+            with pytest.raises(SystemExit) as exc:
+                spawn_auditor.main()
+            assert exc.value.code == 1
+            mock_handshake.assert_called_once_with('invalid:channel')
+

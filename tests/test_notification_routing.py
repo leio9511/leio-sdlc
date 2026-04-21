@@ -4,8 +4,10 @@ import importlib
 import pytest
 from unittest.mock import patch, MagicMock
 
-import scripts.config as config
-from scripts.utils_notification import (
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+
+import config
+from utils_notification import (
     StdoutProvider,
     OpenClawBridgeProvider,
     NotificationRouter,
@@ -48,3 +50,26 @@ def test_send_ignition_handshake_uses_exact_template(capsys):
     send_ignition_handshake("stdout")
     captured = capsys.readouterr()
     assert "🤝 [SDLC Engine] Initial Handshake successful. Channel linked." in captured.out
+
+def test_notify_channel_routes_event_messages_through_router(capsys):
+    from agent_driver import notify_channel
+    with patch.dict(os.environ, {"SDLC_NOTIFICATION_VERSION": "2"}):
+        notify_channel("stdout", "Test Message", "sdlc_handshake")
+        captured = capsys.readouterr()
+        assert "[NOTIFY] 🤝 [SDLC Engine] Initial Handshake successful. Channel linked." in captured.out
+
+def test_orchestrator_ignition_handshake_uses_central_router():
+    import orchestrator
+    with patch("orchestrator.drun", return_value=MagicMock(stdout="", returncode=0)):
+        with patch("orchestrator.validate_prd_is_committed"):
+            with patch("orchestrator.get_mainline_branch", return_value="master"):
+                with patch("orchestrator.acquire_global_locks", return_value=([], [])):
+                    with patch("fcntl.flock"):
+                        with patch("agent_driver.send_ignition_handshake", side_effect=SystemExit(1)) as mock_handshake:
+                            with patch.object(sys, 'argv', ["orchestrator.py", "--channel", "invalid:channel", "--prd-file", "test.md", "--workdir", ".", "--enable-exec-from-workspace", "--force-replan", "false"]):
+                                with patch.dict(os.environ, {"SDLC_BYPASS_BRANCH_CHECK": "1"}):
+                                    with pytest.raises(SystemExit) as exc:
+                                        orchestrator.main()
+                                    assert exc.value.code == 1
+                                    mock_handshake.assert_called_once_with("invalid:channel")
+
