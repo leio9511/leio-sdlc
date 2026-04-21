@@ -129,3 +129,35 @@ def test_prd_template_contains_section_7():
     # Assert it is at the very end
     # Because of possible newlines, we strip the content and check if it ends with the block
     assert content.strip().endswith("```")
+
+@patch("utils_api_key.assign_gemini_api_key")
+@patch("spawn_auditor.invoke_agent")
+def test_auditor_uses_shared_key_utility(mock_invoke_agent, mock_assign_api_key, tmp_path):
+    mock_invoke_agent.return_value = MagicMock(stdout='{"status": "APPROVED"}', returncode=0)
+    mock_assign_api_key.return_value = "TEST_API_KEY"
+    
+    prd_file = tmp_path / "dummy_prd.md"
+    prd_file.write_text("1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
+    
+    workdir = str(tmp_path)
+    
+    args = ["--enable-exec-from-workspace", "--prd-file", str(prd_file), "--workdir", workdir, "--channel", "slack:C123"]
+    
+    original_environ = dict(os.environ)
+    if "GEMINI_API_KEY" in os.environ:
+        del os.environ["GEMINI_API_KEY"]
+        
+    try:
+        with patch("sys.argv", ["spawn_auditor.py"] + args):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value.returncode = 0
+                with pytest.raises(SystemExit) as e:
+                    import spawn_auditor
+                    spawn_auditor.main()
+                assert e.value.code == 0
+            
+        mock_assign_api_key.assert_called_once()
+        assert os.environ.get("GEMINI_API_KEY") == "TEST_API_KEY"
+    finally:
+        os.environ.clear()
+        os.environ.update(original_environ)

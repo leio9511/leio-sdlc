@@ -29,7 +29,7 @@ HARNESS="$TMP_DIR/test_harness.py"
 cat << 'PYEOF' > "$HARNESS"
 import sys
 import json
-from orchestrator import assign_gemini_api_key
+from utils_api_key import assign_gemini_api_key
 
 def main():
     session_key = sys.argv[1]
@@ -37,7 +37,7 @@ def main():
     state_file = sys.argv[3]
     with open(config_file, "r") as f:
         keys = json.load(f).get("gemini_api_keys", [])
-    assigned = assign_gemini_api_key(session_key, keys, state_file)
+    assigned = assign_gemini_api_key(session_key, {"gemini_api_keys": keys}, state_file)
     print(assigned)
 
 if __name__ == "__main__":
