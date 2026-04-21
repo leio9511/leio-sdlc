@@ -16,6 +16,7 @@ def main():
     parser.add_argument("--out-dir", required=False, default=None, help="Output directory for PRs")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--slice-failed-pr", required=False, default=None, help="Path to a failed PR file to slice")
+    parser.add_argument("--replan-uat-failures", required=False, default=None, help="Path to a UAT report JSON file")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
@@ -122,6 +123,40 @@ def main():
             insert_after_flag=insert_after_flag,
             template_content=template_content
         )
+    elif getattr(args, "replan_uat_failures", None) is not None:
+        try:
+            with open(args.replan_uat_failures, "r") as f:
+                uat_report_content = f.read()
+        except Exception as e:
+            print(f"[Pre-flight Failed] Planner cannot start. Failed to read UAT report: {e}")
+            sys.exit(1)
+        
+        planner_recovery_prompt = "作为一个架构师，不要重新规划已有的功能。请仔细阅读 UAT 报告中标记为 MISSING 的需求，生成专门针对这些遗漏点的新 Micro-PRs（例如 PR_UAT_Fix_1.md），确保不破坏现有代码。"
+        
+        # We need to construct a task string that has the strict context but uses this recovery prompt instead of the standard planning one.
+        # "exactly like standard PRD planning, but strictly using the UAT failure prompt context."
+        # We'll use the base planner playbook context but replace the main instruction.
+        task_string = f"""ATTENTION: Your root workspace is rigidly locked to {workdir}. You are strictly forbidden from reading, writing, or modifying files outside this absolute path. Use explicit 'git add <file>' to stage changes safely within your directory.
+
+You are explicitly forbidden from manually editing the markdown file's status field.
+
+--- PLANNER PLAYBOOK ---
+{playbook_content}
+------------------------
+
+{planner_recovery_prompt}
+
+--- UAT REPORT ---
+{uat_report_content}
+
+--- ORIGINAL PRD ---
+{prd_content}
+
+CORE INSTRUCTION: You MUST FIRST use `python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>` to instantiate the physical files with the strict header. THEN, use the `write` or `edit` tool to fill in the contract content. For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. Do NOT alter the `status: open` YAML frontmatter.
+TEMPLATE:
+{template_content}
+Start now. DO NOT ASK FOR PERMISSION. DO NOT OUTPUT CONVERSATIONAL TEXT ASKING TO BEGIN. GENERATE THE PR CONTRACTS IMMEDIATELY IN THIS TURN USING THE TOOL."""
+
     else:
         task_string = build_prompt("planner",
             workdir=workdir,
@@ -136,7 +171,7 @@ def main():
 
     if test_mode:
         os.makedirs(os.path.join(args.run_dir or ".", "tests"), exist_ok=True)
-        log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': args.prd_file, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr}})
+        log_entry = str({'tool': 'spawn_planner', 'args': {'prd_file': args.prd_file, 'workdir': workdir, 'contract_script': contract_script, 'slice_failed_pr': args.slice_failed_pr, 'replan_uat_failures': getattr(args, 'replan_uat_failures', None)}})
         with open(os.path.join(args.run_dir or ".", "tests", "tool_calls.log"), "a") as f:
             f.write(log_entry + "\\n")
         
