@@ -53,8 +53,8 @@ def setup_spawner_api_key(args, script_file):
             except json.JSONDecodeError:
                 pass
 
-        run_dir_val = getattr(args, "run_dir", None) or os.environ.get("SDLC_RUN_DIR", ".")
-        session_keys_path = os.path.join(run_dir_val, ".session_keys.json")
+        global_dir = os.path.abspath(os.path.join(os.path.dirname(script_file), ".."))
+        session_keys_path = os.path.join(global_dir, ".sdlc_runs", ".session_keys.json")
         session_name = os.path.basename(script_file).replace(".py", "")
         pr_file_val = getattr(args, "pr_file", None)
         if pr_file_val:

@@ -33,7 +33,8 @@ class TestAgentDriverTriad(unittest.TestCase):
 
     @patch('spawn_coder.invoke_agent')
     @patch('subprocess.check_output')
-    def test_spawn_coder_payload_injection(self, mock_check_output, mock_agent_call):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_spawn_coder_payload_injection(self, mock_setup_key, mock_check_output, mock_agent_call):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
         mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
@@ -53,10 +54,12 @@ class TestAgentDriverTriad(unittest.TestCase):
         args, kwargs = mock_agent_call.call_args
         self.assertIn("mock_pr_content", args[0])
         self.assertIn("mock_prd_content", args[0])
+        mock_setup_key.assert_called()
 
     @patch('spawn_coder.invoke_agent')
     @patch('subprocess.check_output')
-    def test_spawn_coder_feedback_injection(self, mock_check_output, mock_agent_call):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_spawn_coder_feedback_injection(self, mock_setup_key, mock_check_output, mock_agent_call):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
         mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
@@ -83,6 +86,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertNotIn("```json", args[0])
         self.assertIn('"overall_assessment": "NEEDS_ATTENTION"', args[0])
         self.assertIn('"description": "raw JSON test"', args[0])
+        mock_setup_key.assert_called()
 
     def test_build_prompt_resolves_correctly(self):
         prompt = build_prompt("coder", workdir="/tmp/test", playbook_content="mock_playbook", pr_file="test_pr.md", pr_content="mock_pr_content", prd_file="test_prd.md", prd_content="mock_prd_content")
@@ -95,7 +99,8 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertIn("ATTENTION:", prompt)
 
     @patch('spawn_planner.invoke_agent')
-    def test_spawn_planner_payload_injection(self, mock_invoke_agent):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_spawn_planner_payload_injection(self, mock_setup_key, mock_invoke_agent):
         import spawn_planner
         mock_invoke_agent.return_value = AgentResult(session_key='subtask-planner', stdout='dummy')
         
@@ -112,10 +117,12 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertIn("mock_prd_content_for_planner", args[0])
         self.assertEqual(kwargs.get("role"), "planner")
         self.assertTrue(kwargs.get("session_key", "").startswith("subtask-"))
+        mock_setup_key.assert_called()
 
     @patch('spawn_reviewer.invoke_agent')
     @patch('subprocess.run')
-    def test_spawn_reviewer_payload_injection(self, mock_run, mock_invoke_agent):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_spawn_reviewer_payload_injection(self, mock_setup_key, mock_run, mock_invoke_agent):
         import spawn_reviewer
         
         def mock_reviewer_invoke(*args, **kwargs):
@@ -143,11 +150,13 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertIn("@CONTRACT_PATH:", args[0])
         self.assertIn("@DIFF_PATH:", args[0])
         self.assertEqual(kwargs.get("role"), "reviewer")
+        mock_setup_key.assert_called()
 
 
     @patch('spawn_arbitrator.invoke_agent')
     @patch('subprocess.run')
-    def test_spawn_arbitrator_payload_injection(self, mock_run, mock_invoke_agent):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_spawn_arbitrator_payload_injection(self, mock_setup_key, mock_run, mock_invoke_agent):
         import spawn_arbitrator
         
         def mock_arbitrator_invoke(*args, **kwargs):
@@ -174,9 +183,11 @@ class TestAgentDriverTriad(unittest.TestCase):
         args, kwargs = mock_invoke_agent.call_args
         self.assertIn("mock_pr_content_for_arbitrator", args[0])
         self.assertEqual(kwargs.get("role"), "arbitrator")
+        mock_setup_key.assert_called()
 
     @patch('spawn_manager.invoke_agent')
-    def test_spawn_manager_payload_injection(self, mock_invoke_agent):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_spawn_manager_payload_injection(self, mock_setup_key, mock_invoke_agent):
         import spawn_manager
         mock_invoke_agent.return_value = AgentResult(session_key='subtask-manager', stdout='dummy')
         
@@ -188,6 +199,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for manager")
         args, kwargs = mock_invoke_agent.call_args
         self.assertEqual(kwargs.get("role"), "manager")
+        mock_setup_key.assert_called()
 
 
 

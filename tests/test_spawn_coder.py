@@ -55,7 +55,8 @@ class TestSpawnCoder(unittest.TestCase):
     @patch('spawn_coder.invoke_agent')
     @patch('os.path.exists')
     @patch('spawn_coder.build_prompt')
-    def test_playbook_injection(self, mock_build, mock_exists, mock_invoke, mock_run):
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_playbook_injection(self, mock_setup_key, mock_build, mock_exists, mock_invoke, mock_run):
         mock_build.return_value = "--- CODER PLAYBOOK ---\nplaybook content\nstrictly forbidden from manually editing the markdown file's `status` field"
     
         # Mocking for the main block
@@ -82,11 +83,7 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertIn("--- CODER PLAYBOOK ---", task_string)
             self.assertIn("playbook content", task_string)
             self.assertIn("strictly forbidden from manually editing the markdown file's `status` field", task_string)
-
-    @patch('utils_api_key.assign_gemini_api_key')
-    def test_api_key_assignment_during_initialization(self, mock_assign_key):
-        mock_assign_key.return_value = "mocked_gemini_key"
-        self.assertTrue(True)
+            mock_setup_key.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
