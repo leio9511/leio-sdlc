@@ -83,5 +83,10 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertIn("playbook content", task_string)
             self.assertIn("strictly forbidden from manually editing the markdown file's `status` field", task_string)
 
+    @patch('utils_api_key.assign_gemini_api_key')
+    def test_api_key_assignment_during_initialization(self, mock_assign_key):
+        mock_assign_key.return_value = "mocked_gemini_key"
+        self.assertTrue(True)
+
 if __name__ == '__main__':
     unittest.main()

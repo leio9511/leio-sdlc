@@ -77,26 +77,8 @@ def main():
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     args = parser.parse_args()
     # API Key Assignment
-    try:
-        import json
-        from utils_api_key import assign_gemini_api_key
-        config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "sdlc_config.json"))
-        app_config = {}
-        if os.path.exists(config_path):
-            with open(config_path, "r") as f:
-                app_config = json.load(f)
-
-        run_dir_val = getattr(args, "run_dir", os.environ.get("SDLC_RUN_DIR", "."))
-        session_keys_path = os.path.join(run_dir_val, ".session_keys.json")
-        session_name = os.path.basename(__file__).replace(".py", "")
-        if getattr(args, "pr_file", None):
-            session_name += "_" + os.path.basename(args.pr_file)
-
-        assigned_key = assign_gemini_api_key(session_name, app_config, session_keys_path)
-        if assigned_key and not os.environ.get("GEMINI_API_KEY"):
-            os.environ["GEMINI_API_KEY"] = assigned_key
-    except Exception as e:
-        pass
+    from utils_api_key import setup_spawner_api_key
+    setup_spawner_api_key(args, __file__)
     
     if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
         os.environ["LLM_DRIVER"] = args.engine

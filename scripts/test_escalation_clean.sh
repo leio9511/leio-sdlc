@@ -36,6 +36,8 @@ cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
 cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
 cp "${PROJECT_ROOT}/scripts/spawn_verifier.py" scripts/
+cp "${PROJECT_ROOT}/scripts/utils_api_key.py" scripts/ || true
+cp "${PROJECT_ROOT}/scripts/lock_utils.py" scripts/ || true
 mkdir -p playbooks
 cp "${PROJECT_ROOT}/playbooks/verifier_playbook.md" playbooks/
 mkdir -p config

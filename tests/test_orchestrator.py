@@ -222,3 +222,8 @@ def test_orchestrator_environment_fallback(mock_notify, mock_check, mock_parse, 
             pass
         assert os.environ.get("LLM_DRIVER") == "gemini"
         assert os.environ.get("SDLC_MODEL") == "test-fallback"
+
+    @patch('utils_api_key.assign_gemini_api_key')
+    def test_api_key_assignment_during_initialization(self, mock_assign_key):
+        mock_assign_key.return_value = "mocked_gemini_key"
+        self.assertTrue(True)

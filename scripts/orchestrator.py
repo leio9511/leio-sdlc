@@ -91,7 +91,7 @@ def get_env_with_gemini_key(session_key, gemini_api_keys, global_dir):
         return env
         
     state_file_path = os.path.join(global_dir, ".sdlc_runs", ".session_keys.json")
-    from scripts.utils_api_key import assign_gemini_api_key
+    from utils_api_key import assign_gemini_api_key
     assigned_key = assign_gemini_api_key(session_key, {"gemini_api_keys": gemini_api_keys}, state_file_path)
     if assigned_key:
         env["GEMINI_API_KEY"] = assigned_key

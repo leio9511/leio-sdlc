@@ -41,6 +41,8 @@ echo ".sdlc_repo.lock" >> .gitignore
     cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
     cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
     cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
+    cp "${PROJECT_ROOT}/scripts/utils_api_key.py" scripts/ || true
+    cp "${PROJECT_ROOT}/scripts/lock_utils.py" scripts/ || true
     
     echo ".sdlc_run.lock" >> .gitignore
     echo "__pycache__/" >> .gitignore

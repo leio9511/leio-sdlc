@@ -1,7 +1,7 @@
 import os
 import json
 import hashlib
-from lock_utils import FileLock
+from lock_utils import FileLock, WorkspaceLockException
 
 def assign_gemini_api_key(session_key, config, session_keys_path):
     gemini_api_keys = config.get("gemini_api_keys", [])
@@ -18,7 +18,7 @@ def assign_gemini_api_key(session_key, config, session_keys_path):
                 try:
                     with open(session_keys_path, "r") as f:
                         state = json.load(f)
-                except Exception:
+                except json.JSONDecodeError:
                     pass
                     
             fingerprint = state.get(session_key)
@@ -38,6 +38,31 @@ def assign_gemini_api_key(session_key, config, session_keys_path):
                 json.dump(state, f, indent=2)
                 
             return selected_key
-    except Exception:
-        # Graceful degradation
+    except (OSError, WorkspaceLockException):
+        # Graceful degradation for IO/Lock errors
         return None
+
+def setup_spawner_api_key(args, script_file):
+    try:
+        config_path = os.path.abspath(os.path.join(os.path.dirname(script_file), "..", "config", "sdlc_config.json"))
+        app_config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    app_config = json.load(f)
+            except json.JSONDecodeError:
+                pass
+
+        run_dir_val = getattr(args, "run_dir", None) or os.environ.get("SDLC_RUN_DIR", ".")
+        session_keys_path = os.path.join(run_dir_val, ".session_keys.json")
+        session_name = os.path.basename(script_file).replace(".py", "")
+        pr_file_val = getattr(args, "pr_file", None)
+        if pr_file_val:
+            session_name += "_" + os.path.basename(pr_file_val)
+
+        assigned_key = assign_gemini_api_key(session_name, app_config, session_keys_path)
+        if assigned_key and not os.environ.get("GEMINI_API_KEY"):
+            os.environ["GEMINI_API_KEY"] = assigned_key
+    except (OSError, AttributeError):
+        pass
+

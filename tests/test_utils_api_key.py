@@ -3,7 +3,10 @@ import os
 import json
 import tempfile
 import shutil
-from scripts.utils_api_key import assign_gemini_api_key
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
+from utils_api_key import assign_gemini_api_key
 
 class TestUtilsApiKey(unittest.TestCase):
     def setUp(self):
