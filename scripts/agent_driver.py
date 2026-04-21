@@ -22,12 +22,7 @@ class AgentResult:
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
-try:
-    from notification_formatter import format_notification
-except ImportError:
-    # If format_notification isn't easily available, fallback
-    def format_notification(event_type, context):
-        return f"[{event_type}] {context}"
+from notification_formatter import format_notification
 
 def notify_channel(effective_channel, msg, event_type=None, context=None):
     if event_type:
@@ -60,13 +55,8 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
             subprocess.run(cmd, capture_output=True)
     else:
         # New Strategy Layer
-        try:
-            from utils_notification import NotificationRouter
-            NotificationRouter.send(effective_channel, msg)
-        except ImportError:
-            # Fallback if utils_notification is missing in some weird environments
-            logger.error("utils_notification not found, falling back to legacy log")
-            logger.info(f"[Channel Message to {effective_channel}]: {msg}")
+        from utils_notification import NotificationRouter
+        NotificationRouter.send(effective_channel, msg)
 
 def send_ignition_handshake(channel: str) -> None:
     import config
@@ -75,12 +65,8 @@ def send_ignition_handshake(channel: str) -> None:
         msg = format_notification("sdlc_handshake", {})
         notify_channel(channel, msg)
     else:
-        try:
-            from utils_notification import send_ignition_handshake as utils_handshake
-            utils_handshake(channel)
-        except ImportError:
-            msg = format_notification("sdlc_handshake", {})
-            notify_channel(channel, msg)
+        from utils_notification import send_ignition_handshake as utils_handshake
+        utils_handshake(channel)
 
 def resolve_cmd(cmd_name):
     # Dynamic path resolution with $AGENT_SKILLS_DIR fallback

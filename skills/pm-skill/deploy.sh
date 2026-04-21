@@ -41,6 +41,7 @@ rsync -a --exclude=.git --exclude=__pycache__ skills/$SLUG/ "$TMP_DIR/"
 # Package dependencies from monorepo root
 mkdir -p "$TMP_DIR/scripts"
 cp scripts/agent_driver.py "$TMP_DIR/scripts/"
+cp scripts/utils_notification.py "$TMP_DIR/scripts/"
 
 if [ -e "$PROD_DIR" ]; then
     mv "$PROD_DIR" "$OLD_DIR"
