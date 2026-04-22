@@ -465,7 +465,7 @@ def main():
         dlog("Running SDLC Doctor check...")
         res = drun([sys.executable, doctor_script, workdir, "--check"], capture_output=True, text=True)
         if res.returncode != 0:
-            print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
+            print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
             print(HandoffPrompter.get_prompt("startup_validation_failed"))
             sys.exit(1)
 
