@@ -1,0 +1,80 @@
+diff --git a/deploy.sh b/deploy.sh
+index bfcbab9..f6d5fa0 100755
+--- a/deploy.sh
++++ b/deploy.sh
+@@ -11,7 +11,7 @@ perform_hard_copy_deployment() {
+     local SLUG=$(basename "$PWD")
+     local HOME_DIR="${HOME_MOCK:-$HOME}"
+     local OPENCLAW_DIR="$HOME_DIR/.openclaw"
+-    local SKILLS_DIR="$OPENCLAW_DIR/skills"
++    local SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_DIR/skills}"
+     local RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+     local PROD_DIR="$SKILLS_DIR/$SLUG"
+ 
+@@ -119,7 +119,7 @@ perform_hard_copy_deployment() {
+     echo "✅ DEPLOYMENT SUCCESS: $SLUG is now live via hard-copy swap."
+ 
+     # 5. GitHub Auto-Sync (PRD-035)
+-    local SYNC_SCRIPT="$HOME_DIR/.openclaw/skills/leio-github-sync/scripts/sync.py"
++    local SYNC_SCRIPT="$SKILLS_DIR/leio-github-sync/scripts/sync.py"
+     if [ -f "$SYNC_SCRIPT" ] && [ -z "$HOME_MOCK" ]; then
+         echo "🌐 Synchronizing code to GitHub..."
+         python3 "$SYNC_SCRIPT" --project-dir "$PWD" || echo "⚠️ GitHub sync failed but deployment succeeded."
+diff --git a/scripts/orchestrator.py b/scripts/orchestrator.py
+index afc139f..fb5ab38 100755
+--- a/scripts/orchestrator.py
++++ b/scripts/orchestrator.py
+@@ -465,7 +465,7 @@ def main():
+         dlog("Running SDLC Doctor check...")
+         res = drun([sys.executable, doctor_script, workdir, "--check"], capture_output=True, text=True)
+         if res.returncode != 0:
+-            print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
++            print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
+             print(HandoffPrompter.get_prompt("startup_validation_failed"))
+             sys.exit(1)
+ 
+diff --git a/scripts/test_deploy_hardcopy.sh b/scripts/test_deploy_hardcopy.sh
+index cb2af2f..a81ce0a 100755
+--- a/scripts/test_deploy_hardcopy.sh
++++ b/scripts/test_deploy_hardcopy.sh
+@@ -71,6 +71,18 @@ if ! grep -q "Mock gemini executed with args: skills link" deploy_with_gemini.lo
+ fi
+ echo "✅ Passed: Executed link logic when present."
+ 
++echo "--- test_deploy_sh_respects_runtime_dir ---"
++export SDLC_RUNTIME_DIR="$MOCK_HOME/custom_runtime"
++./deploy.sh > deploy_custom_runtime.log 2>&1
++
++if [ ! -d "$SDLC_RUNTIME_DIR/$SKILL_NAME" ]; then
++    echo "❌ Assertion Failed: Deployment did not respect SDLC_RUNTIME_DIR!"
++    exit 1
++fi
++
++unset SDLC_RUNTIME_DIR
++echo "✅ Passed: Deployment respects SDLC_RUNTIME_DIR."
++
+ # Clean up mock bin
+ rm -rf "/tmp/mock_bin"
+ 
+diff --git a/tests/test_doctor_core.py b/tests/test_doctor_core.py
+index f72c20e..1f0040e 100644
+--- a/tests/test_doctor_core.py
++++ b/tests/test_doctor_core.py
+@@ -64,3 +64,17 @@ def test_doctor_apply_base_scaffold():
+         
+         with open(target / ".gitignore", "r") as f:
+             assert ".sdlc_runs/" in f.read()
++
++def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
++    custom_root = "/tmp/custom_skills_root"
++    env = os.environ.copy()
++    env["SDLC_RUNTIME_DIR"] = custom_root
++    
++    script = Path(__file__).parent.parent / "scripts" / "doctor.py"
++    
++    result = subprocess.run(
++        ["python3", str(script), str(tmp_path), "--check"],
++        capture_output=True, text=True, env=env
++    )
++    assert result.returncode == 1
++    assert f"[JIT] To fix: Execute `python3 {custom_root}/leio-sdlc/scripts/doctor.py --fix" in result.stdout

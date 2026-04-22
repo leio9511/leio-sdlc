@@ -32,5 +32,5 @@ def test_orchestrator_dynamic_strings(tmp_path):
     )
 
     assert result.returncode == 1
-    expected_error = f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {custom_root}/leio-sdlc/scripts/commit_state.py --files <path>"
+    expected_error = f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {custom_root}/leio-sdlc/scripts/commit_state.py --files {os.path.abspath('PRD_uncommitted.md')}"
     assert expected_error in result.stdout

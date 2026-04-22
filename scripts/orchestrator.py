@@ -181,14 +181,14 @@ def validate_prd_is_committed(prd_file, workdir):
         try:
             drun(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
-            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files <path>")
-            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {{path}}".format(path="<path>"))
+            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
+            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
             sys.exit(1)
 
         status_out = drun(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
-            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files <path>")
-            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {{path}}".format(path="<path>"))
+            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
+            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
             sys.exit(1)
 
 from utils_json import extract_and_parse_json

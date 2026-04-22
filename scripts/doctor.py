@@ -120,6 +120,7 @@ def main():
     
     if not args.fix and issues:
         print('[FATAL] Project is not SDLC compliant.')
+        # Provide runtime-aware compliance guidance using config.SDLC_RUNTIME_DIR
         print(f'[JIT] To fix: Execute `python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix {target_dir}`')
         sys.exit(1)
         
