@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+PROJECT_ROOT="$(pwd)"
+
 echo "Running live-LLM validation harness for Coder revision loop..."
 
 # Test should not be a hard gate. If SDLC_LIVE_TEST_MODE is not set, skip it gracefully.
@@ -24,7 +26,7 @@ import sys
 import os
 
 # Add scripts to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
+sys.path.insert(0, os.path.abspath('scripts'))
 
 from agent_driver import invoke_agent, build_prompt
 
@@ -73,7 +75,7 @@ if __name__ == "__main__":
 PROMPT
 
 # Move to the project root to run the python script so it can import agent_driver properly
-cd "$(dirname "$0")/.."
+cd "$PROJECT_ROOT"
 
 # Unset SDLC_TEST_MODE so we actually hit the real endpoint
 export SDLC_TEST_MODE="false"

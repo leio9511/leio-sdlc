@@ -130,6 +130,52 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertIn("If you do not make code changes after revision feedback, you have failed the task", prompt_sent)
         self.assertIn("Commit the required files explicitly", prompt_sent)
 
+
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('os.path.exists')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_mocked_revision_flow_prompt_injection_existing_session(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):
+        def custom_exists(path):
+            if ".coder_session" in str(path):
+                return True
+            if "PR" in str(path) or "PRD" in str(path) or "feedback" in str(path) or "prompts.json" in str(path):
+                return True
+            return real_exists(path)
+        mock_exists.side_effect = custom_exists
+
+        def mock_file_open(path, *args, **kwargs):
+            if "feedback" in str(path):
+                return mock_open(read_data='{"status": "NEEDS_FIX", "comments": "Missing stuff"}')(path, *args, **kwargs)
+            elif "PR_001.md" in str(path) or "PRD.md" in str(path):
+                return mock_open(read_data="Mocked Content")(path, *args, **kwargs)
+            elif ".coder_session" in str(path):
+                return mock_open(read_data="sdlc_coder_PR_001_1234abcd")(path, *args, **kwargs)
+            return real_open(path, *args, **kwargs)
+
+        test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--feedback-file", "feedback.json", "--workdir", "/tmp", "--enable-exec-from-workspace"]
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false", "SDLC_FORCE_NEW_CODER_SESSION": "0"}):
+            with patch.object(sys, 'argv', test_args):
+                mock_check_output.return_value = "feature/test"
+                mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001_1234abcd", stdout="")
+        
+                with patch('builtins.open', side_effect=mock_file_open):
+                    spawn_coder.main()
+                    
+        # Check that invoke_agent was called with the hardened prompt
+        mock_invoke.assert_called()
+        prompt_sent = mock_invoke.call_args[0][0]
+        called_kwargs = mock_invoke.call_args[1]
+        
+        # Verify it used the existing session key
+        self.assertEqual(called_kwargs['session_key'], "sdlc_coder_PR_001_1234abcd")
+        
+        # Verify the hardened revision text is in the prompt
+        self.assertIn("This is an execution task, not an acknowledgment task", prompt_sent)
+        self.assertIn("You MUST NOT respond with only an acknowledgment such as", prompt_sent)
+        self.assertIn("If you do not make code changes after revision feedback, you have failed the task", prompt_sent)
+        self.assertIn("Commit the required files explicitly", prompt_sent)
+
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
     @patch('os.path.exists')
