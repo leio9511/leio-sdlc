@@ -775,8 +775,8 @@ def main():
                         print("[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py.")
                         sys.exit(0)
                     elif uat_status == "NEEDS_FIX":
-                        missing_items = [item for item in uat_data.get("verification_details", []) if item.get("status") == "MISSING"]
-                        if missing_items:
+                        actionable_items = [item for item in uat_data.get("verification_details", []) if item.get("status") in ["MISSING", "PARTIAL"]]
+                        if actionable_items:
                             if uat_recovery_count < max_uat_recovery_attempts:
                                 logger.info("STATE_UAT_RECOVERY")
                                 uat_recovery_count += 1
@@ -799,7 +799,7 @@ def main():
                                 logger.info("STATE_UAT_BLOCKED")
                                 sys.exit(1)
                         else:
-                            print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo.")
+                            print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo.")
                             sys.exit(1)
 
                 current_pr = output.split('\n')[-1].strip()

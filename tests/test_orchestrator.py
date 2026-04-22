@@ -456,3 +456,265 @@ def test_uat_system_error_circuit_breaker(mock_workdir):
         drun_calls = mock_drun.call_args_list
         verifier_calls = [call for call in drun_calls if "spawn_verifier.py" in " ".join(call[0][0])]
         assert len(verifier_calls) == 3
+
+def test_uat_recovery_triggered_by_partial(mock_workdir):
+    with patch('orchestrator.SanityContext.perform_healthy_check'), \
+         patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
+         patch('orchestrator.drun') as mock_drun, \
+         patch('orchestrator.dpopen') as mock_dpopen, \
+         patch('git_utils.check_git_boundary'), \
+         patch('orchestrator.validate_prd_is_committed'), \
+         patch('orchestrator.parse_affected_projects', return_value=[]), \
+         patch('orchestrator.safe_git_checkout'), \
+         patch('orchestrator.notify_channel') as mock_notify, \
+         patch('orchestrator.glob.glob') as mock_glob:
+         
+        def dummy_drun(cmd, *args, **kwargs):
+            mock_res = MagicMock()
+            if isinstance(cmd, list) and "get_next_pr.py" in cmd[0] if len(cmd) > 1 else False:
+                mock_res.stdout = "[QUEUE_EMPTY]\n"
+            elif isinstance(cmd, list) and "branch" in cmd:
+                mock_res.stdout = "master\n"
+            else:
+                mock_res.stdout = ""
+            mock_res.returncode = 0
+            
+            # Mock UAT verifier output with PARTIAL
+            if isinstance(cmd, list) and "spawn_verifier.py" in " ".join(cmd):
+                uat_out_file = [arg for arg in cmd if arg.endswith("uat_report.json")][0]
+                with open(uat_out_file, "w") as f:
+                    json.dump({
+                        "status": "NEEDS_FIX",
+                        "verification_details": [
+                            {"status": "PARTIAL", "detail": "test partial"}
+                        ]
+                    }, f)
+            return mock_res
+            
+        mock_drun.side_effect = dummy_drun
+        
+        target_project_name = os.path.basename(os.path.abspath(mock_workdir))
+        job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
+        os.makedirs(job_dir, exist_ok=True)
+
+        pr_file = os.path.join(job_dir, "PR_001_test.md")
+        with open(pr_file, "w") as f:
+            f.write("---\nstatus: closed\n---\n")
+
+        def dummy_glob(pattern, recursive=False):
+            if "PR_*.md" in pattern or "*.md" in pattern:
+                return [pr_file]
+            return []
+        mock_glob.side_effect = dummy_glob
+        
+        mock_dpopen.return_value.returncode = 0
+        
+        def dummy_dpopen(cmd, *args, **kwargs):
+            mock_proc = MagicMock()
+            mock_proc.returncode = 0
+            if "spawn_planner.py" in " ".join(cmd) and "--replan-uat-failures" in " ".join(cmd):
+                raise SystemExit(0)  # Stop orchestrator here for test
+            return mock_proc
+        mock_dpopen.side_effect = dummy_dpopen
+        
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
+                orchestrator.main()
+        except SystemExit:
+            pass
+            
+        dpopen_calls = mock_dpopen.call_args_list
+        planner_calls = [call for call in dpopen_calls if "spawn_planner.py" in " ".join(call[0][0]) and "--replan-uat-failures" in " ".join(call[0][0])]
+        assert len(planner_calls) > 0
+
+def test_uat_recovery_still_triggered_by_missing(mock_workdir):
+    with patch('orchestrator.SanityContext.perform_healthy_check'), \
+         patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
+         patch('orchestrator.drun') as mock_drun, \
+         patch('orchestrator.dpopen') as mock_dpopen, \
+         patch('git_utils.check_git_boundary'), \
+         patch('orchestrator.validate_prd_is_committed'), \
+         patch('orchestrator.parse_affected_projects', return_value=[]), \
+         patch('orchestrator.safe_git_checkout'), \
+         patch('orchestrator.notify_channel') as mock_notify, \
+         patch('orchestrator.glob.glob') as mock_glob:
+         
+        def dummy_drun(cmd, *args, **kwargs):
+            mock_res = MagicMock()
+            if isinstance(cmd, list) and "get_next_pr.py" in cmd[0] if len(cmd) > 1 else False:
+                mock_res.stdout = "[QUEUE_EMPTY]\n"
+            elif isinstance(cmd, list) and "branch" in cmd:
+                mock_res.stdout = "master\n"
+            else:
+                mock_res.stdout = ""
+            mock_res.returncode = 0
+            
+            # Mock UAT verifier output with MISSING
+            if isinstance(cmd, list) and "spawn_verifier.py" in " ".join(cmd):
+                uat_out_file = [arg for arg in cmd if arg.endswith("uat_report.json")][0]
+                with open(uat_out_file, "w") as f:
+                    json.dump({
+                        "status": "NEEDS_FIX",
+                        "verification_details": [
+                            {"status": "MISSING", "detail": "test missing"}
+                        ]
+                    }, f)
+            return mock_res
+            
+        mock_drun.side_effect = dummy_drun
+        
+        target_project_name = os.path.basename(os.path.abspath(mock_workdir))
+        job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
+        os.makedirs(job_dir, exist_ok=True)
+
+        pr_file = os.path.join(job_dir, "PR_001_test.md")
+        with open(pr_file, "w") as f:
+            f.write("---\nstatus: closed\n---\n")
+
+        def dummy_glob(pattern, recursive=False):
+            if "PR_*.md" in pattern or "*.md" in pattern:
+                return [pr_file]
+            return []
+        mock_glob.side_effect = dummy_glob
+        
+        mock_dpopen.return_value.returncode = 0
+        
+        def dummy_dpopen(cmd, *args, **kwargs):
+            mock_proc = MagicMock()
+            mock_proc.returncode = 0
+            if "spawn_planner.py" in " ".join(cmd) and "--replan-uat-failures" in " ".join(cmd):
+                raise SystemExit(0)
+            return mock_proc
+        mock_dpopen.side_effect = dummy_dpopen
+        
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
+                orchestrator.main()
+        except SystemExit:
+            pass
+            
+        dpopen_calls = mock_dpopen.call_args_list
+        planner_calls = [call for call in dpopen_calls if "spawn_planner.py" in " ".join(call[0][0]) and "--replan-uat-failures" in " ".join(call[0][0])]
+        assert len(planner_calls) > 0
+
+def test_uat_no_recovery_on_pass(mock_workdir):
+    with patch('orchestrator.SanityContext.perform_healthy_check'), \
+         patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
+         patch('orchestrator.drun') as mock_drun, \
+         patch('orchestrator.dpopen') as mock_dpopen, \
+         patch('git_utils.check_git_boundary'), \
+         patch('orchestrator.validate_prd_is_committed'), \
+         patch('orchestrator.parse_affected_projects', return_value=[]), \
+         patch('orchestrator.safe_git_checkout'), \
+         patch('orchestrator.notify_channel') as mock_notify, \
+         patch('orchestrator.glob.glob') as mock_glob:
+         
+        def dummy_drun(cmd, *args, **kwargs):
+            mock_res = MagicMock()
+            if isinstance(cmd, list) and "get_next_pr.py" in cmd[0] if len(cmd) > 1 else False:
+                mock_res.stdout = "[QUEUE_EMPTY]\n"
+            elif isinstance(cmd, list) and "branch" in cmd:
+                mock_res.stdout = "master\n"
+            else:
+                mock_res.stdout = ""
+            mock_res.returncode = 0
+            
+            # Mock UAT verifier output with PASS
+            if isinstance(cmd, list) and "spawn_verifier.py" in " ".join(cmd):
+                uat_out_file = [arg for arg in cmd if arg.endswith("uat_report.json")][0]
+                with open(uat_out_file, "w") as f:
+                    json.dump({
+                        "status": "PASS",
+                        "verification_details": []
+                    }, f)
+            return mock_res
+            
+        mock_drun.side_effect = dummy_drun
+        
+        target_project_name = os.path.basename(os.path.abspath(mock_workdir))
+        job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
+        os.makedirs(job_dir, exist_ok=True)
+
+        pr_file = os.path.join(job_dir, "PR_001_test.md")
+        with open(pr_file, "w") as f:
+            f.write("---\nstatus: closed\n---\n")
+
+        def dummy_glob(pattern, recursive=False):
+            if "PR_*.md" in pattern or "*.md" in pattern:
+                return [pr_file]
+            return []
+        mock_glob.side_effect = dummy_glob
+        
+        mock_dpopen.return_value.returncode = 0
+        
+        exit_code = None
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
+                orchestrator.main()
+        except SystemExit as e:
+            exit_code = e.code
+            
+        assert exit_code == 0
+        
+        dpopen_calls = mock_dpopen.call_args_list
+        planner_calls = [call for call in dpopen_calls if "spawn_planner.py" in " ".join(call[0][0]) and "--replan-uat-failures" in " ".join(call[0][0])]
+        assert len(planner_calls) == 0
+
+def test_uat_manager_handoff_wording(mock_workdir, capsys):
+    with patch('orchestrator.SanityContext.perform_healthy_check'), \
+         patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
+         patch('orchestrator.drun') as mock_drun, \
+         patch('orchestrator.dpopen') as mock_dpopen, \
+         patch('git_utils.check_git_boundary'), \
+         patch('orchestrator.validate_prd_is_committed'), \
+         patch('orchestrator.parse_affected_projects', return_value=[]), \
+         patch('orchestrator.safe_git_checkout'), \
+         patch('orchestrator.notify_channel') as mock_notify, \
+         patch('orchestrator.glob.glob') as mock_glob:
+         
+        def dummy_drun(cmd, *args, **kwargs):
+            mock_res = MagicMock()
+            if isinstance(cmd, list) and "get_next_pr.py" in cmd[0] if len(cmd) > 1 else False:
+                mock_res.stdout = "[QUEUE_EMPTY]\n"
+            elif isinstance(cmd, list) and "branch" in cmd:
+                mock_res.stdout = "master\n"
+            else:
+                mock_res.stdout = ""
+            mock_res.returncode = 0
+            
+            # Mock UAT verifier output with NEEDS_FIX but NO MISSING/PARTIAL items (to trigger fallback)
+            if isinstance(cmd, list) and "spawn_verifier.py" in " ".join(cmd):
+                uat_out_file = [arg for arg in cmd if arg.endswith("uat_report.json")][0]
+                with open(uat_out_file, "w") as f:
+                    json.dump({
+                        "status": "NEEDS_FIX",
+                        "verification_details": [
+                            {"status": "OTHER", "detail": "something else"}
+                        ]
+                    }, f)
+            return mock_res
+            
+        mock_drun.side_effect = dummy_drun
+        
+        target_project_name = os.path.basename(os.path.abspath(mock_workdir))
+        job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
+        os.makedirs(job_dir, exist_ok=True)
+
+        pr_file = os.path.join(job_dir, "PR_001_test.md")
+        with open(pr_file, "w") as f:
+            f.write("---\nstatus: closed\n---\n")
+
+        def dummy_glob(pattern, recursive=False):
+            if "PR_*.md" in pattern or "*.md" in pattern:
+                return [pr_file]
+            return []
+        mock_glob.side_effect = dummy_glob
+        
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
+                orchestrator.main()
+        except SystemExit:
+            pass
+            
+        captured = capsys.readouterr()
+        assert "Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo." in captured.out

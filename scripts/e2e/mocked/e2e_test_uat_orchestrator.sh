@@ -108,7 +108,7 @@ git reset --hard HEAD >/dev/null 2>&1
 git clean -fd >/dev/null 2>&1
 
 OUT=$(python3 "$ORCHESTRATOR" --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
-if [[ "$OUT" != *"[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the MISSING items to the Boss, and ask whether to append a hotfix or redo."* ]]; then
+if [[ "$OUT" != *"[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo."* ]]; then
     echo "Fail Test Case 3: Did not print ACTION REQUIRED FOR MANAGER"
     echo "$OUT"
     exit 1
