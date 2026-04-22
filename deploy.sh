@@ -11,7 +11,7 @@ perform_hard_copy_deployment() {
     local SLUG=$(basename "$PWD")
     local HOME_DIR="${HOME_MOCK:-$HOME}"
     local OPENCLAW_DIR="$HOME_DIR/.openclaw"
-    local SKILLS_DIR="$OPENCLAW_DIR/skills"
+    local SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_DIR/skills}"
     local RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
 

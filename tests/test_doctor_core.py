@@ -64,3 +64,17 @@ def test_doctor_apply_base_scaffold():
         
         with open(target / ".gitignore", "r") as f:
             assert ".sdlc_runs/" in f.read()
+
+def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
+    custom_root = "/tmp/custom_skills_root"
+    env = os.environ.copy()
+    env["SDLC_RUNTIME_DIR"] = custom_root
+    
+    script = Path(__file__).parent.parent / "scripts" / "doctor.py"
+    
+    result = subprocess.run(
+        ["python3", str(script), str(tmp_path), "--check"],
+        capture_output=True, text=True, env=env
+    )
+    assert result.returncode == 1
+    assert f"[JIT] To fix: Execute `python3 {custom_root}/leio-sdlc/scripts/doctor.py --fix" in result.stdout

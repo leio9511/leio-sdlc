@@ -71,6 +71,18 @@ if ! grep -q "Mock gemini executed with args: skills link" deploy_with_gemini.lo
 fi
 echo "✅ Passed: Executed link logic when present."
 
+echo "--- test_deploy_sh_respects_runtime_dir ---"
+export SDLC_RUNTIME_DIR="$MOCK_HOME/custom_runtime"
+./deploy.sh > deploy_custom_runtime.log 2>&1
+
+if [ ! -d "$SDLC_RUNTIME_DIR/$SKILL_NAME" ]; then
+    echo "❌ Assertion Failed: Deployment did not respect SDLC_RUNTIME_DIR!"
+    exit 1
+fi
+
+unset SDLC_RUNTIME_DIR
+echo "✅ Passed: Deployment respects SDLC_RUNTIME_DIR."
+
 # Clean up mock bin
 rm -rf "/tmp/mock_bin"
 
