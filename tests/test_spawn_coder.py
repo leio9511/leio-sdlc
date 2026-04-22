@@ -8,6 +8,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 import spawn_coder
 from agent_driver import AgentResult
+import builtins
+
+real_open = builtins.open
+real_exists = os.path.exists
 
 class TestSpawnCoder(unittest.TestCase):
     def test_extract_pr_id(self):
@@ -31,9 +35,9 @@ class TestSpawnCoder(unittest.TestCase):
         mock_exists.return_value = True
 
         def mock_file_open(path, *args, **kwargs):
-            if "feedback.txt" in path:
+            if "feedback.txt" in str(path):
                 return mock_open(read_data="Fix the bugs.")(path, *args, **kwargs)
-            elif ".coder_session" in path:
+            elif ".coder_session" in str(path):
                 return mock_open(read_data="sdlc_coder_PR_001")(path, *args, **kwargs)
             else:
                 return mock_open(read_data="")(path, *args, **kwargs)
@@ -60,7 +64,7 @@ class TestSpawnCoder(unittest.TestCase):
         mock_build.return_value = "--- CODER PLAYBOOK ---\nplaybook content\nstrictly forbidden from manually editing the markdown file's `status` field"
     
         # Mocking for the main block
-        mock_exists.side_effect = lambda p: True if "playbook" in p or "PR" in p or "PRD" in p else False
+        mock_exists.side_effect = lambda p: True if "playbook" in str(p) or "PR" in str(p) or "PRD" in str(p) else False
     
         # We need to simulate the sys.argv and call main()
         test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--workdir", "/tmp", "--enable-exec-from-workspace"]
@@ -84,6 +88,83 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertIn("playbook content", task_string)
             self.assertIn("strictly forbidden from manually editing the markdown file's `status` field", task_string)
             mock_setup_key.assert_called_once()
+
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('os.path.exists')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_mocked_revision_flow_prompt_injection(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):
+        def custom_exists(path):
+            if ".coder_session" in str(path):
+                return False
+            if "PR" in str(path) or "PRD" in str(path) or "feedback" in str(path) or "prompts.json" in str(path):
+                return True
+            return real_exists(path)
+        mock_exists.side_effect = custom_exists
+
+        def mock_file_open(path, *args, **kwargs):
+            if "feedback" in str(path):
+                return mock_open(read_data='{"status": "NEEDS_FIX", "comments": "Missing stuff"}')(path, *args, **kwargs)
+            elif "PR_001.md" in str(path) or "PRD.md" in str(path):
+                return mock_open(read_data="Mocked Content")(path, *args, **kwargs)
+            elif ".coder_session" in str(path):
+                return mock_open()(path, *args, **kwargs)
+            return real_open(path, *args, **kwargs)
+
+        test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--feedback-file", "feedback.json", "--workdir", "/tmp", "--enable-exec-from-workspace"]
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            with patch.object(sys, 'argv', test_args):
+                mock_check_output.return_value = "feature/test"
+                mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
+        
+                with patch('builtins.open', side_effect=mock_file_open):
+                    spawn_coder.main()
+                    
+        # Check that invoke_agent was called with the hardened prompt
+        mock_invoke.assert_called()
+        prompt_sent = mock_invoke.call_args[0][0]
+        
+        # Verify the hardened revision text is in the prompt
+        self.assertIn("This is an execution task, not an acknowledgment task", prompt_sent)
+        self.assertIn("You MUST NOT respond with only an acknowledgment such as", prompt_sent)
+        self.assertIn("If you do not make code changes after revision feedback, you have failed the task", prompt_sent)
+        self.assertIn("Commit the required files explicitly", prompt_sent)
+
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('os.path.exists')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_mocked_system_alert_prompt_injection(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):
+        def custom_exists(path):
+            if ".coder_session" in str(path):
+                return False
+            if "PR" in str(path) or "PRD" in str(path) or "prompts.json" in str(path):
+                return True
+            return real_exists(path)
+        mock_exists.side_effect = custom_exists
+
+        def mock_file_open(path, *args, **kwargs):
+            if "PR_001.md" in str(path) or "PRD.md" in str(path):
+                return mock_open(read_data="Mocked Content")(path, *args, **kwargs)
+            elif ".coder_session" in str(path):
+                return mock_open()(path, *args, **kwargs)
+            return real_open(path, *args, **kwargs)
+
+        test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--system-alert", "git dirty", "--workdir", "/tmp", "--enable-exec-from-workspace"]
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            with patch.object(sys, 'argv', test_args):
+                mock_check_output.return_value = "feature/test"
+                mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
+        
+                with patch('builtins.open', side_effect=mock_file_open):
+                    spawn_coder.main()
+                    
+        mock_invoke.assert_called()
+        prompt_sent = mock_invoke.call_args[0][0]
+        
+        self.assertIn("System Preflight or Git Workspace Check Failed", prompt_sent)
+        self.assertIn("git dirty", prompt_sent)
+        self.assertIn("This alert requires corrective action, not acknowledgment only", prompt_sent)
 
 if __name__ == '__main__':
     unittest.main()
