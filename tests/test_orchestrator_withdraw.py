@@ -173,3 +173,19 @@ def test_withdraw_baseline_alignment_main(repo_env_main, capsys):
     branch = run_git(["branch", "--show-current"], cwd=workdir).stdout.strip()
     assert branch == "main"
 
+def test_withdraw_missing_metadata(repo_env, capfd):
+    workdir = repo_env["workdir"]
+    job_dir = repo_env["job_dir"]
+    
+    # Remove metadata
+    baseline_file = os.path.join(job_dir, "baseline_commit.txt")
+    if os.path.exists(baseline_file):
+        os.remove(baseline_file)
+        
+    with pytest.raises(RuntimeError) as excinfo:
+        run_orchestrator_withdraw(workdir, repo_env["global_dir"], repo_env["prd_name"])
+    
+    assert "Orchestrator exited with 1" in str(excinfo.value)
+    out, err = capfd.readouterr()
+    assert "Handoff_Metadata_Missing" in out
+

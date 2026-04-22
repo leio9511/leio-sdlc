@@ -40,7 +40,8 @@ perform_hard_copy_rollback() {
 
     echo "📦 Found latest backup: $LATEST_BACKUP"
 
-    # Orchestrator standard guardrails: Prevent rollback during active SDLC sessions
+    # PR-004 Alignment: Orchestrator standard guardrails
+    # Prevent rollback during active SDLC sessions to maintain singleton integrity
     if [ -f "$PROD_DIR/.sdlc_repo.lock" ] || [ -f "$PROD_DIR/.coder_session" ]; then
         echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock or .coder_session found)."
         exit 1
