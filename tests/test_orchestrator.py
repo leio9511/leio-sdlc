@@ -457,7 +457,9 @@ def test_uat_system_error_circuit_breaker(mock_workdir):
         verifier_calls = [call for call in drun_calls if "spawn_verifier.py" in " ".join(call[0][0])]
         assert len(verifier_calls) == 3
 
+# PRD Trigger_UAT_Recovery_For_Partial_Findings: Ensure PARTIAL findings trigger recovery
 def test_uat_recovery_triggered_by_partial(mock_workdir):
+
     with patch('orchestrator.SanityContext.perform_healthy_check'), \
          patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
          patch('orchestrator.drun') as mock_drun, \

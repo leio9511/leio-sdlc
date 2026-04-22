@@ -2,6 +2,7 @@ import os
 import pytest
 
 PROJECT_ROOT = os.getcwd()
+os.environ["SDLC_TEST_MODE"] = "true"
 
 @pytest.fixture(autouse=True)
 def global_restore_cwd():
