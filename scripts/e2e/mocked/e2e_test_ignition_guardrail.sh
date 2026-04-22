@@ -43,7 +43,7 @@ git status
 
 echo "Running Ignition Failure Test..."
 # Mock the orchestrator failure
-output=$(SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/orchestrator.py" --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "invalid:id" --max-prs-to-process 1 --coder-session-strategy always 2>&1 || true)
+output=$(SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "invalid:id" --max-prs-to-process 1 --coder-session-strategy always 2>&1 || true)
 
 if ! echo "$output" | grep -i -q "Invalid notification channel format\|channel.*invalid"; then
     # It might be caught by argparse before or during execution. We check for an error condition.
@@ -60,7 +60,7 @@ echo "Running Ignition Success Test..."
 
 # We need a background process that we can kill after handshake because
 # if we run the orchestrator it will actually execute the PR logic.
-SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/orchestrator.py" --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "valid:id" --max-prs-to-process 1 --coder-session-strategy always > ../success_test.log 2>&1 &
+SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "valid:id" --max-prs-to-process 1 --coder-session-strategy always > ../success_test.log 2>&1 &
 ORCH_PID=$!
 
 # Wait for handshake

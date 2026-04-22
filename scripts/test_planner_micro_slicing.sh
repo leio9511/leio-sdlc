@@ -19,7 +19,7 @@ Please generate a sequential, dependency-ordered chain of Micro-PRs.
 EOF
 
 # Run Planner
-SDLC_TEST_MODE=true python3 scripts/spawn_planner.py --prd-file "$SANDBOX/dummy_complex_prd.md" --out-dir "$SANDBOX/prs" --workdir "$(pwd)" --global-dir "$(pwd)"
+SDLC_TEST_MODE=true python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file "$SANDBOX/dummy_complex_prd.md" --out-dir "$SANDBOX/prs" --workdir "$(pwd)" --global-dir "$(pwd)"
 
 # Assertions
 PR_COUNT=$(ls -1q "$SANDBOX/prs/"*.md 2>/dev/null | wc -l)

@@ -26,7 +26,7 @@ class TestSpawnReviewerOverhaul(unittest.TestCase):
         self.env["SDLC_MOCK_REVIEWER_FAILURE"] = "true"
         
         cmd = [
-            "python3", "scripts/spawn_reviewer.py",
+            "python3", "scripts/spawn_reviewer.py", "--enable-exec-from-workspace",
             "--workdir", self.workdir,
             "--pr-file", self.pr_file,
             "--diff-target", "HEAD",
@@ -53,7 +53,7 @@ class TestSpawnReviewerOverhaul(unittest.TestCase):
         self.env["SDLC_MOCK_REVIEWER_FAILURE"] = "true"
         
         cmd = [
-            "python3", "scripts/spawn_reviewer.py",
+            "python3", "scripts/spawn_reviewer.py", "--enable-exec-from-workspace",
             "--workdir", self.workdir,
             "--pr-file", self.pr_file,
             "--diff-target", "HEAD",
@@ -70,7 +70,7 @@ class TestSpawnReviewerOverhaul(unittest.TestCase):
     def test_spawn_reviewer_success(self):
         # Testing success scenario where file contains valid JSON and is not NOT_STARTED
         cmd = [
-            "python3", "scripts/spawn_reviewer.py",
+            "python3", "scripts/spawn_reviewer.py", "--enable-exec-from-workspace",
             "--workdir", self.workdir,
             "--pr-file", self.pr_file,
             "--diff-target", "HEAD",
@@ -93,7 +93,7 @@ class TestSpawnReviewerOverhaul(unittest.TestCase):
         self.env["SDLC_MOCK_REVIEWER_INVALID_JSON"] = "true"
         
         cmd = [
-            "python3", "scripts/spawn_reviewer.py",
+            "python3", "scripts/spawn_reviewer.py", "--enable-exec-from-workspace",
             "--workdir", self.workdir,
             "--pr-file", self.pr_file,
             "--diff-target", "HEAD",

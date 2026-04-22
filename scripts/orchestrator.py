@@ -263,6 +263,10 @@ def main():
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     args = parser.parse_args()
+    from handoff_prompter import HandoffPrompter
+    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        sys.exit(1)
     
     if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
         os.environ["LLM_DRIVER"] = args.engine
@@ -594,7 +598,7 @@ def main():
             notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
             notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
             try:
-                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                 proc.wait()
                 if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
             except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -619,7 +623,7 @@ def main():
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
-            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
             proc.wait()
             if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -881,7 +885,7 @@ def main():
                     logger.info(f"State 4: Spawning Reviewer for {current_pr}")
                     dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
-                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                    proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                     proc.wait()
                     
                     json_retry_count = 0
@@ -911,7 +915,7 @@ def main():
                                 break
                                 
                             sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py"), "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                             proc.wait()
                                 
                     if verdict == "APPROVED":
@@ -985,7 +989,7 @@ def main():
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"), "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before

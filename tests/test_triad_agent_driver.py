@@ -46,7 +46,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         with open(prd_file, "w") as f:
             f.write("mock_prd_content")
             
-        test_args = ["spawn_coder.py", "--pr-file", pr_file, "--prd-file", prd_file, "--workdir", self.workdir]
+        test_args = ["spawn_coder.py", "--pr-file", pr_file, "--prd-file", prd_file, "--workdir", self.workdir, "--enable-exec-from-workspace"]
         with patch.object(sys, 'argv', test_args):
             spawn_coder.main()
             
@@ -75,7 +75,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         with open(feedback_file, "w") as f:
             f.write('```json\n{"overall_assessment": "NEEDS_ATTENTION", "findings": [{"description": "raw JSON test"}]}\n```')
             
-        test_args = ["spawn_coder.py", "--pr-file", pr_file, "--prd-file", prd_file, "--workdir", self.workdir, "--feedback-file", feedback_file]
+        test_args = ["spawn_coder.py", "--pr-file", pr_file, "--prd-file", prd_file, "--workdir", self.workdir, "--feedback-file", feedback_file, "--enable-exec-from-workspace"]
         with patch.object(sys, 'argv', test_args):
             spawn_coder.main()
             
@@ -108,7 +108,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         with open(prd_file, "w") as f:
             f.write("mock_prd_content_for_planner")
             
-        test_args = ["spawn_planner.py", "--prd-file", prd_file, "--workdir", self.workdir]
+        test_args = ["spawn_planner.py", "--prd-file", prd_file, "--workdir", self.workdir, "--enable-exec-from-workspace"]
         with patch.object(sys, 'argv', test_args):
             spawn_planner.main()
             
@@ -136,7 +136,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         with open(pr_file, "w") as f:
             f.write("mock_pr_content_for_reviewer")
             
-        test_args = ["spawn_reviewer.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir, "--out-file", "review_report.json", "--run-dir", self.workdir]
+        test_args = ["spawn_reviewer.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir, "--out-file", "review_report.json", "--run-dir", self.workdir, "--enable-exec-from-workspace"]
         
         dummy_diff = os.path.join(self.workdir, "dummy.diff")
         with open(dummy_diff, "w") as f:
@@ -170,7 +170,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         with open(pr_file, "w") as f:
             f.write("mock_pr_content_for_arbitrator")
             
-        test_args = ["spawn_arbitrator.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir]
+        test_args = ["spawn_arbitrator.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir, "--enable-exec-from-workspace"]
         
         dummy_diff = os.path.join(self.workdir, "dummy.diff")
         with open(dummy_diff, "w") as f:
@@ -191,7 +191,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         import spawn_manager
         mock_invoke_agent.return_value = AgentResult(session_key='subtask-manager', stdout='dummy')
         
-        test_args = ["spawn_manager.py", "--job-dir", "/tmp/job", "--workdir", self.workdir]
+        test_args = ["spawn_manager.py", "--job-dir", "/tmp/job", "--workdir", self.workdir, "--enable-exec-from-workspace"]
         
         with patch.object(sys, 'argv', test_args):
             spawn_manager.main()

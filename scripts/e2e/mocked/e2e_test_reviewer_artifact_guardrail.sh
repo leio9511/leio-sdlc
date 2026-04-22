@@ -48,7 +48,7 @@ cp "$TEMP_DIR/bin/openclaw" "$TEMP_DIR/bin/gemini"
 
 echo "=== T1: Agent does not write file (leaves scaffolding) ==="
 export MOCK_BEHAVIOR="no_write"
-if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
+if python3 "$SPAWN_REVIEWER" --enable-exec-from-workspace --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
     echo "❌ T1 Failed: Should have failed verification"
     exit 1
 fi
@@ -56,7 +56,7 @@ echo "✅ T1 Passed"
 
 echo "=== T2: Agent writes invalid JSON ==="
 export MOCK_BEHAVIOR="invalid_json"
-if python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
+if python3 "$SPAWN_REVIEWER" --enable-exec-from-workspace --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL" 2>stderr.log; then
     echo "❌ T2 Failed: Should have failed verification"
     exit 1
 fi
@@ -64,7 +64,7 @@ echo "✅ T2 Passed"
 
 echo "=== T3: Agent writes EXCELLENT ==="
 export MOCK_BEHAVIOR="excellent"
-if ! python3 "$SPAWN_REVIEWER" --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL"; then
+if ! python3 "$SPAWN_REVIEWER" --enable-exec-from-workspace --pr-file pr.md --diff-target HEAD --workdir . --override-diff-file diff.txt --run-dir "$RUN_DIR" --out-file "$RUN_DIR/review_report.json" --global-dir "$MOCK_GLOBAL"; then
     echo "❌ T3 Failed: Should have passed verification"; cat "$RUN_DIR/review_report.json"
     exit 1
 fi

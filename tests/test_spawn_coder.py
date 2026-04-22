@@ -63,7 +63,7 @@ class TestSpawnCoder(unittest.TestCase):
         mock_exists.side_effect = lambda p: True if "playbook" in p or "PR" in p or "PRD" in p else False
     
         # We need to simulate the sys.argv and call main()
-        test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--workdir", "/tmp"]
+        test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--workdir", "/tmp", "--enable-exec-from-workspace"]
         with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
             with patch.object(sys, 'argv', test_args):
                 # Also mock git branch check

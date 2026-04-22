@@ -23,7 +23,7 @@ export SDLC_TEST_MODE=true
 # 2. Test Planner Pre-flight
 echo "Testing Planner Pre-flight..."
 set +e
-output=$(python3 scripts/spawn_planner.py --prd-file missing.md --workdir . --global-dir . 2>&1)
+output=$(python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file missing.md --workdir . --global-dir . 2>&1)
 exit_code=$?
 set -e
 if [ $exit_code -ne 1 ]; then
@@ -40,7 +40,7 @@ fi
 echo "Testing Coder Pre-flight..."
 git checkout -b feature/dummy-guardrails >/dev/null 2>&1
 set +e
-output=$(python3 scripts/spawn_coder.py --pr-file missing.md --prd-file missing.md --workdir . --global-dir . 2>&1)
+output=$(python3 scripts/spawn_coder.py --enable-exec-from-workspace --pr-file missing.md --prd-file missing.md --workdir . --global-dir . 2>&1)
 exit_code=$?
 set -e
 git checkout master >/dev/null 2>&1
@@ -61,7 +61,7 @@ echo "---
 status: open
 ---" > PR.md
 set +e
-output=$(python3 scripts/spawn_reviewer.py --pr-file PR.md --diff-target HEAD --workdir . --global-dir . 2>&1)
+output=$(python3 scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR.md --diff-target HEAD --workdir . --global-dir . 2>&1)
 exit_code=$?
 set -e
 

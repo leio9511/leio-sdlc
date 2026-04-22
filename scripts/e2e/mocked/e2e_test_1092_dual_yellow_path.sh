@@ -19,7 +19,7 @@ git commit -m "init" > /dev/null
 export SDLC_TEST_MODE="true"
 
 echo "Testing spawn_planner.py without --global-dir..."
-python3 "$SDLC_ROOT/scripts/spawn_planner.py" --workdir "$TEST_DIR" --prd-file PRD.md
+python3 "$SDLC_ROOT/scripts/spawn_planner.py" --enable-exec-from-workspace --workdir "$TEST_DIR" --prd-file PRD.md
 
 echo "Checking if .sdlc_runs is created in workdir..."
 if [ -d "$TEST_DIR/.sdlc_runs" ]; then
@@ -32,7 +32,7 @@ fi
 echo "Testing orchestrator.py without --global-dir..."
 python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR" --fix
 git rev-parse HEAD > "$TEST_DIR/.sdlc_runs/$(basename $TEST_DIR)/PRD/baseline_commit.txt"
-python3 "$SDLC_ROOT/scripts/orchestrator.py" --workdir "$TEST_DIR" --prd-file PRD.md --force-replan false --test-sleep --enable-exec-from-workspace --channel test_channel
+python3 "$SDLC_ROOT/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$TEST_DIR" --prd-file PRD.md --force-replan false --test-sleep --enable-exec-from-workspace --channel test_channel
 
 echo "PASS: orchestrator.py did not raise RuntimeError"
 

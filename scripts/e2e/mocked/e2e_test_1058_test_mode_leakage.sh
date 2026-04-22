@@ -27,6 +27,7 @@ cp "$PROJECT_ROOT/config/prompts.json" "$WORK_DIR/config/" 2>/dev/null || true
 ORCHESTRATOR="$WORK_DIR/scripts/orchestrator.py"
 
 export SDLC_TEST_MODE=true
+export SDLC_RUNTIME_DIR="$WORK_DIR/scripts"
 
 echo "--- Scenario 1: With --enable-exec-from-workspace (Warning only) ---"
 # We run it with --test-sleep so it exits quickly

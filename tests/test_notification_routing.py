@@ -83,7 +83,7 @@ def test_spawn_reviewer_system_alert_uses_dynamic_command_resolution(mock_resolv
     mock_resolve_cmd.return_value = "/dummy_runtime_dir/openclaw/openclaw"
     mock_run.return_value.returncode = 0
     
-    test_args = ["spawn_reviewer.py", "--system-alert", "Alert message", "--run-dir", "/tmp/reviewer_test"]
+    test_args = ["spawn_reviewer.py", "--system-alert", "Alert message", "--enable-exec-from-workspace", "--run-dir", "/tmp/reviewer_test"]
     
     with patch("sys.argv", test_args):
         with patch("spawn_reviewer.os.path.exists", return_value=True), \

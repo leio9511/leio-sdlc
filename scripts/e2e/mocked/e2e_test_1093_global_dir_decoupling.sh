@@ -31,16 +31,16 @@ echo "dummy prd" > "$TEST_DIR/fake_workdir/dummy_prd.md"
 
 # Test that spawn_coder runs with the sandbox
 echo "Testing spawn_coder..."
-python3 "$TEST_DIR/scripts/spawn_coder.py" --workdir "$TEST_DIR/fake_workdir" --global-dir "$TEST_DIR/fake_global_dir" --pr-file "$TEST_DIR/fake_workdir/dummy.md" --prd-file "$TEST_DIR/fake_workdir/dummy_prd.md" && echo "PASS: spawn_coder ran successfully" || echo "PASS: spawn_coder completed (mock mode)"
+python3 "$TEST_DIR/scripts/spawn_coder.py" --enable-exec-from-workspace --workdir "$TEST_DIR/fake_workdir" --global-dir "$TEST_DIR/fake_global_dir" --pr-file "$TEST_DIR/fake_workdir/dummy.md" --prd-file "$TEST_DIR/fake_workdir/dummy_prd.md" && echo "PASS: spawn_coder ran successfully" || echo "PASS: spawn_coder completed (mock mode)"
 
 # Test that spawn_planner runs with the sandbox
 echo "Testing spawn_planner..."
-python3 "$TEST_DIR/scripts/spawn_planner.py" --workdir "$TEST_DIR/fake_workdir" --global-dir "$TEST_DIR/fake_global_dir" --prd-file "$TEST_DIR/fake_workdir/dummy_prd.md" && echo "PASS: spawn_planner ran successfully" || echo "PASS: spawn_planner completed (mock mode)"
+python3 "$TEST_DIR/scripts/spawn_planner.py" --enable-exec-from-workspace --workdir "$TEST_DIR/fake_workdir" --global-dir "$TEST_DIR/fake_global_dir" --prd-file "$TEST_DIR/fake_workdir/dummy_prd.md" && echo "PASS: spawn_planner ran successfully" || echo "PASS: spawn_planner completed (mock mode)"
 
 # Test that spawn_reviewer runs with the sandbox
 echo "Testing spawn_reviewer..."
 touch "$TEST_DIR/fake_workdir/dummy.diff"
-python3 "$TEST_DIR/scripts/spawn_reviewer.py" --workdir "$TEST_DIR/fake_workdir" --global-dir "$TEST_DIR/fake_global_dir" --pr-file "$TEST_DIR/fake_workdir/dummy.md" --diff-target "HEAD" --override-diff-file "dummy.diff" && echo "PASS: spawn_reviewer ran successfully" || echo "PASS: spawn_reviewer completed (mock mode)"
+python3 "$TEST_DIR/scripts/spawn_reviewer.py" --enable-exec-from-workspace --workdir "$TEST_DIR/fake_workdir" --global-dir "$TEST_DIR/fake_global_dir" --pr-file "$TEST_DIR/fake_workdir/dummy.md" --diff-target "HEAD" --override-diff-file "dummy.diff" && echo "PASS: spawn_reviewer ran successfully" || echo "PASS: spawn_reviewer completed (mock mode)"
 
 rm -rf "$TEST_DIR"
 echo "All E2E checks passed."

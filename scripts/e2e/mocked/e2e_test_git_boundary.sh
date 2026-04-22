@@ -19,11 +19,11 @@ cd "$SANDBOX_DIR"
 # No git init here
 touch prd.md
 
-if python3 "$SANDBOX_DIR/scripts/orchestrator.py" --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --channel "valid:id" --global-dir "$(pwd)" 2>&1 | grep -i "git boundary violation"; then
+if python3 "$SANDBOX_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --channel "valid:id" --global-dir "$(pwd)" 2>&1 | grep -i "git boundary violation"; then
     echo "✅ test_git_boundary.sh PASSED"
 else
     echo "❌ test_git_boundary.sh FAILED: Did not enforce git boundary."
-    python3 "$SANDBOX_DIR/scripts/orchestrator.py" --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --channel "valid:id" --global-dir "$(pwd)" 2>&1
+    python3 "$SANDBOX_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --channel "valid:id" --global-dir "$(pwd)" 2>&1
     exit 1
 fi
 rm -rf "$SANDBOX_DIR"

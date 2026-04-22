@@ -56,3 +56,16 @@ class TestHandoffPrompter(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_handoff_prompter_uses_runtime_dir(self):
+        import config
+        from unittest.mock import patch
+        
+        custom_dir = "/opt/custom_sdlc_runtime"
+        
+        # We need to patch config.SDLC_RUNTIME_DIR to simulate an override
+        with patch.object(config, 'SDLC_RUNTIME_DIR', custom_dir, create=True):
+            prompt = HandoffPrompter.get_prompt("startup_validation_failed")
+            self.assertNotIn("{SDLC_RUNTIME_DIR}", prompt)
+            self.assertNotIn("{SDLC_SKILLS_ROOT}", prompt)
+            self.assertIn(custom_dir, prompt)

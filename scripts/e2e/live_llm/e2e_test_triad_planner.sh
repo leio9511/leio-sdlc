@@ -22,7 +22,7 @@ EOF
 unset SDLC_TEST_MODE
 
 echo "Running Planner..."
-python3 scripts/spawn_planner.py --prd-file docs/PRDs/dummy_triad_prd.md --workdir "$(pwd)" --global-dir "$(pwd)" > triad_planner.log 2>&1 || true
+python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file docs/PRDs/dummy_triad_prd.md --workdir "$(pwd)" --global-dir "$(pwd)" > triad_planner.log 2>&1 || true
 
 echo "Asserting Output..."
 cat triad_planner.log

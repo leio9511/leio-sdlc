@@ -33,7 +33,7 @@ export SDLC_BYPASS_BRANCH_CHECK=1
 export SDLC_TEST_MODE=true
 set +e
 # Use timeout to avoid hang if it tries to spawn something
-timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "/tmp/global_mock_$$" > test_output.log 2>&1
+timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "/tmp/global_mock_$$" > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 

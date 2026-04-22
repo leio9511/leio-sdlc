@@ -7,4 +7,7 @@ class HandoffPrompter:
         prompt = build_prompt(f"handoff_{condition}")
         if not prompt:
             return "[ACTION REQUIRED FOR MANAGER]\nUnknown exit condition."
-        return prompt.replace("{SDLC_SKILLS_ROOT}", config.SDLC_SKILLS_ROOT)
+        # Replace legacy format strings with dynamic runtime path
+        prompt = prompt.replace("{SDLC_SKILLS_ROOT}", getattr(config, "SDLC_RUNTIME_DIR", config.SDLC_SKILLS_ROOT))
+        prompt = prompt.replace("{SDLC_RUNTIME_DIR}", getattr(config, "SDLC_RUNTIME_DIR", config.SDLC_SKILLS_ROOT))
+        return prompt

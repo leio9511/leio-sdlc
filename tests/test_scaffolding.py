@@ -38,7 +38,7 @@ class TestScaffolding(unittest.TestCase):
         
         # Command: python3 scripts/spawn_planner.py --prd-file dummy_prd.md --workdir .
         result = subprocess.run(
-            [sys.executable, planner_script, "--prd-file", "dummy_prd.md", "--workdir", "."],
+            [sys.executable, planner_script, "--prd-file", "dummy_prd.md", "--enable-exec-from-workspace", "--workdir", "."],
             cwd=self.mock_workdir,
             env=env,
             capture_output=True,

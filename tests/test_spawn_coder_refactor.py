@@ -37,6 +37,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
             # Test basic invocation
             test_args = [
                 'spawn_coder.py',
+                "--enable-exec-from-workspace",
                 '--pr-file', pr_file,
                 '--prd-file', prd_file,
                 '--workdir', tmp_dir,
@@ -82,6 +83,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
             
             test_args = [
                 'spawn_coder.py',
+                "--enable-exec-from-workspace",
                 '--pr-file', pr_file,
                 '--prd-file', prd_file,
                 '--workdir', tmp_dir,

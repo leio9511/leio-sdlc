@@ -24,7 +24,7 @@ EOF
 # Test 1: Approved
 echo "Running Test Scenario 1 (Approved)..."
 export MOCK_AUDIT_RESULT="APPROVE"
-OUTPUT=$(python3 scripts/spawn_auditor.py --prd-file docs/PRDs/dummy.md --workdir . --channel "valid:id")
+OUTPUT=$(python3 scripts/spawn_auditor.py --enable-exec-from-workspace --prd-file docs/PRDs/dummy.md --workdir . --channel "valid:id")
 echo "OUTPUT: $OUTPUT"
 
 if ! echo "$OUTPUT" | grep -q '"status": "APPROVED"'; then
@@ -42,7 +42,7 @@ echo "✅ Scenario 1 Passed."
 # Test 2: Rejected
 echo "Running Test Scenario 2 (Rejected)..."
 export MOCK_AUDIT_RESULT="REJECT"
-OUTPUT=$(python3 scripts/spawn_auditor.py --prd-file docs/PRDs/dummy.md --workdir . --channel "valid:id")
+OUTPUT=$(python3 scripts/spawn_auditor.py --enable-exec-from-workspace --prd-file docs/PRDs/dummy.md --workdir . --channel "valid:id")
 echo "OUTPUT: $OUTPUT"
 
 if ! echo "$OUTPUT" | grep -q '"status": "REJECTED"'; then

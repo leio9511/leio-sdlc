@@ -26,7 +26,7 @@ echo "# Mock PRD" > "$PRD_FILE"
 
 OUT_FILE="$TEST_DIR/test_uat_report.json"
 
-python3 "$WORK_DIR/scripts/spawn_verifier.py" --prd-files "$PRD_FILE" --workdir "$WORK_DIR" --out-file "$OUT_FILE" --enable-exec-from-workspace
+python3 "$WORK_DIR/scripts/spawn_verifier.py" --enable-exec-from-workspace --prd-files "$PRD_FILE" --workdir "$WORK_DIR" --out-file "$OUT_FILE" --enable-exec-from-workspace
 
 if [ ! -f "$OUT_FILE" ]; then
     echo "Error: Output file $OUT_FILE was not created."

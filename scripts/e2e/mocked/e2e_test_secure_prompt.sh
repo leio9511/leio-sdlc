@@ -22,7 +22,7 @@ export SDLC_MOCK_LLM_RESPONSE="MOCKED_RESPONSE"
 export SDLC_MOCK_INSPECT_FILE_PERMS="1"
 
 # Use spawn_planner.py to ensure mock works without real API
-python3 scripts/spawn_planner.py --prd-file docs/PRDs/prd.md --workdir "$(pwd)" --global-dir "$(pwd)" > spawner.log 2>&1 || true
+python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file docs/PRDs/prd.md --workdir "$(pwd)" --global-dir "$(pwd)" > spawner.log 2>&1 || true
 
 if ! grep -q "PERMS:600" spawner.log && ! grep -q "PERMS:600" .sdlc_runs/prd/pr_contract.md; then
     echo "❌ test_secure_prompt.sh FAILED: Secure prompt permissions not verified."

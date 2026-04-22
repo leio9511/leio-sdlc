@@ -13,7 +13,7 @@ Dummy PR content.
 PR
 
 # Run the reviewer with a custom out-file
-python3 scripts/spawn_reviewer.py \
+python3 scripts/spawn_reviewer.py --enable-exec-from-workspace \
     --pr-file tests/dummy_pr.md \
     --diff-target HEAD \
     --workdir "$WORKDIR" \

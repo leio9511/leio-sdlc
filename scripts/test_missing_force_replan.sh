@@ -23,7 +23,7 @@ git commit -m "init" > /dev/null
 export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
 export SDLC_BYPASS_BRANCH_CHECK=1
 set +e
-python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --coder-session-strategy always --channel "valid:id" > test_output.log 2>&1
+python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --coder-session-strategy always --channel "valid:id" > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 

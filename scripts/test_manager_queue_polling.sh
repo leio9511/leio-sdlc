@@ -44,7 +44,7 @@ cp "$WORKSPACE_ROOT/scripts/update_pr_status.py" scripts/
 
 # Start Manager LLM
 export SDLC_TEST_MODE=true
-python3 "$WORKSPACE_ROOT/scripts/spawn_manager.py" --job-dir "$JOB_DIR" --workdir "$(pwd)"
+python3 "$WORKSPACE_ROOT/scripts/spawn_manager.py" --enable-exec-from-workspace --job-dir "$JOB_DIR" --workdir "$(pwd)"
 
 # Assert all PRs are closed
 for pr in PR_001_DB.md PR_002_API.md PR_003_UI.md; do

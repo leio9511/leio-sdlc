@@ -18,7 +18,7 @@ class TestSpawnVerifier(unittest.TestCase):
         mock_invoke_agent.return_value = AgentResult(session_key='subtask-verifier', stdout='dummy')
         mock_exists.return_value = True # For the output file check
 
-        test_args = ["spawn_verifier.py", "--prd-files", "PRD1.md,PRD2.md", "--workdir", "/tmp/work"]
+        test_args = ["spawn_verifier.py", "--prd-files", "PRD1.md,PRD2.md", "--workdir", "/tmp/work", "--enable-exec-from-workspace"]
         
         with patch.object(sys, 'argv', test_args):
             with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):

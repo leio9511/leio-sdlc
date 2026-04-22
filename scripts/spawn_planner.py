@@ -21,7 +21,12 @@ def main():
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
+    from handoff_prompter import HandoffPrompter
+    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        sys.exit(1)
     # API Key Assignment
     from utils_api_key import setup_spawner_api_key
     setup_spawner_api_key(args, __file__)

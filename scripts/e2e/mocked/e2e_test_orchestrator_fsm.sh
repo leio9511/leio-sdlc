@@ -92,7 +92,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" $RUN_DIR/dummy_prd/PR_001_Test.md; then
         echo "Green Path Failed: PR not closed"
@@ -147,7 +147,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: blocked_fatal" $RUN_DIR/dummy_prd/PR_002_Test.md; then
         echo "Red Path Blocked Fatal Failed: PR not blocked_fatal"
@@ -192,7 +192,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: superseded" $RUN_DIR/dummy_prd/PR_003_Test.md; then
         echo "Red Path Slice Failed: PR not superseded"
@@ -234,7 +234,7 @@ with open(os.path.join(args.job_dir, "PR_Dummy.md"), "w") as f:
 INNER_EOF
 
     
-    python3 scripts/spawn_planner.py --prd-file docs/PRDs/Dummy_Project.md --workdir "$(pwd)" --out-dir $RUN_DIR/Dummy_Project --global-dir "$MOCK_GLOBAL_DIR" > planner.log 2>&1
+    python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file docs/PRDs/Dummy_Project.md --workdir "$(pwd)" --out-dir $RUN_DIR/Dummy_Project --global-dir "$MOCK_GLOBAL_DIR" > planner.log 2>&1
     
     if [ ! -d "$RUN_DIR/Dummy_Project" ]; then
         echo "Planner Isolation Failed: Directory $RUN_DIR/Dummy_Project not created"
@@ -288,7 +288,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Target_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Target_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if ! grep -q "status: closed" $RUN_DIR/Target_Project/Target_PR.md; then
         echo "Noise Injection Failed: Target PR not closed"
@@ -319,7 +319,7 @@ function run_test_missing_directory() {
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Empty_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/Empty_Project.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
     
     if grep -q "Traceback" orchestrator.log; then
         echo "Missing Directory Failed: Crashed"
@@ -370,7 +370,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "State 0: Auto-slicing PRD" orchestrator.log; then
         echo "Pure Start Failed: Log missing"
@@ -423,7 +423,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "State 0: Existing PRs detected. Resuming queue..." orchestrator.log; then
         echo "Idempotency Failed: Log missing"
@@ -478,7 +478,7 @@ INNER_EOF
 
     export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
     git add . && git commit -m 'pre-run' > /dev/null 2>&1 || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if false; then
         echo "Force Replan Failed: Old PR not deleted"
@@ -513,7 +513,7 @@ INNER_EOF
     git rev-parse HEAD > "$RUN_DIR/Target_Project/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/MyProject/baseline_commit.txt" 2>/dev/null || true
     git rev-parse HEAD > "$RUN_DIR/Empty_Project/baseline_commit.txt" 2>/dev/null || true
-    python3 scripts/orchestrator.py --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/MyProject.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
     if ! grep -q "\[FATAL\] Planner failed to generate any PRs." orchestrator.log; then
         echo "Planner Failure Failed: Missing fatal log"

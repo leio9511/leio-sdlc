@@ -28,7 +28,7 @@ class TestReviewerContextIsolation(unittest.TestCase):
             "--diff-target", "HEAD",
             "--workdir", self.temp_dir,
             "--global-dir", self.temp_dir,
-            "--override-diff-file", "dummy.diff"
+            "--override-diff-file", "dummy.diff", "--enable-exec-from-workspace"
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=self.temp_dir)

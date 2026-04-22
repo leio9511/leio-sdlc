@@ -23,7 +23,7 @@ export PATH="$(pwd)/bin:$PATH"
 init_hermetic_sandbox "$TEST_DIR/scripts"
 
 touch dummy.md
-python3 "$TEST_DIR/scripts/orchestrator.py" --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy.md --global-dir . --max-prs-to-process 1 > test.log 2>&1 || true
+python3 "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file dummy.md --global-dir . --max-prs-to-process 1 > test.log 2>&1 || true
 
 if grep -q "No such file or directory.*scripts/" test.log; then
     echo "FAILED: Orchestrator is still using relative scripts/ paths!"
@@ -36,7 +36,7 @@ echo "Test Scenario 1 passed."
 echo "dummy diff content" > dummy_diff.txt
 git add dummy_diff.txt
 
-SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/spawn_reviewer.py" --pr-file dummy.md --diff-target HEAD --workdir "$(pwd)" --global-dir "$(pwd)" || true
+SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/spawn_reviewer.py" --enable-exec-from-workspace --pr-file dummy.md --diff-target HEAD --workdir "$(pwd)" --global-dir "$(pwd)" || true
 
 # Cleanup git changes
 git reset HEAD dummy_diff.txt >/dev/null 2>&1 || true

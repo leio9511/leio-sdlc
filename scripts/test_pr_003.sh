@@ -17,7 +17,7 @@ export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
 # Test Case 1: Untracked files -> git stash JIT
 touch untracked_test_file
 set +e
-OUTPUT=$(python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
+OUTPUT=$(python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
 set -e
 if ! echo "$OUTPUT" | grep -q 'git stash push -m "sdlc pre-flight stash" --include-untracked'; then
     echo "❌ Test Case 1 Failed: Missing git stash JIT prompt."
@@ -30,7 +30,7 @@ mkdir -p docs/PRDs
 touch docs/PRDs/dummy.md
 git add docs/PRDs/dummy.md
 set +e
-OUTPUT=$(python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
+OUTPUT=$(python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
 set -e
 if ! echo "$OUTPUT" | grep -q 'commit_state.py'; then
     echo "❌ Test Case 2 Failed: Missing commit_state.py JIT prompt for uncommitted PRD file."
@@ -41,7 +41,7 @@ git commit -m "add prd" > /dev/null
 # Test Case 3: Default engine initialization
 set +e
 unset LLM_DRIVER
-OUTPUT=$(python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
+OUTPUT=$(python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
 set -e
 if ! echo "$OUTPUT" | grep -q 'Engine: gemini'; then
     echo "❌ Test Case 3 Failed: Engine didn't default to gemini."

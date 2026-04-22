@@ -9,7 +9,7 @@ echo "# Mock PRD for Template Test" > "$MOCK_PRD"
 export SDLC_TEST_MODE=true
 OUT_DIR="docs/PRs/mock_prd_070"
 rm -rf "$OUT_DIR"
-python3 scripts/spawn_planner.py --workdir . --prd-file "$MOCK_PRD" --out-dir "$OUT_DIR"
+python3 scripts/spawn_planner.py --enable-exec-from-workspace --workdir . --prd-file "$MOCK_PRD" --out-dir "$OUT_DIR"
 
 # Verify outputs
 for pr_file in "$OUT_DIR"/*.md; do

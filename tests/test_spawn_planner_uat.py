@@ -20,7 +20,7 @@ def test_planner_uses_uat_recovery_prompt(tmp_path, monkeypatch):
     monkeypatch.setenv("SDLC_TEST_MODE", "true")
     
     result = subprocess.run([
-        "python3", "scripts/spawn_planner.py",
+        "python3", "scripts/spawn_planner.py", "--enable-exec-from-workspace",
         "--prd-file", str(prd_file),
         "--workdir", str(workdir),
         "--out-dir", str(out_dir),
@@ -56,7 +56,7 @@ def test_planner_parses_uat_report(tmp_path, monkeypatch):
     monkeypatch.setenv("SDLC_TEST_MODE", "true")
     
     result = subprocess.run([
-        "python3", "scripts/spawn_planner.py",
+        "python3", "scripts/spawn_planner.py", "--enable-exec-from-workspace",
         "--prd-file", str(prd_file),
         "--workdir", str(workdir),
         "--out-dir", str(out_dir),

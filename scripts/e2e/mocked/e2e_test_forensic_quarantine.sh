@@ -88,7 +88,7 @@ export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
 git add -A && git commit -m "clean state" > /dev/null 2>&1
 
 # This run will fail and trigger State 5
-python3 scripts/orchestrator.py --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --global-dir "$MOCK_GLOBAL_DIR" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
+python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --global-dir "$MOCK_GLOBAL_DIR" --prd-file dummy_prd.md --max-prs-to-process 1 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
 echo "--- Orchestrator Log ---"
 cat orchestrator.log
@@ -118,7 +118,7 @@ fi
 echo "Testing --cleanup forensic quarantine..."
 git checkout -b "feature_branch" > /dev/null 2>&1
 echo "dirty crash file" > crash_artifact.txt
-python3 scripts/orchestrator.py --force-replan true --cleanup --workdir "$(pwd)" --global-dir "$MOCK_GLOBAL_DIR" --prd-file dummy_prd.md > cleanup.log 2>&1 || true
+python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --cleanup --workdir "$(pwd)" --global-dir "$MOCK_GLOBAL_DIR" --prd-file dummy_prd.md > cleanup.log 2>&1 || true
 
 echo "Checking quarantined branch..."
 QUARANTINE_BRANCH=$(git branch --list "feature_branch_crashed_*" | head -n 1 | sed 's/[* ]//g')

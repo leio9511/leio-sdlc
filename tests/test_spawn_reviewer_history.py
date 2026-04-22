@@ -25,6 +25,7 @@ def test_spawn_reviewer_uses_baseline_if_present():
             
         test_args = [
             "spawn_reviewer.py",
+                "--enable-exec-from-workspace",
             "--pr-file", pr_file,
             "--diff-target", "master",
             "--workdir", workdir,
@@ -74,6 +75,7 @@ def test_spawn_reviewer_uses_fallback_if_missing():
             
         test_args = [
             "spawn_reviewer.py",
+                "--enable-exec-from-workspace",
             "--pr-file", pr_file,
             "--diff-target", "master",
             "--workdir", workdir,
@@ -120,6 +122,7 @@ def test_spawn_reviewer_creates_session_file():
             
         test_args = [
             "spawn_reviewer.py",
+                "--enable-exec-from-workspace",
             "--pr-file", pr_file,
             "--diff-target", "master",
             "--workdir", workdir,
@@ -160,6 +163,7 @@ def test_spawn_reviewer_system_alert():
             
         test_args = [
             "spawn_reviewer.py",
+                "--enable-exec-from-workspace",
             "--run-dir", run_dir,
             "--system-alert", "test alert"
         ]
@@ -195,6 +199,7 @@ def test_spawn_reviewer_system_alert_gemini():
             
         test_args = [
             "spawn_reviewer.py",
+                "--enable-exec-from-workspace",
             "--run-dir", run_dir,
             "--system-alert", "test alert"
         ]

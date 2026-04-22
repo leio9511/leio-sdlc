@@ -17,7 +17,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-dir", required=True)
     parser.add_argument("--workdir", required=True, help="Working directory lock")
+    parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
+    import config
+    from handoff_prompter import HandoffPrompter
+    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+        print(HandoffPrompter.get_prompt("startup_validation_failed"))
+        sys.exit(1)
     # API Key Assignment
     from utils_api_key import setup_spawner_api_key
     setup_spawner_api_key(args, __file__)
