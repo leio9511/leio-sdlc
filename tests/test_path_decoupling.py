@@ -26,7 +26,6 @@ class TestPathDecoupling(unittest.TestCase):
         
         self.assertTrue(found_global, f"Did not find expected global config path: {expected_global_config}")
 
-    import pytest
     
     
     @patch("spawn_planner.os.path.isfile", return_value=True)

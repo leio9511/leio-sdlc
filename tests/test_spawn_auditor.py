@@ -1,8 +1,8 @@
+import pytest
 import os
 import sys
 import tempfile
 import json
-import pytest
 from unittest.mock import patch, MagicMock
 import subprocess
 
@@ -35,7 +35,6 @@ def test_spawn_auditor_invalid_channel_handshake_fail(mock_which, mock_run, caps
         assert e.value.code == 1
         captured = capsys.readouterr()
         assert "[FATAL] Notification delivery failed" in captured.err
-import pytest
 
 def test_spawn_auditor_guardrail(capsys):
     with patch.object(sys, "argv", ["spawn_auditor.py", "--prd-file", "dummy.md", "--workdir", ".", "--channel", "test_channel"]):
@@ -46,7 +45,6 @@ def test_spawn_auditor_guardrail(capsys):
         captured = capsys.readouterr()
         assert "Startup validation failed" in captured.out
 
-import pytest
 
 @patch("agent_driver.notify_channel")
 def test_spawn_auditor_valid_channel_success(mock_notify, capsys):
@@ -68,7 +66,6 @@ def test_spawn_auditor_valid_channel_success(mock_notify, capsys):
     mock_notify.assert_any_call("test_channel", "Auditor APPROVED the PRD.", "auditor_approved", {"prd_file": prd_file})
     os.remove(prd_file)
 
-import pytest
 
 @patch("agent_driver.notify_channel")
 def test_auditor_rejected_returns_exit_0(mock_notify, capsys):
@@ -90,7 +87,6 @@ def test_auditor_rejected_returns_exit_0(mock_notify, capsys):
     mock_notify.assert_any_call("test_channel", "Auditor REJECTED the PRD.", "auditor_rejected", {"prd_file": prd_file})
     os.remove(prd_file)
 
-import pytest
 
 @patch("agent_driver.notify_channel")
 def test_auditor_notifies_on_missing_sections(mock_notify, capsys):
@@ -161,7 +157,6 @@ def test_auditor_uses_shared_key_utility(mock_invoke_agent, mock_assign_api_key,
     finally:
         os.environ.clear()
         os.environ.update(original_environ)
-import pytest
 import sys
 import os
 from unittest.mock import patch
@@ -179,7 +174,6 @@ def test_spawn_auditor_fails_fast_on_handshake_failure():
             mock_handshake.assert_called_once_with('invalid:channel')
 
 
-import pytest
 from unittest.mock import patch, MagicMock
 @patch("spawn_auditor.config")
 @patch("sys.argv", ["/custom_runtime_dir/spawn_auditor.py", "--prd-file", "dummy", "--workdir", "dummy", "--channel", "dummy"])
@@ -191,8 +185,8 @@ def test_spawn_auditor_startup_validation_uses_runtime_dir(mock_config):
     try:
         with patch("spawn_auditor.invoke_agent"), \
              patch("spawn_auditor.os.makedirs"), \
-                 patch("spawn_auditor.os.chdir"), \
-                 patch("spawn_auditor.os.path.exists", return_value=True), \
+             patch("spawn_auditor.os.chdir"), \
+             patch("spawn_auditor.os.path.exists", return_value=True), \
              patch("spawn_auditor.open", create=True), \
              patch("agent_driver.send_ignition_handshake"), \
              patch("agent_driver.notify_channel"), \

@@ -1,7 +1,7 @@
+import pytest
 import os
 import sys
 import tempfile
-import pytest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
@@ -105,7 +105,6 @@ def test_spawn_reviewer_uses_fallback_if_missing():
                     
             assert history_cmd_found, f"git log fallback command was not called correctly. Expected '{expected_cmd}' in calls"
 
-import pytest
 
 
 def test_spawn_reviewer_creates_session_file():
@@ -169,6 +168,7 @@ def test_spawn_reviewer_system_alert():
             raise SystemExit(code)
 
         with patch("sys.argv", test_args), \
+             patch("spawn_reviewer.resolve_cmd", return_value="/usr/bin/openclaw"), \
              patch("subprocess.run") as mock_run, \
              patch("sys.exit", side_effect=fake_exit), \
              patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
@@ -183,3 +183,37 @@ def test_spawn_reviewer_system_alert():
             assert cmd[-5:] == ["agent", "--session-id", "subtask-12345678", "-m", "test alert"]
             assert "openclaw" in cmd[0]
 
+
+def test_spawn_reviewer_system_alert_gemini():
+    with tempfile.TemporaryDirectory() as td:
+        run_dir = os.path.join(td, "run_dir")
+        os.makedirs(run_dir)
+        
+        session_file = os.path.join(run_dir, ".reviewer_session")
+        with open(session_file, "w") as f:
+            f.write("subtask-12345678")
+            
+        test_args = [
+            "spawn_reviewer.py",
+            "--run-dir", run_dir,
+            "--system-alert", "test alert"
+        ]
+
+        def fake_exit(code):
+            raise SystemExit(code)
+
+        with patch("sys.argv", test_args), \
+             patch("spawn_reviewer.resolve_cmd", return_value="/usr/bin/gemini"), \
+             patch("subprocess.run") as mock_run, \
+             patch("sys.exit", side_effect=fake_exit), \
+             patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
+            
+            try:
+                spawn_reviewer.main()
+            except SystemExit:
+                pass
+                
+            mock_run.assert_called_once()
+            cmd = mock_run.call_args[0][0]
+            assert cmd[-5:] == ["-r", "subtask-12345678", "-p", "test alert", "--yolo"]
+            assert "gemini" in cmd[0]

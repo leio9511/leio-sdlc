@@ -88,18 +88,16 @@ def test_spawn_reviewer_system_alert_uses_dynamic_command_resolution(mock_resolv
     with patch("sys.argv", test_args):
         with patch("spawn_reviewer.os.path.exists", return_value=True), \
              patch("spawn_reviewer.open", create=True) as mock_open:
-             
+
             mock_open.return_value.__enter__.return_value.read.return_value = "dummy-session-id"
             with patch.dict("os.environ", {"SDLC_TEST_MODE": "false"}):
-            
-            # The script logic runs directly on import, or maybe main() isn't there? Let's verify.
                 try:
                     spawn_reviewer.main()
                 except SystemExit:
                     pass
-                
+
                 mock_resolve_cmd.assert_called()
                 called_cmd = mock_run.call_args[0][0]
                 assert called_cmd[0] == "/dummy_runtime_dir/openclaw/openclaw"
                 assert "dummy-session-id" in called_cmd
-            assert "Alert message" in called_cmd
+                assert "Alert message" in called_cmd

@@ -83,6 +83,9 @@ def main():
             session_id = sf.read().strip()
         
         cmd_exec = resolve_cmd(os.environ.get("LLM_DRIVER", "openclaw").lower())
+        if not cmd_exec:
+            print("[FATAL] System alert driver not found", file=sys.stderr)
+            sys.exit(1)
         if cmd_exec.endswith("gemini"):
             # If the driver is gemini, use actual gemini flags
             cmd = [cmd_exec, "-r", session_id, "-p", args.system_alert, "--yolo"]
