@@ -178,3 +178,38 @@ def test_spawn_auditor_fails_fast_on_handshake_failure():
             assert exc.value.code == 1
             mock_handshake.assert_called_once_with('invalid:channel')
 
+
+import pytest
+from unittest.mock import patch, MagicMock
+@patch("spawn_auditor.config")
+@patch("sys.argv", ["/custom_runtime_dir/spawn_auditor.py", "--prd-file", "dummy", "--workdir", "dummy", "--channel", "dummy"])
+def test_spawn_auditor_startup_validation_uses_runtime_dir(mock_config):
+    mock_config.SDLC_RUNTIME_DIR = "/custom_runtime_dir"
+    mock_config.DEFAULT_LLM_ENGINE = "gemini"
+    import spawn_auditor
+    
+    try:
+        with patch("spawn_auditor.invoke_agent"), \
+             patch("spawn_auditor.os.makedirs"), \
+                 patch("spawn_auditor.os.chdir"), \
+                 patch("spawn_auditor.os.path.exists", return_value=True), \
+             patch("spawn_auditor.open", create=True), \
+             patch("agent_driver.send_ignition_handshake"), \
+             patch("agent_driver.notify_channel"), \
+             patch("utils_api_key.setup_spawner_api_key"):
+            spawn_auditor.main()
+    except SystemExit as e:
+        if e.code == 1:
+            pytest.fail("spawn_auditor exited fatally, meaning startup validation failed unexpectedly")
+            
+@patch("spawn_auditor.config")
+@patch("sys.argv", ["/invalid_dir/spawn_auditor.py", "--prd-file", "dummy", "--workdir", "dummy", "--channel", "dummy"])
+def test_spawn_auditor_startup_validation_rejects_invalid_dir(mock_config):
+    mock_config.SDLC_RUNTIME_DIR = "/custom_runtime_dir"
+    mock_config.DEFAULT_LLM_ENGINE = "gemini"
+    import spawn_auditor
+    with patch("handoff_prompter.HandoffPrompter.get_prompt", return_value="failed"), \
+         patch("utils_api_key.setup_spawner_api_key"):
+        with pytest.raises(SystemExit) as e:
+            spawn_auditor.main()
+        assert e.value.code == 1

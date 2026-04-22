@@ -203,5 +203,14 @@ class TestAgentDriverTriad(unittest.TestCase):
 
 
 
+
+    def test_spawn_scripts_keep_runtime_aware_prompt_resolution(self):
+        from agent_driver import build_prompt
+        
+        prompt = build_prompt("coder", workdir="/tmp/test", playbook_content="mock_playbook", pr_file="test_pr.md", pr_content="mock_pr_content", prd_file="test_prd.md", prd_content="mock_prd_content")
+        
+        self.assertNotEqual(prompt, "")
+        self.assertIn("/tmp/test", prompt)
+
 if __name__ == '__main__':
     unittest.main()

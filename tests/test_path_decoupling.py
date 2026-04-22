@@ -51,5 +51,27 @@ class TestPathDecoupling(unittest.TestCase):
             if mode_arg == 'w' and "PR_Slice" in path_arg:
                 self.assertTrue(path_arg.startswith("/tmp/run"), f"Output {path_arg} is not in run_dir")
 
+
+    @patch("agent_driver.shutil.which", return_value=None)
+    @patch("agent_driver.os.path.exists")
+    def test_resolve_cmd_prefers_sdlc_runtime_dir(self, mock_exists, mock_which):
+        from agent_driver import resolve_cmd
+        import config
+        
+        def side_effect(path):
+            if "dummy_runtime_dir" in path:
+                return True
+            return False
+            
+        mock_exists.side_effect = side_effect
+        original_runtime_dir = getattr(config, "SDLC_RUNTIME_DIR", None)
+        config.SDLC_RUNTIME_DIR = "/dummy_runtime_dir"
+        
+        try:
+            result = resolve_cmd("my_cmd")
+            self.assertTrue("/dummy_runtime_dir" in result)
+        finally:
+            config.SDLC_RUNTIME_DIR = original_runtime_dir
+
 if __name__ == "__main__":
     unittest.main()

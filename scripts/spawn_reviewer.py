@@ -2,7 +2,7 @@ import argparse
 import tempfile
 import os
 import sys
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent, build_prompt, resolve_cmd
 import config
 import subprocess
 import uuid
@@ -82,7 +82,12 @@ def main():
         with open(session_file, "r") as sf:
             session_id = sf.read().strip()
         
-        cmd = ["openclaw", "agent", "--session-id", session_id, "-m", args.system_alert]
+        cmd_exec = resolve_cmd(os.environ.get("LLM_DRIVER", "openclaw").lower())
+        if cmd_exec.endswith("gemini"):
+            # If the driver is gemini, use actual gemini flags
+            cmd = [cmd_exec, "-r", session_id, "-p", args.system_alert, "--yolo"]
+        else:
+            cmd = [cmd_exec, "agent", "--session-id", session_id, "-m", args.system_alert]
         print(f"[reviewer] Sending system alert to session {session_id}")
         
         if os.environ.get("SDLC_TEST_MODE") == "true":

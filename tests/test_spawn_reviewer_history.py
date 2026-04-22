@@ -180,5 +180,6 @@ def test_spawn_reviewer_system_alert():
                 
             mock_run.assert_called_once()
             cmd = mock_run.call_args[0][0]
-            assert cmd == ["openclaw", "agent", "--session-id", "subtask-12345678", "-m", "test alert"]
+            assert cmd[-5:] == ["agent", "--session-id", "subtask-12345678", "-m", "test alert"]
+            assert "openclaw" in cmd[0]
 

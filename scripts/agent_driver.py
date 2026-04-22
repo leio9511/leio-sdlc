@@ -87,6 +87,16 @@ def resolve_cmd(cmd_name):
     if cmd_path:
         return cmd_path
         
+    import config
+    runtime_dir = getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))
+    runtime_path = os.path.join(runtime_dir, cmd_name, "scripts", f"{cmd_name}.sh")
+    if os.path.exists(runtime_path):
+        return runtime_path
+        
+    runtime_path = os.path.join(runtime_dir, cmd_name, cmd_name)
+    if os.path.exists(runtime_path):
+        return runtime_path
+        
     skills_dir = os.environ.get("AGENT_SKILLS_DIR", os.path.expanduser("~/.openclaw/skills"))
     fallback_path = os.path.join(skills_dir, cmd_name, "scripts", f"{cmd_name}.sh")
     if os.path.exists(fallback_path):
