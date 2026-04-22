@@ -775,6 +775,7 @@ def main():
                         print("[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py.")
                         sys.exit(0)
                     elif uat_status == "NEEDS_FIX":
+                        # PRD Trigger_UAT_Recovery_For_Partial_Findings: Trigger recovery on MISSING or PARTIAL findings
                         actionable_items = [item for item in uat_data.get("verification_details", []) if item.get("status") in ["MISSING", "PARTIAL"]]
                         if actionable_items:
                             if uat_recovery_count < max_uat_recovery_attempts:
