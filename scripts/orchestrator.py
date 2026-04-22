@@ -376,22 +376,28 @@ def main():
         with open(baseline_file, "r") as f:
             baseline_hash = f.read().strip()
 
+        # Lineage Audit (Non-blocking)
         log_res = drun(["git", "log", f"{baseline_hash}..HEAD", "--oneline"], capture_output=True, text=True)
         if log_res.stdout.strip():
             print("[WARNING] Unauthorized external commits detected between baseline and HEAD. These changes are NOT protected by SDLC and will be overwritten to ensure baseline integrity.")
 
-        if branch_output in ["master", "main"]:
-            drun(["git", "stash", "push", "-m", "SDLC Withdrawal Emergency Stash"], check=False)
-        else:
-            drun(["git", "add", "-A"], check=False)
-            drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
-            timestamp = int(time.time())
-            drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
-            drun(["git", "checkout", get_mainline_branch(args.workdir)], check=False)
+        # Workspace Purification (Non-destructive)
+        status_res = drun(["git", "status", "--porcelain"], capture_output=True, text=True)
+        if status_res.stdout.strip() or branch_output not in ["master", "main"]:
+            if branch_output in ["master", "main"]:
+                drun(["git", "stash", "push", "-m", "SDLC Withdrawal Emergency Stash"], check=False)
+            else:
+                drun(["git", "add", "-A"], check=False)
+                drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+                timestamp = int(time.time())
+                drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
+                drun(["git", "checkout", get_mainline_branch(args.workdir)], check=False)
 
+        # State Capture
         interrupted_hash_res = drun(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
         interrupted_hash = interrupted_hash_res.stdout.strip()
 
+        # Force Baseline Alignment (Atomic)
         drun(["git", "reset", "--hard", baseline_hash], check=True)
         drun(["git", "reset", "--soft", interrupted_hash], check=True)
         
@@ -400,9 +406,14 @@ def main():
             commit_msg = f"chore: force baseline alignment of PRD {base_name} to baseline"
             drun(["git", "commit", "-m", commit_msg], check=True)
 
-        withdrawn_dir = f"{job_dir}.withdrawn"
+        # Job Teardown
+        teardown_coder_session(args.workdir, run_dir=job_dir)
+        
         if os.path.exists(job_dir):
             import shutil
+            # Ensure withdrawn_dir is removed if it exists to avoid nested move
+            if os.path.exists(withdrawn_dir):
+                shutil.rmtree(withdrawn_dir)
             shutil.move(job_dir, withdrawn_dir)
 
         manifest_path = os.path.join(args.workdir, ".sdlc_lock_manifest.json")
@@ -927,7 +938,7 @@ def main():
                             drun(["git", "branch", "-D", branch_name], check=True)
                             set_pr_status(current_pr, "closed")
                             notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
-                            teardown_coder_session(workdir)
+                            teardown_coder_session(workdir, run_dir=run_dir)
                             pr_done = True
                             break
                         else:

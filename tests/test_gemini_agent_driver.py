@@ -94,7 +94,7 @@ class TestGeminiAgentDriver(unittest.TestCase):
         if "TEST_MODEL" in env:
             del env["TEST_MODEL"]
             
-        with patch.dict(os.environ, env):
+        with patch.dict(os.environ, env, clear=True):
             invoke_agent("test task", session_key="test-session")
             
         cmd = mock_run.call_args_list[0][0][0]
