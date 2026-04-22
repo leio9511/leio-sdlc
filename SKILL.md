@@ -1,41 +1,205 @@
 ---
 name: leio-sdlc
 version: 1.0.0
-description: "强制指令：执行 Software Development Life Cycle (SDLC)。所有的代码修改、Bug 修复和功能实现，必须且只能通过启动本技能中的 orchestrator.py 来完成。严禁主 Agent (你) 绕过本技能直接去操作源码工作区。"
+description: "Use when an audit-approved execution brief in the required project format is ready to be started, resumed, or withdrawn through the `leio-sdlc` orchestrator, a PRD-driven multi-agent SDLC workflow for planning, coding, review, and UAT. This skill is for downstream pipeline control only, not for PRD authoring or coder/reviewer/verifier/planner role behavior."
 ---
 
-# LEIO SDLC Runbook
+# leio-sdlc Orchestrator Launch Skill
 
-【Job 并发隔离沙盘机制】（The Workspace-as-a-Job-Queue）
-1. 规定：禁止将生成的 PR 扔到全局 `docs/PRs/` 里。所有执行任务必须在项目根目录创建 `.sdlc_runs/` 等隔离目录。
-2. 规定：Orchestrator 会自动接管沙盒队列和并发调度。
+## Scope
 
-【自解释纪律】：如果用户（Boss）向你提问关于 leio-sdlc 的内部逻辑、架构设计、状态机或错误处理机制，你**严禁凭空记忆或编造**。你必须立刻使用 `read` 工具读取 `ARCHITECTURE.md`，基于该说明书向用户解释。
+This skill is only for controlling the downstream `leio-sdlc` pipeline from the primary-agent side.
 
-## Invocation (Command Template)
+Use it to:
+- start a new SDLC run
+- resume an interrupted SDLC run
+- withdraw or quarantine an SDLC run
 
-The entire SDLC pipeline is fully automated and managed by `scripts/orchestrator.py`. 
-Your ONLY job is to start the Orchestrator.
+Do not use this skill as behavior guidance for:
+- coder
+- reviewer
+- verifier
+- planner
+- other execution-side sub-agents
 
-1. If you are unsure about the required parameters, use the `exec` tool to run:
-   `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --help`
-   
-2. Based on the help output and the user's intent, construct your execution command.
+This skill is a pipeline-control skill, not a universal SDLC constitution.
 
-### Intent Mapping (Guidance for Agents)
+## What `leio-sdlc` is
 
-- **Scenario: Normal Start**
-  If starting a fresh PRD or restarting a failed one from scratch:
-  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --prd-file <path> --workdir <path> --force-replan true`
+`leio-sdlc` is a PRD-driven multi-agent SDLC orchestrator.
 
-- **Scenario: Resume/Continue**
-  If the process was interrupted (e.g., timeout, crash) and you need to continue:
-  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --prd-file <path> --workdir <path> --resume --force-replan false`
+It executes an approved PRD / execution brief through a workflow that may include:
+- planning / slicing
+- coding
+- review
+- merge
+- UAT verification
+- recovery / resume / withdrawal when needed
 
-- **Scenario: Withdraw/Rollback**
-  If the user says "withdraw", "rollback", "cancel", or "revert" the PRD changes:
-  `python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --prd-file <path> --workdir <path> --withdraw`
+This skill only governs how to launch and control that orchestrator.
 
-3. Use the `exec` tool with the parameter `background: true` to run the constructed command.
+## Preconditions
 
-4. **Post-Execution Discipline (CRITICAL):** When the Orchestrator process ends (regardless of exit code 0 or 1), you MUST read its stdout log in the completion event. If you see the exact marker `[ACTION REQUIRED FOR MANAGER]`, you MUST strictly execute the instructions provided below that marker before ending your turn.
+Before using this skill, all of the following should already be true:
+
+1. A PRD / execution brief already exists on disk.
+2. The document is in the required project format.
+3. The document has passed Auditor review.
+4. Explicit human authorization to execute has been given.
+
+If these conditions are not met, do not launch SDLC yet.
+
+## Relationship to the upstream lifecycle
+
+This skill is part of a larger human-agent software delivery protocol.
+
+The expected upstream flow is:
+
+1. co-pilot design discussion
+2. PRD / execution-brief synthesis through `pm-skill`
+3. Auditor review
+4. explicit human approval to execute
+5. `leio-sdlc` launch and downstream automation
+
+This skill therefore assumes that the upstream authoring and audit gates have already been satisfied.
+
+It is not a general “run any PRD” tool.  
+It is a downstream execution-control skill for approved PRD / execution briefs.
+
+For the full collaboration lifecycle, read:
+- `references/sdlc-lifecycle.md`
+
+If the execution brief has not yet passed Auditor review, return to the upstream PM workflow before launching SDLC execution.
+This skill must not be used to bypass the audit gate.
+
+## When to use this skill
+
+Use this skill when:
+- an approved execution brief is ready to enter SDLC execution
+- an interrupted SDLC run must be resumed
+- an existing SDLC run must be withdrawn or quarantined
+
+If the user is asking about:
+- internal architecture
+- state machine behavior
+- recovery logic
+- governance semantics
+
+read the architecture references before answering.
+
+## Invocation
+
+If you are unsure about the available parameters, inspect the installed entrypoint first:
+
+```bash
+python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --help
+```
+
+The pipeline is launched through `scripts/orchestrator.py`.
+
+## Intent-to-command mapping
+
+- If the user asks to start SDLC execution, launch `scripts/orchestrator.py` in normal-start mode.
+- If the user asks to continue or resume an interrupted run, add `--resume`.
+- If the user asks to withdraw, cancel, rollback, or quarantine the current run, add `--withdraw`.
+- If the user explicitly specifies an execution engine, append `--engine <value>`.
+- If the user explicitly specifies a model, append `--model <value>`.
+
+### Normal start
+
+```bash
+python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py \
+  --prd-file <path> \
+  --workdir <path> \
+  --force-replan true
+```
+
+### Resume
+
+```bash
+python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py \
+  --prd-file <path> \
+  --workdir <path> \
+  --resume \
+  --force-replan false
+```
+
+### Withdraw
+
+```bash
+python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py \
+  --prd-file <path> \
+  --workdir <path> \
+  --withdraw
+```
+
+## Execution rule
+
+Run the orchestrator as a background process using the `exec` tool with `background: true`.
+
+Do not use:
+- `nohup`
+- manual `&`
+- improvised daemon loops
+
+## After launch
+
+When the orchestrator completes, inspect the completion output.
+
+If the output contains:
+
+```text
+[ACTION REQUIRED FOR MANAGER]
+```
+
+follow that instruction before ending your turn.
+
+Do not silently ignore manager handoff instructions.
+
+## What this skill does NOT define
+
+This skill does not:
+- create or refine the execution brief
+- replace the Auditor gate
+- replace the human approval gate
+- define coder sub-agent behavior
+- define reviewer sub-agent behavior
+- define verifier sub-agent behavior
+- define planner internals
+- authorize execution on its own
+
+Those concerns belong to:
+- upstream PRD authoring skills
+- Auditor
+- explicit human decisions
+- role-specific prompts, playbooks, and references
+
+## References
+
+Read these only when needed:
+
+- `ARCHITECTURE.md`
+  - for SDLC state machine / recovery explanations
+
+- `projects/docs/TEMPLATES/organization_governance.md`
+  - for governance and human-in-the-loop clarification
+
+- `references/sdlc-lifecycle.md`
+  - for the full upstream/downstream human + agent collaboration lifecycle
+
+- `playbooks/`
+  - for role-specific downstream implementation behavior inside the project
+
+## Design boundary
+
+This skill should remain:
+- small
+- low-blast-radius
+- orchestrator-control-only
+- safe even if loaded in a context where coding/review work is happening
+
+It should not become:
+- a universal SDLC constitution
+- a global role override
+- a substitute for coder/reviewer/verifier playbooks
+- a substitute for PM authoring or Auditor approval
