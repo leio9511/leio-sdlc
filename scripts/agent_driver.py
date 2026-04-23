@@ -169,6 +169,8 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
             else:
                 cmd = [cmd_exec, "--yolo", "-p", secure_msg, "--model", model]
         else:
+            from config import DEFAULT_GEMINI_MODEL
+            model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL") or DEFAULT_GEMINI_MODEL
             cmd_exec = resolve_cmd("openclaw")
             agent_id = "sdlc-generic-openclaw"
             
@@ -178,7 +180,7 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
                 home_dir = os.environ.get("HOME_MOCK") or os.environ.get("HOME", os.path.expanduser("~"))
                 agent_ws = os.path.join(home_dir, ".openclaw", "agents", agent_id, "workspace")
                 os.makedirs(agent_ws, exist_ok=True)
-                create_cmd = [cmd_exec, "agents", "add", agent_id, "--non-interactive", "--workspace", agent_ws]
+                create_cmd = [cmd_exec, "agents", "add", agent_id, "--non-interactive", "--model", model, "--workspace", agent_ws]
                 subprocess.run(create_cmd, capture_output=True)
                 
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
