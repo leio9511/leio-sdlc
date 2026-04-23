@@ -50,3 +50,4 @@ sdlc_runs_symlink
 tmp_job_dir
 docs/PRs/mock_prd_070/
 tests/sandbox_070/
+mock_bin/
