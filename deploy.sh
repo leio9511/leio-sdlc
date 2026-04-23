@@ -88,6 +88,12 @@ perform_hard_copy_deployment() {
         rsync -a --exclude-from='.gitignore' --exclude-from='.release_ignore' . "$TMP_DIR/"
     fi
 
+    # Ensure openclaw templates are copied (PR-001)
+    if [ -d "TEMPLATES/openclaw_execution_agent" ]; then
+        mkdir -p "$TMP_DIR/TEMPLATES/openclaw_execution_agent"
+        cp -a TEMPLATES/openclaw_execution_agent/* "$TMP_DIR/TEMPLATES/openclaw_execution_agent/"
+    fi
+
     # Hot Preservation (PRD-1088)
     local HOT_CONFIG=""
     if [ -f "$PROD_DIR/config/sdlc_config.json" ]; then

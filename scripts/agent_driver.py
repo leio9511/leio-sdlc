@@ -170,10 +170,33 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
                 cmd = [cmd_exec, "--yolo", "-p", secure_msg, "--model", model]
         else:
             cmd_exec = resolve_cmd("openclaw")
+            agent_id = "sdlc-generic-openclaw"
+            
+            list_cmd = [cmd_exec, "agents", "list"]
+            list_res = subprocess.run(list_cmd, capture_output=True, text=True)
+            if agent_id not in list_res.stdout:
+                home_dir = os.environ.get("HOME_MOCK") or os.environ.get("HOME", os.path.expanduser("~"))
+                agent_ws = os.path.join(home_dir, ".openclaw", "agents", agent_id, "workspace")
+                os.makedirs(agent_ws, exist_ok=True)
+                create_cmd = [cmd_exec, "agents", "add", agent_id, "--non-interactive", "--workspace", agent_ws]
+                subprocess.run(create_cmd, capture_output=True)
+                
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                templates_dir = os.path.join(base_dir, "TEMPLATES", "openclaw_execution_agent")
+                if os.path.exists(templates_dir):
+                    import shutil
+                    for item in os.listdir(templates_dir):
+                        s = os.path.join(templates_dir, item)
+                        d = os.path.join(agent_ws, item)
+                        if os.path.isdir(s):
+                            shutil.copytree(s, d, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(s, d)
+
             if actual_id:
-                cmd = [cmd_exec, "agent", "--session-id", actual_id, "-m", secure_msg]
+                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "-m", secure_msg]
             else:
-                cmd = [cmd_exec, "agent", "--session-id", session_key, "-m", secure_msg]
+                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", session_key, "-m", secure_msg]
             
         print(f"[{role or 'system'}] Invoking agent driver: {' '.join(cmd)}")
         
