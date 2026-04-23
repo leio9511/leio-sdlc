@@ -6,68 +6,77 @@ Context_Workdir: /root/projects/leio-sdlc
 # PRD: Config_Driven_Multi_CLI_Engine_Integration
 
 ## 1. Context & Problem (业务背景与核心痛点)
-`leio-sdlc` already runs through more than one execution path, but the engine behavior is still encoded as business logic branches inside the runtime. Today the codebase has first-class knowledge of:
-- OpenClaw-native agent execution
-- Gemini CLI execution
+`leio-sdlc` already supports more than one execution path, but engine behavior is still encoded as provider-specific business logic inside the runtime. Today the system has first-class knowledge of OpenClaw-native execution and Gemini CLI behavior. Codex now needs to be onboarded as an additional engine.
 
-A third engine, Codex CLI, now needs to be onboarded. The real architectural requirement is larger than “add Codex support.” The framework must stop accreting one-off engine branches whenever a new CLI appears.
+The real requirement is not “add Codex support.” The real requirement is to evolve `leio-sdlc` into a provider-agnostic, config-driven, hot-pluggable engine runtime.
 
-The current hard-coded model creates four concrete risks:
-1. **Engine onboarding cost scales linearly with code edits**. Every new CLI tends to require new conditional logic in `agent_driver.py` and related entrypoints.
-2. **Open-source/private boundary is unstable**. Future private corporate CLIs must not require their names, arguments, or invocation details to be committed into the public repository.
-3. **Continuity assumptions are under-specified**. Some engines support resumable sessions, some discover provider session ids after the first run, and some are stateless. The current design does not encode that as a contract.
-4. **Role safety is ambiguous**. Not every engine is valid for every SDLC role. In particular, revision-heavy coder loops cannot silently use a stateless engine unless that behavior is explicitly authorized.
+The current model creates six concrete risks:
+1. **Engine onboarding cost scales linearly with code edits.** Every new CLI tends to require new conditional logic in `agent_driver.py` and related entrypoints.
+2. **Open-source / private boundary is unstable.** Future private corporate CLIs must not require their names, arguments, or invocation details to be committed into the public repository.
+3. **Continuity assumptions are underspecified.** The system currently mixes together two different questions:
+   - whether an engine is stateful enough for a role,
+   - how the provider-native session handle is acquired.
+4. **Role safety is ambiguous.** Revision-heavy coder loops require real continuity and must not silently degrade to stateless execution.
+5. **Control-plane behavior is at risk during refactor.** This is a core SDLC runtime path. If the engine abstraction is changed carelessly, existing OpenClaw and Gemini workflows may break.
+6. **Public examples can accidentally become architecture.** If OpenClaw, Gemini, and Codex are treated as hard-coded architectural identities rather than example engines under a generic contract, the system will remain only partially configurable.
 
-This PRD therefore fixes the architecture at a closed-contract level:
-- keep OpenClaw as the built-in first-class path,
-- introduce a generic config-driven external CLI engine contract,
-- onboard Codex through that generic contract,
-- keep private engine details in local runtime config,
-- fail fast when an engine is incompatible with a role or continuity requirement.
+This PRD therefore defines the final iteration-1 contract:
+- preserve the existing SDLC control plane,
+- move engine selection to a config-driven registry,
+- separate **continuity mode** from **native-handle acquisition strategy**,
+- support OpenClaw, Gemini, and Codex as the initial public conformance matrix,
+- allow future private engines to be added through runtime-only config overlays,
+- forbid public-code dependence on private provider names.
 
-This is a final execution-grade contract for the first implementation, not a discussion placeholder.
+This is a final execution-grade contract, not a discussion placeholder.
 
 ## 2. Requirements & User Stories (需求定义)
-1. **Public Template + Local Runtime Overlay**
-   - The repo must ship a public template file at `config/sdlc_config.json.template`.
-   - The runtime may load a local non-template config at `config/sdlc_config.json` inside the installed skill/runtime directory.
-   - Private engines may exist only in the runtime config overlay and must not be required in tracked public source.
+1. **Public Core Schema + Public Examples + Local Runtime Overlay**
+   - The repo must ship a public schema-bearing template at `config/sdlc_config.json.template`.
+   - The public template may include public example engines such as `openclaw`, `gemini`, and `codex`, but those examples must not be treated as the architecture’s full universe of legal engine identities.
+   - The installed runtime may load a local overlay at `config/sdlc_config.json`.
+   - Private engines may exist only in the runtime overlay and must not be required in tracked public source.
+   - Public code must treat provider identity as config data, not as a hard-coded architectural constant.
 
 2. **Engine Registry**
    - The system must load engines from an explicit registry under `engines`.
-   - Iteration 1 must support these engine ids:
+   - Iteration 1 must support these public example engine ids as the initial conformance matrix:
      - `openclaw`
      - `gemini`
      - `codex`
-   - Future private engines may be added only if they satisfy the same engine-spec contract.
+   - Future private engines may be added if and only if they satisfy the same engine-spec contract.
 
 3. **Two Engine Kinds Only in Iteration 1**
    - `builtin_openclaw`
    - `generic_external_cli`
-   - OpenClaw remains a built-in engine kind.
-   - Gemini and Codex must both use the same `generic_external_cli` contract instead of product-specific business-logic branches.
+   - OpenClaw remains a built-in runtime kind, but it must still be selected through the same registry path as all other engines.
+   - Gemini and Codex must both use the same `generic_external_cli` contract.
+   - The orchestrator and role entrypoints must depend on resolved engine capabilities, not provider names.
 
 4. **Exact Engine Spec Contract**
    - Every engine entry must define the required contract fields listed in Section 7.
-   - Missing required keys, invalid enum values, or malformed arrays must fail at startup before any sub-agent is invoked.
+   - Missing required keys, invalid enum values, malformed arrays, or invalid command-template shapes must fail at startup before any sub-agent is invoked.
+   - The public core contract must be sufficient to express a new private engine without adding a provider-specific branch, enum, or hard-coded engine id to public code.
 
-5. **Continuity Contract Must Be Explicit**
-   - Every engine must declare one `continuity_mode`:
-     - `persistent_session`
-     - `discovered_resume`
+5. **Continuity Must Be Modeled in Two Layers**
+   - Every engine must declare exactly one `continuity_mode`:
+     - `stateful`
      - `stateless`
-   - Semantics are fixed:
-     - `persistent_session`: the same logical session key can be passed directly on subsequent invocations.
-     - `discovered_resume`: the engine creates a provider session id after first execution; SDLC must discover and persist it before reuse.
-     - `stateless`: no resume attempt is allowed, ever.
+   - Every engine must also declare exactly one `handle_acquisition_strategy`:
+     - `caller_assigned_handle`
+     - `emitted_handle_on_start`
+     - `deterministic_post_start_discovery`
+     - `none`
+   - `continuity_mode` answers whether the engine can safely continue a prior session.
+   - `handle_acquisition_strategy` answers how the provider-native handle is obtained on the first turn.
 
 6. **Role Compatibility Must Be Explicit**
    - Every engine must declare `allowed_roles`.
    - The selected engine must be rejected if the current role is not in `allowed_roles`.
    - Iteration 1 role rules are:
-     - `coder` requires `persistent_session` or `discovered_resume`.
-     - `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator` may use any continuity mode if the engine explicitly allows that role.
-     - `stateless` engines are forbidden for `coder` in iteration 1.
+     - `coder` requires `continuity_mode = stateful`
+     - `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator` may use either `stateful` or `stateless` engines if the engine explicitly allows that role
+     - `stateless` engines are forbidden for `coder`
 
 7. **Engine Resolution Order**
    - Engine resolution precedence must be exact:
@@ -82,95 +91,225 @@ This is a final execution-grade contract for the first implementation, not a dis
    - Model resolution precedence must be exact:
      1. explicit CLI `--model` if provided and not equal to `auto`,
      2. explicit CLI `--model auto` resolved via engine `auto_model_behavior`,
-     3. engine `default_model`,
-     4. legacy environment fallback `SDLC_MODEL`,
+     3. legacy environment fallback `SDLC_MODEL`,
+     4. engine `default_model`,
      5. built-in constant from `scripts/config.py`.
 
 9. **Exact `auto` Semantics**
    - `auto` is a semantic request, not a universal literal.
    - Iteration 1 behaviors are:
      - for `openclaw`, `auto_model_behavior = "omit_flag"`, meaning SDLC does not pass a model flag and lets the OpenClaw runtime/session default decide;
-     - for `gemini` and `codex`, `auto_model_behavior = "use_default_model"`, meaning SDLC resolves to the engine’s `default_model` and passes that value through the configured model arg.
+     - for `gemini` and `codex`, `auto_model_behavior = "use_default_model"`, meaning SDLC resolves `auto` to the engine’s `default_model` and passes that value through the configured model arg.
 
-10. **Codex Onboarding Scope in Iteration 1**
-    - Codex must be onboarded as `generic_external_cli`.
-    - In iteration 1, Codex is approved only for stateless-safe roles:
-      - `planner`
-      - `reviewer`
-      - `auditor`
-      - `verifier`
-      - `arbitrator`
-    - Codex must be rejected for `coder` until a resumable continuity path is explicitly introduced in a future PRD.
+10. **Unified Logical Session Lifecycle**
+    - SDLC must own a stable `logical_session_key` for each role / PR loop.
+    - For stateful engines, SDLC must persist a mapping:
+      - `logical_session_key -> native_handle`
+    - A native handle must be acquired exactly once for a fresh logical session and reused on all later turns.
 
-11. **Fail-Fast Observability**
-    - Unavailable commands, invalid configs, invalid role bindings, and unsupported continuity must fail with the exact strings defined in Section 7.
+11. **Initial Public Conformance Matrix**
+    - OpenClaw, Gemini, and Codex are the three required public engine fixtures for iteration 1.
+    - They must all be validated through the same engine registry and normalized contract.
+    - Their purpose is to prove the abstraction is generic, not to make provider-specific branching permanent.
+    - Public example config must remain conservative: conformance fixtures may exist in the public template without becoming default production role bindings.
+
+12. **Gemini Continuity Scope in Iteration 1**
+    - Gemini is approved for `coder`, `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator`.
+    - Gemini must use `continuity_mode = stateful` and `handle_acquisition_strategy = deterministic_post_start_discovery`.
+    - The discovery path must use provider-native session listing and session-set diffing in an isolated project/worktree context.
+    - Same-project concurrent fresh Gemini bootstrap for multiple logical sessions is forbidden unless serialized by a runtime lock or equivalent per-project guard.
+    - Prompt-text or temp-file-path matching is explicitly recognized as transitional scaffolding, not the target architecture.
+
+13. **Codex Continuity Scope in Iteration 1**
+    - Codex is architecturally compatible with `coder`, `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator`, because local validation confirms a resumable path via `codex exec` plus `codex exec resume`.
+    - Codex must use `continuity_mode = stateful` and `handle_acquisition_strategy = emitted_handle_on_start`.
+    - However, Codex coder rollout is gated by completion of the Mandatory Baseline Validation Phase. Iteration-1 architecture may support Codex coder continuity, but production-facing role defaults and rollout decisions must remain conservative until OpenClaw and Gemini baselines are proven stable under the new engine architecture.
+
+14. **Fail-Fast Observability**
+    - Unavailable commands, invalid configs, invalid role bindings, failed handle acquisition, and unsupported continuity must fail with the exact strings defined in Section 7.
     - The system must not continue with degraded behavior.
 
-12. **Scope Restraint**
-    - This PRD modifies only engine selection, config loading, capability validation, and CLI rendering contracts.
-    - It does not authorize broad orchestrator state-machine redesign, skill-router redesign, or prompt-contamination remediation unrelated to engine integration.
+15. **Regression-Safety Requirement**
+    - This refactor is not allowed to change SDLC control-plane behavior without explicit authorization.
+    - Required safety target:
+      - existing OpenClaw-driven SDLC flows continue to behave normally,
+      - existing Gemini-driven SDLC flows continue to behave normally,
+      - Codex is added as a third conformance case under the same engine contract.
+
+16. **Scope Restraint**
+    - This PRD modifies only engine selection, config loading, capability validation, handle acquisition, continuity persistence, and CLI rendering contracts.
+    - It does not authorize broad orchestrator state-machine redesign, skill-router redesign, or unrelated prompt-contamination remediation.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 ### 3.1 Architectural Pattern
 This is an agentic runtime routing problem. The correct pattern is:
+- **Control Plane / Data Plane Separation**
+  - the SDLC control plane owns role routing, PR state transitions, escalation, retries, and policy enforcement,
+  - the engine data plane owns provider-specific command rendering, native-handle acquisition, and resume mechanics
 - **Strategy Pattern** for engine invocation
-- **Configuration-Driven Plugin Registry** for engine definitions
+- **Configuration-Driven Engine Registry** for engine definitions
 - **Capability Gating** for role and continuity safety
+- **Logical Session Ownership** for stable SDLC-side continuity
+- **Conformance Test Matrix** to prove multiple engines satisfy the same contract
 
-The anti-pattern being explicitly banned is product-specific branching such as “if engine == gemini do X, if engine == codex do Y” across business logic outside the engine registry/renderer layer.
+The anti-patterns being explicitly banned are:
+- product-specific branching such as “if engine == gemini do X, if engine == codex do Y” across business logic outside the engine registry / renderer layer,
+- making orchestrator state logic depend on provider name,
+- treating public example engines as the architecture’s full identity model.
 
 ### 3.2 Runtime Shape
 Iteration 1 must standardize the engine layer into exactly two runtime paths:
 1. **`builtin_openclaw`**
    - implemented as a built-in engine renderer inside `agent_driver.py`
    - preserves first-class OpenClaw-native execution
+   - still resolved through the same engine registry and config contract as other engines
 2. **`generic_external_cli`**
    - implemented as a generic renderer driven entirely by engine spec fields
    - used for Gemini, Codex, and any future private CLI that conforms to the same contract
 
+The key invariant is:
+- the control plane must not care whether the resolved engine is OpenClaw, Gemini, Codex, or a future private engine,
+- it may care only about validated engine capabilities and the normalized start / resume contract.
+
 ### 3.3 Configuration Layering
+The configuration model must be explicitly understood as three layers:
+
+1. **Public Core Schema Layer**
+   - defines the engine contract shape, validation rules, precedence rules, merge rules, and normalized semantics
+   - must be provider-agnostic except where a built-in runtime kind must exist for OpenClaw-native support
+
+2. **Public Example Layer**
+   - may include public example engine entries such as `openclaw`, `gemini`, and `codex`
+   - exists to document supported public examples and to serve as the initial conformance matrix
+   - must not be treated as the full required universe of engine identities
+
+3. **Local Runtime Overlay Layer**
+   - may define private engine ids, private commands, private arguments, private model defaults, and private role bindings
+   - must be sufficient for private-engine onboarding without changing public code
+
 The load path must be:
-1. read `config/sdlc_config.json.template` from the repo/runtime as the public baseline,
+1. read `config/sdlc_config.json.template` from the repo / runtime as the public baseline,
 2. if present, overlay `config/sdlc_config.json` from the installed runtime directory,
 3. validate the merged result before any engine is selected.
 
-The public template may contain public engines such as `openclaw`, `gemini`, and `codex`.
-Private corporate engines may be added only in `config/sdlc_config.json`, not in the tracked template.
+The merge contract is fixed as follows:
+- top-level object keys are merged by key, not whole-file replacement,
+- `default_engine` is scalar override, so runtime overlay replaces template when present,
+- `role_overrides` is merged by role name, with runtime overlay values overriding template values for matching roles,
+- `engines` is merged by engine id, with runtime overlay allowed to both override existing engine entries and inject entirely new private engine ids,
+- when the same engine id exists in both template and runtime overlay, object fields are merged by key with runtime overlay winning on conflicts,
+- arrays are always replaced as whole values, never concatenated,
+- setting a field to `null` in runtime overlay is not a deletion primitive unless a future PRD explicitly introduces deletion semantics.
 
-### 3.4 Required Engine Contract
+### 3.4 Core Abstraction: Logical Session vs Native Handle
+The engine layer must stop assuming that every provider supports caller-specified session ids.
+
+The stable abstraction is:
+- **logical session key**: owned by SDLC, stable across the role workflow
+- **native handle**: owned by the provider CLI/runtime, used to continue the real underlying session
+
+The runtime must persist a mapping from logical session key to native handle for every stateful engine.
+
+This resolves the real provider differences:
+- OpenClaw supports caller-assigned handles,
+- Codex emits a handle on first run,
+- Gemini requires deterministic one-time post-start discovery.
+
+### 3.5 Required Engine Contract
 Every engine entry must follow the exact JSON contract in Section 7. The required meaning of key fields is:
 - `kind`: selects `builtin_openclaw` or `generic_external_cli`
 - `command`: executable name or path used for availability and invocation
 - `availability_check`: command array used to prove the engine exists before selection
 - `allowed_roles`: authoritative allowlist for role binding
-- `continuity_mode`: authoritative continuity contract
+- `continuity_mode`: `stateful` or `stateless`
+- `handle_acquisition_strategy`: how the native handle is obtained on the first turn
 - `default_model`: engine-level fallback model
 - `auto_model_behavior`: `omit_flag` or `use_default_model`
-- `invoke.base_args`: args always passed on every invocation
-- `invoke.prompt_arg`: arg name used to pass the prompt payload
-- `invoke.model_arg`: arg name used to pass a model when a model flag is needed
-- `invoke.resume_arg`: arg name used to pass a resumable session id when continuity supports it
-- `session_discovery`: strategy block for engines using `discovered_resume`
+- `start`: invocation contract for a fresh session
+- `resume`: invocation contract for a continued session
+- `handle_capture`: strategy block used only when the native handle is not caller-assigned
 
-### 3.5 Role Resolution
-The runtime must resolve the effective engine per role using this algorithm:
+### 3.6 Handle Acquisition Strategies
+Iteration 1 recognizes exactly these strategies:
+
+1. **`caller_assigned_handle`**
+   - SDLC chooses the native handle before the first turn and passes it directly to the provider
+   - used by `openclaw`
+
+2. **`emitted_handle_on_start`**
+   - the provider emits the native handle in structured output on the first run
+   - SDLC parses and persists that handle
+   - used by `codex`
+
+3. **`deterministic_post_start_discovery`**
+   - the provider creates a native handle on first run but does not emit it directly in the primary response path
+   - SDLC must discover it once, deterministically, and persist it
+   - used by `gemini`
+
+4. **`none`**
+   - only valid for `stateless` engines
+
+### 3.7 Gemini Final Solution
+Gemini is not allowed to remain on prompt-text or temp-file-path matching as the target design.
+
+The required iteration-1 solution is:
+1. before the first Gemini turn, collect the project-scoped session set via provider-native list command,
+2. run the fresh Gemini start command,
+3. collect the project-scoped session set again,
+4. compute the set difference,
+5. persist the newly created Gemini session id as the native handle for the logical session key,
+6. use `-r <native_handle>` for all subsequent turns.
+
+This requires isolated project / worktree context so that the set difference is deterministic.
+Same-project concurrent fresh Gemini bootstrap is forbidden unless explicitly serialized by a runtime lock or equivalent per-project guard.
+
+### 3.8 Codex Final Solution
+Codex local validation has already confirmed:
+- `codex exec` starts a session,
+- structured JSON output emits `thread.started.thread_id`,
+- `codex exec resume <thread_id>` continues the same thread,
+- prior context is preserved across turns.
+
+Therefore, Codex must use:
+- `continuity_mode = stateful`
+- `handle_acquisition_strategy = emitted_handle_on_start`
+- first turn: parse `thread_id` from structured output
+- later turns: use `codex exec resume <thread_id>`
+
+However, iteration-1 rollout must remain conservative:
+- Codex coder support is part of the architecture contract,
+- but production-facing enablement for coder must remain gated until the Mandatory Baseline Validation Phase has proven that the OpenClaw and Gemini baselines remain stable under the refactor.
+
+### 3.9 OpenClaw Final Solution
+OpenClaw remains the cleanest path:
+- `continuity_mode = stateful`
+- `handle_acquisition_strategy = caller_assigned_handle`
+- SDLC sets the session id directly
+- no discovery step is required
+
+### 3.10 Role Resolution
+The runtime must resolve the effective engine per role using this exact algorithm:
 1. if the active script explicitly passes an engine override for this role, use it,
 2. else if `role_overrides[role]` exists in config, use it,
-3. else use `default_engine`.
+3. else use `default_engine`,
+4. else if legacy env `LLM_DRIVER` exists, use it,
+5. else fall back to the built-in constant from `scripts/config.py`.
 
 After that selection, SDLC must validate:
 1. engine id exists,
 2. engine spec passes schema validation,
 3. command exists via `availability_check`,
 4. role is included in `allowed_roles`,
-5. continuity mode is legal for the role.
+5. continuity mode is legal for the role,
+6. handle acquisition strategy is legal for the continuity mode,
+7. the start and resume contracts are valid for the declared strategy.
 
 If any check fails, SDLC must stop with the exact fail-fast strings from Section 7.
 
-### 3.6 Continuity Enforcement
+### 3.11 Continuity Enforcement
 Iteration 1 continuity behavior must be hard-coded at the policy level:
 - `coder`
-  - allowed: `persistent_session`, `discovered_resume`
+  - allowed: only `stateful`
   - forbidden: `stateless`
 - `planner`, `reviewer`, `auditor`, `verifier`, `arbitrator`
   - allowed: whatever the engine explicitly declares in `allowed_roles`
@@ -178,28 +317,87 @@ Iteration 1 continuity behavior must be hard-coded at the policy level:
 
 This is intentionally conservative. It prevents the architecture from silently putting revision-critical coder loops onto a fresh-session CLI.
 
-### 3.7 Model Resolution
+### 3.12 Model Resolution
 The runtime must resolve the effective model with this exact algorithm:
 1. if `--model <value>` is provided and `<value> != auto`, use `<value>`;
 2. if `--model auto` is provided, apply engine `auto_model_behavior`;
-3. else if the engine has `default_model`, use it;
-4. else if legacy env `SDLC_MODEL` exists, use it;
-5. else fall back to `scripts/config.py` default.
+3. else if legacy env `SDLC_MODEL` exists, use it;
+4. else if the engine has `default_model` and that value is not `auto`, use it;
+5. else if the engine has `default_model = auto`, apply `auto_model_behavior` exactly as if the caller had supplied `--model auto`;
+6. else fall back to `scripts/config.py` default.
 
 `auto_model_behavior` rules:
 - `omit_flag`: do not pass a model flag to the CLI
-- `use_default_model`: pass the engine’s `default_model` through `invoke.model_arg`
+- `use_default_model`: `default_model` must resolve to a concrete non-`auto` value before invocation; storing `default_model = auto` together with `use_default_model` is invalid and must fail with `engine_auto_model_invalid_default_error`
 
-### 3.8 Codex in Iteration 1
-Codex must be introduced as a `generic_external_cli` entry in config, not as a new hard-coded product branch.
-Its iteration-1 contract is:
-- `continuity_mode = "stateless"`
-- `allowed_roles = ["planner", "reviewer", "auditor", "verifier", "arbitrator"]`
-- not legal for `coder`
+### 3.13 Handle Mapping Persistence and Lifecycle
+The native-handle mapping for stateful engines must be treated as an explicit runtime contract, not an implementation detail.
 
-That gives the system a real third engine immediately without lying about unsupported continuity.
+Iteration 1 must enforce these rules:
+- mapping persistence must live in the per-run runtime area, not in tracked repository files,
+- the mapping key must include at least the logical session key and resolved engine id,
+- a mapping entry may be created only after successful first-turn handle acquisition,
+- resumed turns must read the stored handle instead of re-running bootstrap logic,
+- cleanup, supersede, withdraw, and fatal teardown paths must clear stale mappings associated with the affected logical session,
+- mappings from one PR / role loop must never be reused by another PR / role loop,
+- concurrent runs must not be allowed to race on the same logical session mapping without a runtime lock or equivalent serialization.
 
-### 3.9 Files Authorized for Change
+This contract exists to prevent handle drift, cross-PR session contamination, and accidental continuation of the wrong provider session.
+
+### 3.14 Rollout and Migration Strategy
+This architecture change must be delivered as a staged migration, not as a single-step replacement.
+
+Required rollout order:
+1. **Characterization Phase**
+   - First add or update tests that pin the current OpenClaw and Gemini behavior.
+   - No architectural replacement is allowed before those regression baselines exist.
+2. **Registry Introduction Phase**
+   - Introduce the new engine registry and normalized contract while preserving existing OpenClaw and Gemini behavior.
+   - At the end of this phase, the same SDLC workflows must still pass under OpenClaw and Gemini.
+3. **Mandatory Baseline Validation Phase**
+   - OpenClaw and Gemini must pass the mandatory regression suites before Codex is accepted as a supported engine under the new architecture.
+4. **Codex Conformance Phase**
+   - Add Codex as the third public conformance case under the same contract.
+   - Codex onboarding is evidence that the abstraction is generic, not the justification for destabilizing existing engines.
+5. **Post-Migration Tightening Phase**
+   - After the shared architecture is proven stable, remaining provider-specific legacy branches may be removed.
+
+Any implementation plan that skips the mandatory OpenClaw and Gemini regression baselines is non-compliant with this PRD.
+
+### 3.15 Test Architecture and Regression Strategy
+This refactor is large enough that testing must be treated as part of the architecture, not as cleanup work after coding.
+
+The required testing model is three layers:
+
+1. **Contract Tests**
+   - Validate the engine registry schema, precedence, role gating, continuity rules, and model-resolution rules without depending on provider name.
+
+2. **Engine Conformance Matrix**
+   - Run the same engine-contract assertions against three public fixtures:
+     - `openclaw`
+     - `gemini`
+     - `codex`
+   - These tests prove all three engines satisfy the same normalized contract while still allowing different handle-acquisition strategies.
+
+3. **Pipeline-Preservation E2E**
+   - Run mocked E2E scenarios to prove SDLC control-plane behavior is preserved after the refactor.
+   - The primary regression goal is not provider-specific success, but preservation of orchestrator behavior under the new provider-agnostic engine contract.
+
+Control-plane invariants that must remain stable include:
+- PR state transitions
+- green-path close behavior
+- red-path block and slice behavior
+- coder revision-loop routing
+- teardown and escalation behavior
+- fail-fast notification paths
+
+Engine-specific differences are allowed only in the data plane, such as:
+- handle acquisition mechanism
+- command rendering
+- resume invocation shape
+- model-flag rendering
+
+### 3.16 Files Authorized for Change
 This PRD authorizes work in:
 - `scripts/agent_driver.py`
 - `scripts/config.py`
@@ -212,98 +410,150 @@ This PRD authorizes work in:
 - `scripts/spawn_arbitrator.py`
 - `scripts/doctor.py`
 - `config/sdlc_config.json.template`
-- tests covering engine config parsing, capability gating, and CLI rendering
+- tests covering engine config parsing, capability gating, handle acquisition, contract conformance, and pipeline-preservation E2E
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
-- **Scenario 1: Valid external engine selection renders from config, not product-specific branch logic**
-  - **Given** `config/sdlc_config.json` defines a valid `generic_external_cli` engine entry
+- **Scenario 1: Valid external engine selection renders from config into a normalized runtime behavior**
+  - **Given** `config/sdlc_config.json` defines a valid engine entry
   - **When** a compatible SDLC role selects that engine
-  - **Then** the runtime renders the command from the configured engine spec
-  - **And** it does not require a new product-specific branch outside the engine registry path
+  - **Then** the runtime launches using the command and arguments implied by the configured engine contract
+  - **And** the observable runtime behavior matches the contract regardless of which public example engine is selected
 
-- **Scenario 2: Codex can be onboarded without a Codex-specific business-logic path**
-  - **Given** the runtime config includes the `codex` engine defined in Section 7
-  - **When** `auditor` or `reviewer` resolves to `codex`
-  - **Then** SDLC invokes Codex through the generic external CLI renderer
-  - **And** the invocation uses the configured command and argument contract
+- **Scenario 2: The same engine contract works across the initial conformance matrix**
+  - **Given** the runtime config includes the `openclaw`, `gemini`, and `codex` engine entries defined in Section 7
+  - **When** contract-conformance tests are run against each engine fixture
+  - **Then** each engine is resolved through the configured engine selection contract
+  - **And** each engine satisfies the same normalized start / resume contract after applying its declared handle-acquisition strategy
 
-- **Scenario 3: Stateless engines are blocked for coder**
-  - **Given** `codex` declares `continuity_mode = "stateless"`
-  - **When** the runtime attempts to bind `coder` to `codex`
+- **Scenario 3: Gemini coder loop uses one-time deterministic bootstrap, not per-turn rediscovery**
+  - **Given** `gemini` declares `continuity_mode = stateful` and `handle_acquisition_strategy = deterministic_post_start_discovery`
+  - **When** a fresh `coder` logical session is started on an isolated worktree / project context
+  - **Then** SDLC acquires the Gemini native session id exactly once via provider-native session-set diff
+  - **And** persists that handle
+  - **And** all later turns use `-r <native_handle>` instead of repeating discovery
+
+- **Scenario 4: Stateful Codex coder loop uses emitted native handle correctly**
+  - **Given** `codex` declares `continuity_mode = stateful` and `handle_acquisition_strategy = emitted_handle_on_start`
+  - **When** a fresh `coder` logical session is started
+  - **Then** SDLC captures `thread.started.thread_id` from structured output
+  - **And** uses that stored handle for later `codex exec resume` turns
+  - **And** this proves contract compatibility only, not automatic production rollout for Codex as the default coder engine
+
+- **Scenario 5: Stateless engines are blocked for coder**
+  - **Given** an engine declares `continuity_mode = stateless`
+  - **When** the runtime attempts to bind `coder` to that engine
   - **Then** the process fails before agent invocation
   - **And** it emits the exact `engine_role_continuity_error` string from Section 7
 
-- **Scenario 4: Invalid or missing engine spec fails before execution**
-  - **Given** the selected engine is missing a required field such as `kind` or `invoke.prompt_arg`
+- **Scenario 6: Invalid or missing engine spec fails before execution**
+  - **Given** the selected engine is missing a required field such as `kind`, `start.prompt_style`, or `handle_acquisition_strategy`
   - **When** the runtime loads config
   - **Then** the process aborts before spawning any sub-agent
   - **And** it emits the exact `engine_config_invalid` string from Section 7
 
-- **Scenario 5: Missing executable fails clearly**
+- **Scenario 7: Missing executable fails clearly**
   - **Given** an engine is selected but its configured executable is not available
   - **When** SDLC performs `availability_check`
   - **Then** the process aborts before invoking the role
   - **And** it emits the exact `engine_command_missing` string from Section 7
 
-- **Scenario 6: Role override works deterministically**
+- **Scenario 8: Role override works deterministically**
   - **Given** `default_engine` is `gemini` and `role_overrides.auditor` is `codex`
   - **When** the auditor is spawned without an explicit CLI engine override
   - **Then** the auditor uses `codex`
   - **And** other roles continue using `gemini` unless separately overridden
 
-- **Scenario 7: `--model auto` behaves per-engine, not universally**
+- **Scenario 9: `--model auto` behaves per-engine, not universally**
   - **Given** `--model auto` is passed
   - **When** the selected engine is `openclaw`
   - **Then** SDLC omits the model flag entirely
   - **When** the selected engine is `gemini` or `codex`
   - **Then** SDLC resolves `auto` to the engine’s `default_model` and passes it via the configured model arg
 
-- **Scenario 8: Private engine details remain out of tracked public source**
+- **Scenario 10: Native-handle mappings are isolated and cleaned up correctly**
+  - **Given** a stateful engine has acquired and persisted a native handle for a logical session
+  - **When** the related PR loop is superseded, withdrawn, or fatally torn down
+  - **Then** the stale mapping is not reused by future logical sessions
+  - **And** another PR / role loop cannot accidentally continue the old provider session
+
+- **Scenario 11: Pipeline-preservation behavior remains stable under multiple engine configs**
+  - **Given** the orchestrator green-path and red-path mocked E2E suites exist
+  - **When** those suites are run against at least the `openclaw` and `gemini` engine configs, and against `codex` where the role contract permits
+  - **Then** SDLC control-plane behavior remains unchanged
+  - **And** differences are limited to engine-specific command rendering and native-handle acquisition details
+
+- **Scenario 12: Private engine onboarding remains externalized from tracked public artifacts**
   - **Given** a private engine is defined only in local runtime `config/sdlc_config.json`
-  - **When** the public repository is inspected
-  - **Then** the private engine name and invocation args are not required in tracked source files
+  - **When** SDLC is launched with that runtime overlay present
+  - **Then** the private engine can be resolved and used through the same normalized contract
+  - **And** no change to tracked public example config is required for that private engine to exist at runtime
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 ### Core Quality Risks
 - Reintroducing product-specific hard-coded branching after claiming to be config-driven
-- Allowing a role/continuity mismatch to slip into runtime execution
+- Allowing a role / continuity mismatch to slip into runtime execution
 - Breaking existing OpenClaw and Gemini behavior while adding the engine registry
+- Breaking coder continuity by treating native-handle acquisition as an afterthought
 - Leaking private engine details into tracked source
 - Making `auto` model resolution inconsistent across roles and engines
 
 ### Required Verification Strategy
 1. **Schema Validation Unit Tests**
    - Validate missing required keys
-   - Validate invalid enum values for `kind`, `continuity_mode`, and `auto_model_behavior`
-   - Validate malformed `allowed_roles`, `availability_check`, and `invoke` fields
+   - Validate invalid enum values for `kind`, `continuity_mode`, `handle_acquisition_strategy`, and `auto_model_behavior`
+   - Validate malformed `allowed_roles`, `availability_check`, `start`, `resume`, and `handle_capture` fields
+   - Validate invalid merge outcomes produced by template + runtime overlay application
 
 2. **Engine Resolution Unit Tests**
    - Validate precedence across explicit override, `role_overrides`, `default_engine`, env fallback, and code default
    - Validate that silent fallback is impossible
 
-3. **Capability Gate Unit Tests**
+3. **Configuration Merge Contract Tests**
+   - Validate top-level object merge behavior
+   - Validate `role_overrides` key-based overlay behavior
+   - Validate `engines` key-based overlay behavior for both existing engine override and private engine injection
+   - Validate array replacement behavior
+   - Validate that `null` does not act as an implicit deletion primitive
+
+4. **Capability Gate Unit Tests**
    - Validate `stateless` rejection for `coder`
    - Validate allowed stateless roles for `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator`
+   - Validate illegal combinations between `continuity_mode` and `handle_acquisition_strategy`
 
-4. **Command Rendering Unit Tests**
+4. **Contract-Conformance Unit Tests**
+   - Run the same normalized contract assertions against the initial engine matrix:
+     - `openclaw`
+     - `gemini`
+     - `codex`
+   - Validate that provider-specific details are expressed only through config and adapter strategy, not through control-plane branching
+
+5. **Command Rendering Unit Tests**
    - Validate `builtin_openclaw` rendering
    - Validate `generic_external_cli` rendering for Gemini and Codex using the config contract
+   - Validate positional vs flagged prompt handling
    - Validate `--model auto` handling for `omit_flag` and `use_default_model`
 
-5. **Mocked Integration Tests**
-   - Mock CLI binaries and verify exact rendered command arrays
-   - Mock session discovery for `discovered_resume`
-   - Validate that runtime config overlays template defaults correctly
+6. **Handle Acquisition Tests**
+   - Mock OpenClaw caller-assigned-handle behavior
+   - Mock Codex JSON event output and verify extraction of `thread.started.thread_id`
+   - Mock Gemini before / after session listings and verify deterministic set-diff acquisition
+   - Verify mapping persistence from `logical_session_key -> native_handle`
+   - Verify resumed turns use the stored handle rather than repeating bootstrap
 
-6. **Selective Live Validation**
+7. **Pipeline-Preservation Mocked E2E**
+   - Reuse and extend existing orchestrator E2E suites so they can run under multiple engine configs
+   - At minimum, preserve green-path, blocked_fatal, and slice-path behavior under the refactored engine architecture
+   - Treat OpenClaw and Gemini as mandatory regression baselines before accepting Codex onboarding
+
+8. **Selective Live Validation**
    - Perform non-blocking live checks for:
      - OpenClaw engine
      - Gemini engine
-     - Codex engine for stateless-safe roles
+     - Codex engine
    - Keep live-provider validation out of default blocking CI
 
 ### Quality Goal
-After this change, `leio-sdlc` must behave as a closed-contract, capability-gated multi-engine runtime. Adding a new compatible CLI should be primarily a config operation, not a business-logic rewrite.
+After this change, `leio-sdlc` must behave as a closed-contract, capability-gated multi-engine runtime. Adding a new compatible CLI should be primarily a config operation, not a business-logic rewrite. The primary regression objective is preservation of SDLC control-plane behavior under a provider-agnostic engine contract.
 
 ## 6. Framework Modifications (框架防篡改声明)
 - `scripts/agent_driver.py`
@@ -317,18 +567,21 @@ After this change, `leio-sdlc` must behave as a closed-contract, capability-gate
 - `scripts/spawn_arbitrator.py`
 - `scripts/doctor.py`
 - `config/sdlc_config.json.template`
-- Tests for schema validation, engine resolution, capability gating, and command rendering
+- tests for schema validation, engine resolution, capability gating, handle acquisition, contract conformance, and pipeline-preservation E2E
 
 ---
 
 ## Appendix: Architecture Evolution Trace (架构演进与审查追踪)
-> **[CRITICAL INSTRUCTION FOR PLANNER & CODER]** 
+> **[CRITICAL INSTRUCTION FOR PLANNER & CODER]**
 > IGNORING THIS SECTION IS MANDATORY. This section is strictly for historical tracking of the PM-Auditor-Boss discussion loop. Do NOT read, reference, or implement any logic from this appendix into the SDLC pipeline.
 
-- **v1.0**: Framed the migration direction correctly, but left the engine contract open-ended.
-- **Audit Rejection (v1.0)**: Rejected because the PRD demanded new config behavior and fail-fast errors while leaving `Section 7` as `None`, and because the architecture still carried unresolved open questions around config DSL, continuity, role binding, and `auto` semantics.
-- **v2.0 Revision Rationale**: Closed every open contract. Defined the exact engine registry structure, continuity enums, role compatibility rules, model resolution order, fail-fast strings, and the iteration-1 Codex boundary.
-- **Trade-off Chosen**: Iteration 1 intentionally refuses stateless `coder` execution. This is a restraint decision to prevent fake support for revision-heavy loops before resumable continuity is designed.
+- **v1.0**: Correctly recognized the need for a config-driven multi-engine runtime, but left core contracts open.
+- **v2.0**: Closed the original open questions around public engine shape, minimal config DSL, continuity semantics, role gating, `auto` model behavior, precedence order, and runtime overlay validation.
+- **v3.0**: Refined the architecture based on direct local validation of Codex and Gemini continuity behavior. The core correction was to separate `continuity_mode` from `handle_acquisition_strategy`.
+- **v4.0**: Re-centered the PRD away from Codex-specific framing and clarified that OpenClaw, Gemini, and Codex are public conformance cases under one provider-agnostic engine contract.
+- **Design pattern correction**: The architecture is explicitly framed as Control Plane / Data Plane Separation + Registry-Driven Strategy + Capability-Based Adapter Contract + Conformance Test Matrix.
+- **Testing correction**: The PRD now requires contract tests, engine conformance matrix tests, and pipeline-preservation E2E so that the existing SDLC control plane can be proven stable before and after the engine refactor.
+- **Private-boundary correction**: Public code and public schema must remain provider-agnostic enough that future private engines can be added through runtime-only config overlays.
 
 ---
 
@@ -339,32 +592,51 @@ After this change, `leio-sdlc` must behave as a closed-contract, capability-gate
 > **Coder 必须且只能从本章节进行 Copy-Paste（复制粘贴），绝对禁止对以下内容进行任何改写或二次加工。**
 > 如果本需求不涉及任何写死的文本，请明确填写 "None"。
 
-### Exact config template contract (`config/sdlc_config.json.template`)
+### 7A. Exact schema contract (public core)
+```text
+Public core contract defines only normalized fields, enums, precedence rules, and fail-fast semantics.
+Public core contract must not require future private engine ids to be added to public code.
+Public example engines are examples and regression fixtures, not the architecture's identity model.
+If onboarding a future private engine still requires adding a provider-specific branch or hard-coded engine id to public code, the architecture defined by this PRD must be considered failed.
+```
+
+### 7B. Exact public example template (`config/sdlc_config.json.template`)
 ```json
 {
-  "default_engine": "gemini",
-  "role_overrides": {
-    "auditor": "codex"
-  },
+  "default_engine": null,
+  "role_overrides": {},
   "engines": {
     "openclaw": {
       "kind": "builtin_openclaw",
       "command": "openclaw",
       "availability_check": ["openclaw", "agent", "--help"],
       "allowed_roles": ["planner", "coder", "reviewer", "auditor", "verifier", "arbitrator"],
-      "continuity_mode": "persistent_session",
+      "continuity_mode": "stateful",
+      "handle_acquisition_strategy": "caller_assigned_handle",
       "default_model": "auto",
       "auto_model_behavior": "omit_flag",
-      "invoke": {
-        "base_args": ["agent"],
+      "start": {
+        "args": ["agent"],
+        "prompt_style": "flag",
         "prompt_arg": "-m",
         "model_arg": "--model",
-        "resume_arg": "--session-id"
+        "handle_style": "flag",
+        "handle_arg": "--session-id"
       },
-      "session_discovery": {
+      "resume": {
+        "args": ["agent"],
+        "prompt_style": "flag",
+        "prompt_arg": "-m",
+        "model_arg": "--model",
+        "handle_style": "flag",
+        "handle_arg": "--session-id"
+      },
+      "handle_capture": {
         "strategy": "none",
         "list_args": [],
-        "match_field": ""
+        "event_type": "",
+        "event_field": "",
+        "project_scoped": false
       }
     },
     "gemini": {
@@ -372,39 +644,65 @@ After this change, `leio-sdlc` must behave as a closed-contract, capability-gate
       "command": "gemini",
       "availability_check": ["gemini", "--version"],
       "allowed_roles": ["planner", "coder", "reviewer", "auditor", "verifier", "arbitrator"],
-      "continuity_mode": "discovered_resume",
+      "continuity_mode": "stateful",
+      "handle_acquisition_strategy": "deterministic_post_start_discovery",
       "default_model": "gemini-3.1-pro-preview",
       "auto_model_behavior": "use_default_model",
-      "invoke": {
-        "base_args": ["--yolo"],
+      "start": {
+        "args": ["--yolo"],
+        "prompt_style": "flag",
         "prompt_arg": "-p",
         "model_arg": "--model",
-        "resume_arg": "-r"
+        "handle_style": "none",
+        "handle_arg": ""
       },
-      "session_discovery": {
-        "strategy": "provider_cli_json",
-        "list_args": ["--list-sessions", "-o", "json"],
-        "match_field": "prompt"
+      "resume": {
+        "args": ["--yolo"],
+        "prompt_style": "flag",
+        "prompt_arg": "-p",
+        "model_arg": "--model",
+        "handle_style": "flag",
+        "handle_arg": "-r"
+      },
+      "handle_capture": {
+        "strategy": "session_list_diff",
+        "list_args": ["--list-sessions"],
+        "event_type": "",
+        "event_field": "",
+        "project_scoped": true
       }
     },
     "codex": {
       "kind": "generic_external_cli",
       "command": "codex",
       "availability_check": ["codex", "--help"],
-      "allowed_roles": ["planner", "reviewer", "auditor", "verifier", "arbitrator"],
-      "continuity_mode": "stateless",
+      "allowed_roles": ["planner", "coder", "reviewer", "auditor", "verifier", "arbitrator"],
+      "continuity_mode": "stateful",
+      "handle_acquisition_strategy": "emitted_handle_on_start",
       "default_model": "gpt-5.4",
       "auto_model_behavior": "use_default_model",
-      "invoke": {
-        "base_args": [],
-        "prompt_arg": "-m",
+      "start": {
+        "args": ["exec", "--json"],
+        "prompt_style": "positional",
+        "prompt_arg": "",
         "model_arg": "--model",
-        "resume_arg": ""
+        "handle_style": "none",
+        "handle_arg": ""
       },
-      "session_discovery": {
-        "strategy": "none",
+      "resume": {
+        "args": ["exec", "resume", "{handle}", "--json"],
+        "prompt_style": "positional",
+        "prompt_arg": "",
+        "model_arg": "--model",
+        "handle_style": "embedded",
+        "handle_arg": ""
+      },
+      "handle_capture": {
+        "strategy": "json_event",
         "list_args": [],
-        "match_field": ""
+        "event_type": "thread.started",
+        "event_field": "thread_id",
+        "project_scoped": false
       }
     }
   }
@@ -418,13 +716,32 @@ builtin_openclaw
 generic_external_cli
 
 continuity_mode:
-persistent_session
-discovered_resume
+stateful
 stateless
+
+handle_acquisition_strategy:
+caller_assigned_handle
+emitted_handle_on_start
+deterministic_post_start_discovery
+none
 
 auto_model_behavior:
 omit_flag
 use_default_model
+
+prompt_style:
+flag
+positional
+
+handle_style:
+flag
+embedded
+none
+
+handle_capture.strategy:
+none
+json_event
+session_list_diff
 ```
 
 ### Exact fail-fast messages
@@ -453,9 +770,24 @@ use_default_model
 [FATAL] Engine '{engine_id}' with continuity mode '{continuity_mode}' cannot be used for role '{role}'.
 ```
 
-- **`engine_auto_model_error`**
+- **`engine_handle_strategy_error`**
+```text
+[FATAL] Engine '{engine_id}' cannot use handle acquisition strategy '{handle_acquisition_strategy}' with continuity mode '{continuity_mode}'.
+```
+
+- **`engine_handle_acquisition_error`**
+```text
+[FATAL] Engine '{engine_id}' failed to acquire a native session handle for logical session '{logical_session_key}'.
+```
+
+- **`engine_auto_model_missing_default_error`**
 ```text
 [FATAL] Engine '{engine_id}' cannot resolve model 'auto' because no default_model is defined.
+```
+
+- **`engine_auto_model_invalid_default_error`**
+```text
+[FATAL] Engine '{engine_id}' cannot use default_model 'auto' with auto_model_behavior '{auto_model_behavior}'.
 ```
 
 ### Exact JSON keys that must not be renamed
@@ -468,17 +800,30 @@ command
 availability_check
 allowed_roles
 continuity_mode
+handle_acquisition_strategy
 default_model
 auto_model_behavior
-invoke
-base_args
+start
+resume
+args
+prompt_style
 prompt_arg
 model_arg
-resume_arg
-session_discovery
+handle_style
+handle_arg
+handle_capture
 strategy
 list_args
-match_field
+event_type
+event_field
+project_scoped
+```
+
+### Exact nullability rule for public example template
+```text
+default_engine may be null in the public example template.
+A null default_engine means the public baseline does not declare a production default engine.
+In that case, the effective engine must be resolved by runtime overlay, then legacy fallback, then built-in code default according to the precedence contract.
 ```
 
 ### Exact role names that must not be renamed
