@@ -53,17 +53,22 @@ mkdir -p "$WORK_DIR/docs/PRDs"
 echo "Test PR" > "$WORK_DIR/docs/PRDs/dummy.md"
 echo "Test PR" > "$WORK_DIR/dummy_pr.md"
 
-OUTPUT=$(python3 scripts/spawn_coder.py --enable-exec-from-workspace --pr-file dummy_pr.md --prd-file docs/PRDs/dummy.md --workdir . --run-dir .)
+probe_isolation_from_main_workspace() {
+    echo "Running probe_isolation_from_main_workspace..."
+    OUTPUT=$(python3 scripts/spawn_coder.py --enable-exec-from-workspace --pr-file dummy_pr.md --prd-file docs/PRDs/dummy.md --workdir . --run-dir .)
 
-if echo "$OUTPUT" | grep -q "I AM CONTAMINATED"; then
-    echo "❌ Probe Failed: Execution context is contaminated by main workspace."
-    exit 1
-fi
+    if echo "$OUTPUT" | grep -q "I AM CONTAMINATED"; then
+        echo "❌ Probe Failed: Execution context is contaminated by main workspace."
+        exit 1
+    fi
 
-if ! echo "$OUTPUT" | grep -q "You are a generic execution agent"; then
-    echo "❌ Probe Failed: Did not read from isolated workspace. Output: $OUTPUT"
-    exit 1
-fi
+    if ! echo "$OUTPUT" | grep -q "You are a generic execution agent"; then
+        echo "❌ Probe Failed: Did not read from isolated workspace. Output: $OUTPUT"
+        exit 1
+    fi
 
-echo "✅ Probe Passed: Execution context cleanly isolated."
+    echo "✅ Probe Passed: Execution context cleanly isolated."
+}
+
+probe_isolation_from_main_workspace
 exit 0
