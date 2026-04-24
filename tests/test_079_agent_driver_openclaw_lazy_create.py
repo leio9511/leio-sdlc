@@ -36,18 +36,23 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
         mock_result_list.stdout = "sdlc-generic-openclaw-gpt\nother-agent\n"
         mock_result_list.returncode = 0
         
+        mock_result_show = MagicMock()
+        mock_result_show.stdout = "Model: gpt\n"
+        mock_result_show.returncode = 0
+        
         mock_result_run = MagicMock()
         mock_result_run.stdout = "output"
         mock_result_run.returncode = 0
         
-        self.mock_run.side_effect = [mock_result_list, mock_result_run]
+        self.mock_run.side_effect = [mock_result_list, mock_result_show, mock_result_run]
         
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
             agent_driver.invoke_agent("test task", session_key="session-123")
         
         calls = self.mock_run.call_args_list
         self.assertEqual(calls[0][0][0], ["mock_openclaw", "agents", "list"])
-        cmd = calls[1][0][0]
+        self.assertEqual(calls[1][0][0], ["mock_openclaw", "agents", "show", "sdlc-generic-openclaw-gpt"])
+        cmd = calls[2][0][0]
         self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
         self.assertTrue(cmd[7].startswith("Read your complete task instructions"))
 

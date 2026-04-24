@@ -119,6 +119,35 @@ def get_openclaw_agent_id(model: str) -> str:
 def openclaw_agent_exists(list_stdout: str, agent_id: str) -> bool:
     return agent_id in {line.strip() for line in (list_stdout or '').splitlines() if line.strip()}
 
+def parse_openclaw_agent_model(agent_show_stdout: str) -> str | None:
+    for raw_line in (agent_show_stdout or '').splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        lowered = line.lower()
+        if lowered.startswith('model:'):
+            return line.split(':', 1)[1].strip() or None
+        if lowered.startswith('model '):
+            return line.split(None, 1)[1].strip() or None
+    return None
+
+def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model: str) -> None:
+    from config import OPENCLAW_MODEL_MISMATCH_ERROR
+
+    show_cmd = [cmd_exec, 'agents', 'show', agent_id]
+    show_res = subprocess.run(show_cmd, capture_output=True, text=True)
+    actual_model = parse_openclaw_agent_model(show_res.stdout)
+    if actual_model and actual_model != requested_model:
+        print(
+            OPENCLAW_MODEL_MISMATCH_ERROR.format(
+                requested_model=requested_model,
+                agent_id=agent_id,
+                actual_model=actual_model,
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
 def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
@@ -187,7 +216,8 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
             
             list_cmd = [cmd_exec, "agents", "list"]
             list_res = subprocess.run(list_cmd, capture_output=True, text=True)
-            if not openclaw_agent_exists(list_res.stdout, agent_id):
+            agent_exists = openclaw_agent_exists(list_res.stdout, agent_id)
+            if not agent_exists:
                 home_dir = os.environ.get("HOME_MOCK") or os.environ.get("HOME", os.path.expanduser("~"))
                 agent_ws = os.path.join(home_dir, ".openclaw", "agents", agent_id, "workspace")
                 os.makedirs(agent_ws, exist_ok=True)
@@ -205,6 +235,8 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
                             shutil.copytree(s, d, dirs_exist_ok=True)
                         else:
                             shutil.copy2(s, d)
+            else:
+                validate_openclaw_agent_model(cmd_exec, agent_id, model)
 
             if actual_id:
                 cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "-m", secure_msg]
