@@ -30,6 +30,13 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
     def tearDown(self):
         patch.stopall()
 
+    def test_model_specific_agent_ids_match_smoke_contract_examples(self):
+        self.assertEqual(agent_driver.get_openclaw_agent_id("gpt"), "sdlc-generic-openclaw-gpt")
+        self.assertEqual(
+            agent_driver.get_openclaw_agent_id("gemini-3.1-pro-preview"),
+            "sdlc-generic-openclaw-gemini-3-1-pro-preview",
+        )
+
     def test_openclaw_agent_id_is_model_aware_for_alias_model(self):
         self.assertEqual(agent_driver.get_openclaw_agent_id("gpt"), "sdlc-generic-openclaw-gpt")
 

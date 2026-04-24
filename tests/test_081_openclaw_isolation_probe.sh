@@ -61,11 +61,16 @@ echo "Test PR" > "$WORK_DIR/docs/PRDs/dummy.md"
 echo "Test PR" > "$WORK_DIR/dummy_pr.md"
 
 probe_isolation_from_main_workspace() {
-    echo "Running probe_isolation_from_main_workspace..."
+    echo "Running probe_isolation_from_main_workspace for $TARGET_AGENT..."
     OUTPUT=$(python3 scripts/spawn_coder.py --enable-exec-from-workspace --pr-file dummy_pr.md --prd-file docs/PRDs/dummy.md --workdir . --run-dir .)
 
     if echo "$OUTPUT" | grep -q "I AM CONTAMINATED"; then
         echo "❌ Probe Failed: Execution context is contaminated by main workspace."
+        exit 1
+    fi
+
+    if ! echo "$OUTPUT" | grep -q "$TARGET_AGENT"; then
+        echo "❌ Probe Failed: Did not route through target agent $TARGET_AGENT. Output: $OUTPUT"
         exit 1
     fi
 
@@ -74,7 +79,7 @@ probe_isolation_from_main_workspace() {
         exit 1
     fi
 
-    echo "✅ Probe Passed: Execution context cleanly isolated."
+    echo "✅ Probe Passed: Execution context cleanly isolated through $TARGET_AGENT."
 }
 
 probe_isolation_from_main_workspace
