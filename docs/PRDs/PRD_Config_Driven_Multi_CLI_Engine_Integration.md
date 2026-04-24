@@ -30,6 +30,18 @@ This PRD therefore defines the final iteration-1 contract:
 
 This is a final execution-grade contract, not a discussion placeholder.
 
+### 1.1 Status Delta Since Original Approval
+Since the original approval of this PRD, the OpenClaw baseline has materially advanced and that changes how this document should be interpreted:
+- execution-role startup context contamination under the OpenClaw path has been remediated through isolated execution routing,
+- explicit model selection under the OpenClaw engine has been implemented and deployed, eliminating the earlier non-determinism where a reused generic agent could silently retain an old model binding,
+- live OpenClaw + GPT validation has already passed at two levels: an Auditor smoke test and a full SDLC smoke test that completed planner / coder / reviewer / merge flow and UAT,
+- therefore Codex is no longer being onboarded onto an unstable or ambiguous OpenClaw substrate. The remaining question is third-engine conformance under an already validated OpenClaw baseline, not first-principles rescue of the engine layer.
+
+### 1.2 Current-Code Reality vs Target-State Contract
+The current codebase has not yet completed the provider-agnostic runtime described by this PRD.
+Today, the production path still primarily relies on environment-driven engine selection and provider-specific branching centered on `LLM_DRIVER`, while the config-driven engine registry remains a partial and transitional substrate.
+Accordingly, this PRD must be read as a target-state execution contract for replacing that current branching model, not as a claim that the present implementation already satisfies every registry, continuity, or Codex-runtime requirement described below.
+
 ## 2. Requirements & User Stories (需求定义)
 1. **Public Core Schema + Public Examples + Local Runtime Overlay**
    - The repo must ship a public schema-bearing template at `config/sdlc_config.json.template`.
@@ -94,6 +106,7 @@ This is a final execution-grade contract, not a discussion placeholder.
      3. legacy environment fallback `SDLC_MODEL`,
      4. engine `default_model`,
      5. built-in constant from `scripts/config.py`.
+   - For OpenClaw specifically, an explicit non-`auto` model request must resolve deterministically at launch time. Reusing a previously created runtime identity that remains bound to a different model without fail-fast detection is forbidden.
 
 9. **Exact `auto` Semantics**
    - `auto` is a semantic request, not a universal literal.
@@ -133,12 +146,18 @@ This is a final execution-grade contract, not a discussion placeholder.
     - This refactor is not allowed to change SDLC control-plane behavior without explicit authorization.
     - Required safety target:
       - existing OpenClaw-driven SDLC flows continue to behave normally,
+      - existing OpenClaw deterministic explicit-model-selection behavior remains preserved,
       - existing Gemini-driven SDLC flows continue to behave normally,
       - Codex is added as a third conformance case under the same engine contract.
 
 16. **Scope Restraint**
     - This PRD modifies only engine selection, config loading, capability validation, handle acquisition, continuity persistence, and CLI rendering contracts.
     - It does not authorize broad orchestrator state-machine redesign, skill-router redesign, or unrelated prompt-contamination remediation.
+
+17. **Post-1181 Baseline Interpretation**
+    - For this PRD's rollout and acceptance, OpenClaw must be treated as an already validated baseline for isolated execution routing and deterministic explicit model selection.
+    - Codex onboarding must be measured against that post-1181 baseline, not against older singleton-agent or best-effort model-binding assumptions.
+    - Codex acceptance therefore requires contract parity in engine selection determinism, model resolution determinism, normalized start / resume behavior, and fail-fast observability.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
 ### 3.1 Architectural Pattern
@@ -264,11 +283,13 @@ This requires isolated project / worktree context so that the set difference is 
 Same-project concurrent fresh Gemini bootstrap is forbidden unless explicitly serialized by a runtime lock or equivalent per-project guard.
 
 ### 3.8 Codex Final Solution
-Codex local validation has already confirmed:
+Codex local validation has already confirmed, outside the current production runtime path, that:
 - `codex exec` starts a session,
 - structured JSON output emits `thread.started.thread_id`,
 - `codex exec resume <thread_id>` continues the same thread,
 - prior context is preserved across turns.
+
+The current codebase does not yet implement this Codex continuity path end-to-end in the production runtime. This PRD authorizes bringing that validated provider capability into the unified engine contract.
 
 Therefore, Codex must use:
 - `continuity_mode = stateful`
@@ -276,9 +297,15 @@ Therefore, Codex must use:
 - first turn: parse `thread_id` from structured output
 - later turns: use `codex exec resume <thread_id>`
 
+Codex is not being introduced here as an ad hoc provider-specific branch. It is being onboarded as the third public conformance fixture under the already-defined multi-engine runtime contract.
+Its acceptance target is therefore stronger than “Codex can be invoked”:
+- Codex must satisfy the same normalized engine-resolution, model-resolution, start / resume, handle-persistence, and fail-fast contracts already proven on the OpenClaw baseline,
+- Codex-specific differences are allowed only in data-plane handle capture and CLI rendering semantics,
+- production-facing enablement must remain conservative until Codex itself passes contract tests, smoke validation, and controlled full-chain validation under the unified runtime.
+
 However, iteration-1 rollout must remain conservative:
 - Codex coder support is part of the architecture contract,
-- but production-facing enablement for coder must remain gated until the Mandatory Baseline Validation Phase has proven that the OpenClaw and Gemini baselines remain stable under the refactor.
+- but production-facing enablement for coder must remain gated until the Mandatory Baseline Validation Phase has proven that the OpenClaw and Gemini baselines remain stable under the refactor, and until Codex has completed its own conformance and controlled live validation.
 
 ### 3.9 OpenClaw Final Solution
 OpenClaw remains the cleanest path:
@@ -286,6 +313,8 @@ OpenClaw remains the cleanest path:
 - `handle_acquisition_strategy = caller_assigned_handle`
 - SDLC sets the session id directly
 - no discovery step is required
+- explicit non-`auto` model requests must land deterministically at launch time rather than inheriting stale provider-side bindings
+- if the resolved OpenClaw runtime identity is incompatible with the requested model, the runtime must fail fast rather than silently continuing under the wrong model
 
 ### 3.10 Role Resolution
 The runtime must resolve the effective engine per role using this exact algorithm:
@@ -356,9 +385,15 @@ Required rollout order:
    - At the end of this phase, the same SDLC workflows must still pass under OpenClaw and Gemini.
 3. **Mandatory Baseline Validation Phase**
    - OpenClaw and Gemini must pass the mandatory regression suites before Codex is accepted as a supported engine under the new architecture.
+   - For current planning purposes, the OpenClaw side of this baseline is interpreted against the post-1181 runtime, which already includes isolated execution routing and deterministic explicit model selection.
+   - Remaining baseline concern is therefore not whether OpenClaw can support the contract in principle, but whether the new generic registry preserves that now-validated behavior.
 4. **Codex Conformance Phase**
    - Add Codex as the third public conformance case under the same contract.
    - Codex onboarding is evidence that the abstraction is generic, not the justification for destabilizing existing engines.
+   - Codex acceptance requires three layers of evidence:
+     1. contract conformance under the normalized registry,
+     2. smoke validation through a real but controlled SDLC role flow,
+     3. at least one controlled full-chain SDLC validation proving planner / coder / reviewer / verifier-or-UAT continuity under the unified runtime.
 5. **Post-Migration Tightening Phase**
    - After the shared architecture is proven stable, remaining provider-specific legacy branches may be removed.
 
@@ -367,7 +402,7 @@ Any implementation plan that skips the mandatory OpenClaw and Gemini regression 
 ### 3.15 Test Architecture and Regression Strategy
 This refactor is large enough that testing must be treated as part of the architecture, not as cleanup work after coding.
 
-The required testing model is three layers:
+The required testing model is four layers:
 
 1. **Contract Tests**
    - Validate the engine registry schema, precedence, role gating, continuity rules, and model-resolution rules without depending on provider name.
@@ -379,7 +414,11 @@ The required testing model is three layers:
      - `codex`
    - These tests prove all three engines satisfy the same normalized contract while still allowing different handle-acquisition strategies.
 
-3. **Pipeline-Preservation E2E**
+3. **Smoke Validation**
+   - Run at least one real but controlled SDLC smoke flow for each required baseline or onboarding target.
+   - For Codex, this must be stronger than command availability and stronger than a pure mock. It must prove that a live role flow can launch, acquire or reuse the correct native handle, and complete under the unified engine contract.
+
+4. **Pipeline-Preservation E2E**
    - Run mocked E2E scenarios to prove SDLC control-plane behavior is preserved after the refactor.
    - The primary regression goal is not provider-specific success, but preservation of orchestrator behavior under the new provider-agnostic engine contract.
 
@@ -413,6 +452,8 @@ This PRD authorizes work in:
 - tests covering engine config parsing, capability gating, handle acquisition, contract conformance, and pipeline-preservation E2E
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
+The following scenarios define the required target-state black-box acceptance criteria for the implementation produced under this PRD. They are not a claim that the current codebase already satisfies every scenario today.
+
 - **Scenario 1: Valid external engine selection renders from config into a normalized runtime behavior**
   - **Given** `config/sdlc_config.json` defines a valid engine entry
   - **When** a compatible SDLC role selects that engine
@@ -470,19 +511,32 @@ This PRD authorizes work in:
   - **When** the selected engine is `gemini` or `codex`
   - **Then** SDLC resolves `auto` to the engine’s `default_model` and passes it via the configured model arg
 
-- **Scenario 10: Native-handle mappings are isolated and cleaned up correctly**
+- **Scenario 10: Explicit OpenClaw model selection remains deterministic after registry migration**
+  - **Given** an OpenClaw-backed role is launched with an explicit non-`auto` `--model` value
+  - **When** the unified engine registry resolves the `openclaw` engine path
+  - **Then** the launched runtime identity must match the requested explicit model or fail before work begins
+  - **And** SDLC must not silently reuse a stale OpenClaw runtime binding for a different model
+
+- **Scenario 11: Native-handle mappings are isolated and cleaned up correctly**
   - **Given** a stateful engine has acquired and persisted a native handle for a logical session
   - **When** the related PR loop is superseded, withdrawn, or fatally torn down
   - **Then** the stale mapping is not reused by future logical sessions
   - **And** another PR / role loop cannot accidentally continue the old provider session
 
-- **Scenario 11: Pipeline-preservation behavior remains stable under multiple engine configs**
+- **Scenario 12: Pipeline-preservation behavior remains stable under multiple engine configs**
   - **Given** the orchestrator green-path and red-path mocked E2E suites exist
   - **When** those suites are run against at least the `openclaw` and `gemini` engine configs, and against `codex` where the role contract permits
   - **Then** SDLC control-plane behavior remains unchanged
   - **And** differences are limited to engine-specific command rendering and native-handle acquisition details
 
-- **Scenario 12: Private engine onboarding remains externalized from tracked public artifacts**
+- **Scenario 13: Codex onboarding requires controlled smoke and full-chain proof, not command availability alone**
+  - **Given** Codex has passed config validation and contract-conformance checks
+  - **When** Codex is evaluated for supported-engine acceptance under this PRD
+  - **Then** it must also pass at least one controlled live smoke flow
+  - **And** it must pass at least one controlled full-chain SDLC validation under the unified runtime
+  - **And** successful `codex --help` or isolated command invocation alone is insufficient for acceptance
+
+- **Scenario 14: Private engine onboarding remains externalized from tracked public artifacts**
   - **Given** a private engine is defined only in local runtime `config/sdlc_config.json`
   - **When** SDLC is launched with that runtime overlay present
   - **Then** the private engine can be resolved and used through the same normalized contract
@@ -492,10 +546,12 @@ This PRD authorizes work in:
 ### Core Quality Risks
 - Reintroducing product-specific hard-coded branching after claiming to be config-driven
 - Allowing a role / continuity mismatch to slip into runtime execution
+- Regressing the now-validated OpenClaw baseline, especially isolated execution routing or deterministic explicit model selection
 - Breaking existing OpenClaw and Gemini behavior while adding the engine registry
 - Breaking coder continuity by treating native-handle acquisition as an afterthought
 - Leaking private engine details into tracked source
 - Making `auto` model resolution inconsistent across roles and engines
+- Accepting Codex onboarding on the basis of command availability or thin smoke alone without proving revision-loop continuity and controlled full-chain stability
 
 ### Required Verification Strategy
 1. **Schema Validation Unit Tests**
@@ -507,6 +563,7 @@ This PRD authorizes work in:
 2. **Engine Resolution Unit Tests**
    - Validate precedence across explicit override, `role_overrides`, `default_engine`, env fallback, and code default
    - Validate that silent fallback is impossible
+   - Validate that explicit OpenClaw non-`auto` model requests cannot silently land on a stale incompatible runtime binding
 
 3. **Configuration Merge Contract Tests**
    - Validate top-level object merge behavior
@@ -520,36 +577,39 @@ This PRD authorizes work in:
    - Validate allowed stateless roles for `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator`
    - Validate illegal combinations between `continuity_mode` and `handle_acquisition_strategy`
 
-4. **Contract-Conformance Unit Tests**
+5. **Contract-Conformance Unit Tests**
    - Run the same normalized contract assertions against the initial engine matrix:
      - `openclaw`
      - `gemini`
      - `codex`
    - Validate that provider-specific details are expressed only through config and adapter strategy, not through control-plane branching
 
-5. **Command Rendering Unit Tests**
+6. **Command Rendering Unit Tests**
    - Validate `builtin_openclaw` rendering
    - Validate `generic_external_cli` rendering for Gemini and Codex using the config contract
    - Validate positional vs flagged prompt handling
    - Validate `--model auto` handling for `omit_flag` and `use_default_model`
+   - Validate explicit-model rendering and fail-fast behavior for the OpenClaw path
 
-6. **Handle Acquisition Tests**
+7. **Handle Acquisition Tests**
    - Mock OpenClaw caller-assigned-handle behavior
    - Mock Codex JSON event output and verify extraction of `thread.started.thread_id`
    - Mock Gemini before / after session listings and verify deterministic set-diff acquisition
    - Verify mapping persistence from `logical_session_key -> native_handle`
    - Verify resumed turns use the stored handle rather than repeating bootstrap
 
-7. **Pipeline-Preservation Mocked E2E**
+8. **Pipeline-Preservation Mocked E2E**
    - Reuse and extend existing orchestrator E2E suites so they can run under multiple engine configs
    - At minimum, preserve green-path, blocked_fatal, and slice-path behavior under the refactored engine architecture
    - Treat OpenClaw and Gemini as mandatory regression baselines before accepting Codex onboarding
+   - Explicitly preserve the now-deployed OpenClaw deterministic model-selection behavior across the migration
 
-8. **Selective Live Validation**
+9. **Selective Live Validation**
    - Perform non-blocking live checks for:
      - OpenClaw engine
      - Gemini engine
      - Codex engine
+   - For Codex acceptance, live validation must include both a controlled smoke path and at least one controlled full-chain validation, not just availability probing
    - Keep live-provider validation out of default blocking CI
 
 ### Quality Goal
@@ -579,8 +639,9 @@ After this change, `leio-sdlc` must behave as a closed-contract, capability-gate
 - **v2.0**: Closed the original open questions around public engine shape, minimal config DSL, continuity semantics, role gating, `auto` model behavior, precedence order, and runtime overlay validation.
 - **v3.0**: Refined the architecture based on direct local validation of Codex and Gemini continuity behavior. The core correction was to separate `continuity_mode` from `handle_acquisition_strategy`.
 - **v4.0**: Re-centered the PRD away from Codex-specific framing and clarified that OpenClaw, Gemini, and Codex are public conformance cases under one provider-agnostic engine contract.
+- **v5.0**: Refreshed the approved PRD after post-approval OpenClaw baseline progress. This update records that isolated OpenClaw execution routing and deterministic explicit model selection are now already validated and deployed, so Codex is framed as third-engine conformance onboarding against the post-1181 baseline rather than onboarding onto an unresolved OpenClaw substrate.
 - **Design pattern correction**: The architecture is explicitly framed as Control Plane / Data Plane Separation + Registry-Driven Strategy + Capability-Based Adapter Contract + Conformance Test Matrix.
-- **Testing correction**: The PRD now requires contract tests, engine conformance matrix tests, and pipeline-preservation E2E so that the existing SDLC control plane can be proven stable before and after the engine refactor.
+- **Testing correction**: The PRD now requires contract tests, engine conformance matrix tests, smoke validation, and pipeline-preservation E2E so that the existing SDLC control plane can be proven stable before and after the engine refactor.
 - **Private-boundary correction**: Public code and public schema must remain provider-agnostic enough that future private engines can be added through runtime-only config overlays.
 
 ---
@@ -600,7 +661,8 @@ Public example engines are examples and regression fixtures, not the architectur
 If onboarding a future private engine still requires adding a provider-specific branch or hard-coded engine id to public code, the architecture defined by this PRD must be considered failed.
 ```
 
-### 7B. Exact public example template (`config/sdlc_config.json.template`)
+### 7B. Exact target public example template to be produced (`config/sdlc_config.json.template`)
+The current repository template does not yet implement this target engine schema. The following content defines the exact target template that the implementation under this PRD must create.
 ```json
 {
   "default_engine": null,
