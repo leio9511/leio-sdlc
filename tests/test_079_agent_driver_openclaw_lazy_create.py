@@ -30,31 +30,28 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
     def tearDown(self):
         patch.stopall()
 
-    def test_openclaw_adapter_resolves_generic_agent(self):
+    def test_openclaw_adapter_resolves_model_specific_agent(self):
         # Setup: agent exists
         mock_result_list = MagicMock()
-        mock_result_list.stdout = "sdlc-generic-openclaw\nother-agent\n"
+        mock_result_list.stdout = "sdlc-generic-openclaw-gpt\nother-agent\n"
         mock_result_list.returncode = 0
         
         mock_result_run = MagicMock()
         mock_result_run.stdout = "output"
         mock_result_run.returncode = 0
         
-        # In openclaw and not actual_id, we will do a second run for list-sessions... wait, the original logic had `list-sessions` for gemini
         self.mock_run.side_effect = [mock_result_list, mock_result_run]
         
-        agent_driver.invoke_agent("test task", session_key="session-123")
+        with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
+            agent_driver.invoke_agent("test task", session_key="session-123")
         
-        # Check command executed
         calls = self.mock_run.call_args_list
-        # First call is list agents
         self.assertEqual(calls[0][0][0], ["mock_openclaw", "agents", "list"])
-        # Second call is the actual agent run
         cmd = calls[1][0][0]
-        self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw", "--session-id", "session-123", "-m"])
+        self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
         self.assertTrue(cmd[7].startswith("Read your complete task instructions"))
 
-    def test_lazy_creation_logic_invoked(self):
+    def test_lazy_creation_logic_invoked_with_model_specific_agent(self):
         # Setup: agent missing
         mock_result_list = MagicMock()
         mock_result_list.stdout = "other-agent\n"
@@ -70,17 +67,18 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
         self.mock_run.side_effect = [mock_result_list, mock_result_create, mock_result_run]
         
         # Mock os.listdir to trigger file copy
-        with patch('os.listdir', return_value=['AGENTS.md']):
-            with patch('os.path.exists', return_value=True):
-                with patch('os.path.isdir', return_value=False):
-                    with patch('os.makedirs'):
-                        agent_driver.invoke_agent("test task", session_key="session-123")
+        with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
+            with patch('os.listdir', return_value=['AGENTS.md']):
+                with patch('os.path.exists', return_value=True):
+                    with patch('os.path.isdir', return_value=False):
+                        with patch('os.makedirs'):
+                            agent_driver.invoke_agent("test task", session_key="session-123")
         
         calls = self.mock_run.call_args_list
         
         # Check create command
         create_cmd = calls[1][0][0]
-        self.assertEqual(create_cmd[:5], ["mock_openclaw", "agents", "add", "sdlc-generic-openclaw", "--non-interactive"])
+        self.assertEqual(create_cmd[:5], ["mock_openclaw", "agents", "add", "sdlc-generic-openclaw-gpt", "--non-interactive"])
         self.assertIn("--model", create_cmd)
         
         # Check copy was called

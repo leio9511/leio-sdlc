@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+TARGET_MODEL="${SDLC_MODEL:-gpt}"
+TARGET_AGENT="sdlc-generic-openclaw-${TARGET_MODEL//[^a-zA-Z0-9]/-}"
+TARGET_AGENT="$(echo "$TARGET_AGENT" | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g; s/-$//')"
+export TARGET_MODEL
+export TARGET_AGENT
+
 echo "================================================="
 echo "Testing: OpenClaw Isolation Probe"
 echo "================================================="
@@ -31,8 +37,8 @@ elif [ "$1" == "agents" ] && [ "$2" == "add" ]; then
     echo "Created agent"
     exit 0
 elif [ "$1" == "agent" ]; then
-    if [ -f "$HOME_MOCK/.openclaw/agents/sdlc-generic-openclaw/workspace/SOUL.md" ]; then
-        cat "$HOME_MOCK/.openclaw/agents/sdlc-generic-openclaw/workspace/SOUL.md"
+    if [ -f "$HOME_MOCK/.openclaw/agents/$TARGET_AGENT/workspace/SOUL.md" ]; then
+        cat "$HOME_MOCK/.openclaw/agents/$TARGET_AGENT/workspace/SOUL.md"
     else
         echo "MISSING_SOUL"
     fi
@@ -46,6 +52,7 @@ chmod +x mock_bin/openclaw
 export PATH="$WORK_DIR/mock_bin:$PATH"
 
 export LLM_DRIVER="openclaw"
+export SDLC_MODEL="$TARGET_MODEL"
 export SDLC_TEST_MODE="false"
 unset SDLC_MOCK_LLM_RESPONSE
 

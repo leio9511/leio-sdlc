@@ -7,6 +7,7 @@ import sys
 import uuid
 import shutil
 import logging
+import re
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,16 @@ def resolve_cmd(cmd_name):
         
     return cmd_name
 
+def normalize_openclaw_model_suffix(model: str) -> str:
+    normalized = re.sub(r'[^a-z0-9]+', '-', (model or '').strip().lower()).strip('-')
+    return normalized or "unknown"
+
+def get_openclaw_agent_id(model: str) -> str:
+    return f"sdlc-generic-openclaw-{normalize_openclaw_model_suffix(model)}"
+
+def openclaw_agent_exists(list_stdout: str, agent_id: str) -> bool:
+    return agent_id in {line.strip() for line in (list_stdout or '').splitlines() if line.strip()}
+
 def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
@@ -172,11 +183,11 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
             from config import DEFAULT_GEMINI_MODEL
             model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL") or DEFAULT_GEMINI_MODEL
             cmd_exec = resolve_cmd("openclaw")
-            agent_id = "sdlc-generic-openclaw"
+            agent_id = get_openclaw_agent_id(model)
             
             list_cmd = [cmd_exec, "agents", "list"]
             list_res = subprocess.run(list_cmd, capture_output=True, text=True)
-            if agent_id not in list_res.stdout:
+            if not openclaw_agent_exists(list_res.stdout, agent_id):
                 home_dir = os.environ.get("HOME_MOCK") or os.environ.get("HOME", os.path.expanduser("~"))
                 agent_ws = os.path.join(home_dir, ".openclaw", "agents", agent_id, "workspace")
                 os.makedirs(agent_ws, exist_ok=True)
