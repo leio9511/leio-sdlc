@@ -24,7 +24,11 @@ def format_notification(event_type: str, context: dict) -> str:
     if event_type == "sdlc_handshake":
         return f"🤝 [SDLC Engine] Initial Handshake successful. Channel linked."
     elif event_type == "auditor_start":
-        return f"🚀 [Auditor] Starting PRD audit for: {prd_file}"
+        cmd = context.get('command')
+        if cmd:
+            return f"🚀 [Auditor] Starting PRD audit for: {prd_file}\n💻 Command: `{cmd}`"
+        else:
+            return f"🚀 [Auditor] Starting PRD audit for: {prd_file}"
     elif event_type == "slicing_start":
         return f"🔪 [Planner] Slicing PRD into Micro-PRs..."
     elif event_type == "slicing_end":

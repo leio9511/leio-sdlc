@@ -9,9 +9,22 @@ def test_format_sdlc_handshake():
     res = format_notification("sdlc_handshake", {})
     assert res == "🤝 [SDLC Engine] Initial Handshake successful. Channel linked."
 
-def test_format_auditor_start():
+def test_auditor_start_with_command():
+    res = format_notification("auditor_start", {
+        "prd_file": "PRD_081_test.md",
+        "command": "python3 spawn_auditor.py PRD_081_test.md"
+    })
+    expected = "🚀 [Auditor] Starting PRD audit for: PRD_081_test.md\n💻 Command: `python3 spawn_auditor.py PRD_081_test.md`"
+    assert res == expected
+
+def test_auditor_start_without_command():
+    # Absent
     res = format_notification("auditor_start", {"prd_file": "PRD_081_test.md"})
     assert res == "🚀 [Auditor] Starting PRD audit for: PRD_081_test.md"
+    
+    # Empty
+    res_empty = format_notification("auditor_start", {"prd_file": "PRD_081_test.md", "command": ""})
+    assert res_empty == "🚀 [Auditor] Starting PRD audit for: PRD_081_test.md"
 
 def test_format_slicing_start():
     res = format_notification("slicing_start", {"prd_id": "PRD_081_test.md"})
