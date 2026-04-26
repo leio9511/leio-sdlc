@@ -4,6 +4,7 @@ import os
 import json
 import sys
 from agent_driver import invoke_agent, build_prompt
+from planner_envelope import build_planner_envelope, render_planner_prompt, save_debug_artifacts
 import config
 import subprocess
 import uuid
@@ -163,14 +164,18 @@ TEMPLATE:
 Start now. DO NOT ASK FOR PERMISSION. DO NOT OUTPUT CONVERSATIONAL TEXT ASKING TO BEGIN. GENERATE THE PR CONTRACTS IMMEDIATELY IN THIS TURN USING THE TOOL."""
 
     else:
-        task_string = build_prompt("planner",
+        template_path = os.path.join(SDLC_ROOT, "TEMPLATES", "PR_Contract.md.template")
+        envelope = build_planner_envelope(
             workdir=workdir,
-            playbook_content=playbook_content,
-            prd_content=prd_content,
-            contract_script=contract_script,
             out_dir=args.out_dir,
-            template_content=template_content
+            prd_path=os.path.abspath(args.prd_file),
+            playbook_path=playbook_path,
+            template_path=template_path,
+            mode="standard"
         )
+        task_string = render_planner_prompt(envelope)
+        scaffold_cmd = f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"
+        save_debug_artifacts(args.out_dir, envelope, task_string, scaffold_cmd)
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
 
