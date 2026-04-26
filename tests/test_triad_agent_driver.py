@@ -114,7 +114,7 @@ class TestAgentDriverTriad(unittest.TestCase):
             
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for planner")
         args, kwargs = mock_invoke_agent.call_args
-        self.assertIn("mock_prd_content_for_planner", args[0])
+        self.assertIn(prd_file, args[0])
         self.assertEqual(kwargs.get("role"), "planner")
         self.assertTrue(kwargs.get("session_key", "").startswith("subtask-"))
         mock_setup_key.assert_called()
