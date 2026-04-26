@@ -585,6 +585,47 @@ def main():
     job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
     run_dir = job_dir
 
+    def ensure_run_anchors():
+        # Record baseline commit BEFORE Planner execution to survive slicing crashes
+        os.makedirs(job_dir, exist_ok=True)
+        baseline_file = os.path.join(job_dir, "baseline_commit.txt")
+        baseline_hash = None
+        if not os.path.exists(baseline_file):
+            try:
+                head_res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True)
+                baseline_hash = head_res.stdout.strip()
+                with open(baseline_file, "w") as f:
+                    f.write(baseline_hash)
+                logger.info(f"Recorded baseline commit: {baseline_hash}")
+            except Exception as e:
+                logger.warning(f"Failed to record baseline commit: {e}")
+        else:
+            try:
+                with open(baseline_file, "r") as f:
+                    baseline_hash = f.read().strip()
+            except Exception as e:
+                logger.warning(f"Failed to read baseline commit: {e}")
+
+        # Co-create run_manifest.json for run traceability
+        manifest_path = os.path.join(run_dir, "run_manifest.json")
+        if not os.path.exists(manifest_path):
+            try:
+                from datetime import datetime, timezone
+                manifest = {
+                    "baseline_commit": baseline_hash,
+                    "prd_path": os.path.abspath(args.prd_file),
+                    "job_dir": job_dir,
+                    "run_dir": run_dir,
+                    "started_at": datetime.now(timezone.utc).isoformat()
+                }
+                with open(manifest_path, "w") as f:
+                    json.dump(manifest, f, indent=4)
+                logger.info(f"Created run manifest: {manifest_path}")
+            except Exception as e:
+                logger.warning(f"Failed to create run manifest: {e}")
+
+    ensure_run_anchors()
+
     sanity = SanityContext(workdir, job_dir, base_name, getattr(args, "force_replan", "false"))
     sanity.perform_healthy_check()
 
@@ -602,6 +643,7 @@ def main():
             if args.force_replan == "true" and os.path.exists(job_dir):
                 import shutil
                 shutil.rmtree(job_dir)
+                ensure_run_anchors()
             import shlex
             full_cmd = shlex.join([sys.executable] + sys.argv)
             logger.info("State 0: Auto-slicing PRD...")
@@ -627,6 +669,7 @@ def main():
         if args.force_replan == "true" and os.path.exists(job_dir):
             import shutil
             shutil.rmtree(job_dir)
+            ensure_run_anchors()
         import shlex
         full_cmd = shlex.join([sys.executable] + sys.argv)
         logger.info("State 0: Auto-slicing PRD...")
@@ -649,19 +692,6 @@ def main():
             sys.exit(1)
         notify_channel(effective_channel, "Slicing end.", "slicing_end", {"prd_id": prd_filename, "count": len(md_files)})
 
-
-    # Record baseline commit before starting the main loop
-    os.makedirs(job_dir, exist_ok=True)
-    baseline_file = os.path.join(job_dir, "baseline_commit.txt")
-    if not os.path.exists(baseline_file):
-        try:
-            head_res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True)
-            baseline_hash = head_res.stdout.strip()
-            with open(baseline_file, "w") as f:
-                f.write(baseline_hash)
-            logger.info(f"Recorded baseline commit: {baseline_hash}")
-        except Exception as e:
-            logger.warning(f"Failed to record baseline commit: {e}")
 
     proc = None
 
