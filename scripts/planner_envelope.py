@@ -12,10 +12,10 @@ def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_p
         "Before producing any artifact, you MUST use the read tool to read every reference in the REFERENCE INDEX where required=true and priority=1."
     ]
 
-    if mode == "uat_replan":
+    if mode == "uat":
         execution_contract_lines.insert(0, "Read the required references, then generate focused Micro-PR contracts only for requirements marked missing or partial in the UAT report, without replanning already-satisfied functionality.")
     
-    if mode == "slice_failed_pr" and failed_pr_id:
+    if mode == "slice" and failed_pr_id:
         execution_contract_lines.append(f"You MUST use the exact same `--insert-after {failed_pr_id}` value for every sliced PR generated in this run.")
 
     reference_index = [
@@ -45,7 +45,7 @@ def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_p
         }
     ]
 
-    if mode == "uat_replan" and uat_report_path:
+    if mode == "uat" and uat_report_path:
         reference_index.append({
             "id": "uat_report",
             "kind": "uat_report",

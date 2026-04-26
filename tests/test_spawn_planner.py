@@ -50,6 +50,47 @@ def test_spawn_planner_uses_envelope():
         assert "# EXECUTION CONTRACT" in content
         assert "Massive PRD content" not in content
 
+def test_spawn_planner_slice_uses_envelope():
+    # Expected: Slice mode generates the envelope-based prompt, includes the `insert-after` clause, and creates debug artifacts.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        prd_file = os.path.join(tmpdir, "PRD_Test3.md")
+        with open(prd_file, "w") as f:
+            f.write("# Mock PRD\n")
+            
+        failed_pr_file = os.path.join(tmpdir, "PR_002_failed.md")
+        with open(failed_pr_file, "w") as f:
+            f.write("# Failed PR content\n")
+            
+        run_dir = os.path.join(tmpdir, ".sdlc_runs", "test_proj", "PRD_Test3")
+        os.makedirs(run_dir, exist_ok=True)
+        
+        script_source = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts", "spawn_planner.py"))
+        
+        env = os.environ.copy()
+        env["SDLC_TEST_MODE"] = "true"
+        
+        subprocess.run([
+            "python3", script_source,
+            "--prd-file", prd_file,
+            "--workdir", tmpdir,
+            "--run-dir", run_dir,
+            "--slice-failed-pr", failed_pr_file,
+            "--enable-exec-from-workspace"
+        ], env=env, check=True)
+        
+        task_string_file = os.path.join(run_dir, "tests", "task_string.log")
+        assert os.path.exists(task_string_file)
+        
+        with open(task_string_file, "r") as f:
+            content = f.read()
+            
+        assert "# EXECUTION CONTRACT" in content
+        assert "You MUST use the exact same `--insert-after 002` value" in content
+        
+        debug_dir = os.path.join(run_dir, "planner_debug")
+        assert os.path.exists(debug_dir)
+        assert os.path.exists(os.path.join(debug_dir, "startup_packet.json"))
+
 def test_spawn_planner_saves_artifacts():
     # Expected: The planner_debug artifacts are correctly persisted in the out_dir during a standard spawn_planner.py run.
     with tempfile.TemporaryDirectory() as tmpdir:

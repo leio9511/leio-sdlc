@@ -117,54 +117,40 @@ def main():
         with open(playbook_path, "r") as f:
             playbook_content = f.read()
 
+    template_path = os.path.join(SDLC_ROOT, "TEMPLATES", "PR_Contract.md.template")
+
     if args.slice_failed_pr is not None:
-        insert_after_flag = f" --insert-after {failed_pr_id}" if failed_pr_id else ""
-        task_string = build_prompt("planner_slice",
+        envelope = build_planner_envelope(
             workdir=workdir,
-            playbook_content=playbook_content,
-            failed_pr_content=failed_pr_content,
-            prd_content=prd_content,
-            contract_script=contract_script,
             out_dir=args.out_dir,
-            insert_after_flag=insert_after_flag,
-            template_content=template_content
+            prd_path=os.path.abspath(args.prd_file),
+            playbook_path=playbook_path,
+            template_path=template_path,
+            mode="slice",
+            failed_pr_id=failed_pr_id
         )
+        task_string = render_planner_prompt(envelope)
+        scaffold_cmd = f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"
+        save_debug_artifacts(args.out_dir, envelope, task_string, scaffold_cmd)
     elif getattr(args, "replan_uat_failures", None) is not None:
-        try:
-            with open(args.replan_uat_failures, "r") as f:
-                uat_report_content = f.read()
-        except Exception as e:
-            print(f"[Pre-flight Failed] Planner cannot start. Failed to read UAT report: {e}")
+        if not os.path.isfile(args.replan_uat_failures):
+            print(f"[Pre-flight Failed] Planner cannot start. UAT report not found: {args.replan_uat_failures}")
             sys.exit(1)
         
-        planner_recovery_prompt = "作为一个架构师，不要重新规划已有的功能。请仔细阅读 UAT 报告中标记为 MISSING 的需求，生成专门针对这些遗漏点的新 Micro-PRs（例如 PR_UAT_Fix_1.md），确保不破坏现有代码。"
-        
-        # We need to construct a task string that has the strict context but uses this recovery prompt instead of the standard planning one.
-        # "exactly like standard PRD planning, but strictly using the UAT failure prompt context."
-        # We'll use the base planner playbook context but replace the main instruction.
-        task_string = f"""ATTENTION: Your root workspace is rigidly locked to {workdir}. You are strictly forbidden from reading, writing, or modifying files outside this absolute path. Use explicit 'git add <file>' to stage changes safely within your directory.
-
-You are explicitly forbidden from manually editing the markdown file's status field.
-
---- PLANNER PLAYBOOK ---
-{playbook_content}
-------------------------
-
-{planner_recovery_prompt}
-
---- UAT REPORT ---
-{uat_report_content}
-
---- ORIGINAL PRD ---
-{prd_content}
-
-CORE INSTRUCTION: You MUST FIRST use `python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>` to instantiate the physical files with the strict header. THEN, use the `write` or `edit` tool to fill in the contract content. For EVERY Micro-PR you generate, you MUST strictly use the format defined in the template below. Do NOT alter the `status: open` YAML frontmatter.
-TEMPLATE:
-{template_content}
-Start now. DO NOT ASK FOR PERMISSION. DO NOT OUTPUT CONVERSATIONAL TEXT ASKING TO BEGIN. GENERATE THE PR CONTRACTS IMMEDIATELY IN THIS TURN USING THE TOOL."""
+        envelope = build_planner_envelope(
+            workdir=workdir,
+            out_dir=args.out_dir,
+            prd_path=os.path.abspath(args.prd_file),
+            playbook_path=playbook_path,
+            template_path=template_path,
+            mode="uat",
+            uat_report_path=os.path.abspath(args.replan_uat_failures)
+        )
+        task_string = render_planner_prompt(envelope)
+        scaffold_cmd = f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"
+        save_debug_artifacts(args.out_dir, envelope, task_string, scaffold_cmd)
 
     else:
-        template_path = os.path.join(SDLC_ROOT, "TEMPLATES", "PR_Contract.md.template")
         envelope = build_planner_envelope(
             workdir=workdir,
             out_dir=args.out_dir,
