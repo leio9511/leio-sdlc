@@ -3,7 +3,6 @@ import tempfile
 import os
 import sys
 from agent_driver import invoke_agent, build_prompt, resolve_cmd
-from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
 import config
 import subprocess
 import uuid
@@ -170,36 +169,16 @@ def main():
         with open(playbook_path, "r") as f:
             playbook_content = f.read()
 
-    envelope = build_startup_envelope(
-        role="reviewer",
+    task_string = build_prompt("reviewer",
         workdir=workdir,
-        out_dir=args.run_dir,
-        references={
-            "prd_file": os.path.abspath(args.prd_file) if args.prd_file else "",
-            "pr_contract_file": os.path.abspath(args.pr_file) if args.pr_file else "",
-            "diff_file": diff_file,
-            "playbook_path": playbook_path
-        },
-        contract_params={
-            "output_file": os.path.abspath(os.path.join(args.run_dir, args.out_file)),
-            "output_schema": {
-                "overall_assessment": "(EXCELLENT|GOOD_WITH_MINOR_SUGGESTIONS|NEEDS_ATTENTION|NEEDS_IMMEDIATE_REWORK)",
-                "executive_summary": "string",
-                "findings": [
-                    {
-                        "file_path": "string",
-                        "line_number": "integer",
-                        "category": "(Correctness|PlanAlignmentViolation|ArchAlignmentViolation|Efficiency|Readability|Maintainability|DesignPattern|Security|Standard|PotentialBug|Documentation)",
-                        "severity": "(CRITICAL|MAJOR|MINOR|SUGGESTION|INFO)",
-                        "description": "string",
-                        "recommendation": "string"
-                    }
-                ]
-            }
-        }
+        playbook_content=playbook_content,
+        pr_content=pr_content,
+        pr_file=os.path.abspath(args.pr_file) if args.pr_file else "",
+        prd_file=os.path.abspath(args.prd_file) if args.prd_file else "",
+        diff_file=diff_file,
+        out_file=os.path.abspath(os.path.join(args.run_dir, args.out_file)), run_dir=args.run_dir,
+        template_content=template_content
     )
-    task_string = render_envelope_to_prompt(envelope)
-    save_envelope_artifacts("reviewer", args.run_dir, envelope, task_string)
     
 
     import time

@@ -40,13 +40,11 @@ class TestReviewerContextIsolation(unittest.TestCase):
         with open(log_path, "r") as f:
             prompt_content = f.read()
             
-        # Verify the envelope structure exists
-        self.assertIn("# EXECUTION CONTRACT", prompt_content)
-        self.assertIn("# REFERENCE INDEX", prompt_content)
-        self.assertIn("# FINAL CHECKLIST", prompt_content)
-        self.assertIn('"id": "prd"', prompt_content)
-        self.assertIn('"id": "pr_contract"', prompt_content)
-        self.assertIn('"id": "diff"', prompt_content)
+        # Verify the headers exist and are separated
+        self.assertIn("@PRD_PATH:", prompt_content)
+        self.assertIn("@CONTRACT_PATH:", prompt_content)
+        self.assertIn("@DIFF_PATH:", prompt_content)
+        self.assertIn("@OUT_FILE_PATH:", prompt_content)
 
 if __name__ == '__main__':
     unittest.main()
