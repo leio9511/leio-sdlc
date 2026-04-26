@@ -4,7 +4,7 @@ import os
 import json
 import sys
 from agent_driver import invoke_agent, build_prompt
-from planner_envelope import build_planner_envelope, render_planner_prompt, save_debug_artifacts
+from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
 import config
 import subprocess
 import uuid
@@ -120,51 +120,46 @@ def main():
     template_path = os.path.join(SDLC_ROOT, "TEMPLATES", "PR_Contract.md.template")
 
     if args.slice_failed_pr is not None:
-        envelope = build_planner_envelope(
+        envelope = build_startup_envelope(
+            role="planner",
             workdir=workdir,
             out_dir=args.out_dir,
-            prd_path=os.path.abspath(args.prd_file),
-            playbook_path=playbook_path,
-            template_path=template_path,
-            contract_script=contract_script,
-            mode="slice",
-            failed_pr_id=failed_pr_id
+            references={"prd_file": os.path.abspath(args.prd_file), "playbook_path": playbook_path, "template_path": template_path},
+            contract_params={"scaffold_command": f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>", "failed_pr_id": failed_pr_id},
+            mode="slice"
         )
-        task_string = render_planner_prompt(envelope)
+        task_string = render_envelope_to_prompt(envelope)
         scaffold_cmd = f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"
-        save_debug_artifacts(args.out_dir, envelope, task_string, scaffold_cmd)
+        save_envelope_artifacts("planner", args.out_dir, envelope, task_string, {"startup_prompt.txt": task_string, "scaffold_contract.txt": scaffold_cmd})
     elif getattr(args, "replan_uat_failures", None) is not None:
         if not os.path.isfile(args.replan_uat_failures):
             print(f"[Pre-flight Failed] Planner cannot start. UAT report not found: {args.replan_uat_failures}")
             sys.exit(1)
         
-        envelope = build_planner_envelope(
+        envelope = build_startup_envelope(
+            role="planner",
             workdir=workdir,
             out_dir=args.out_dir,
-            prd_path=os.path.abspath(args.prd_file),
-            playbook_path=playbook_path,
-            template_path=template_path,
-            contract_script=contract_script,
-            mode="uat",
-            uat_report_path=os.path.abspath(args.replan_uat_failures)
+            references={"prd_file": os.path.abspath(args.prd_file), "playbook_path": playbook_path, "template_path": template_path, "uat_report_path": os.path.abspath(args.replan_uat_failures)},
+            contract_params={"scaffold_command": f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"},
+            mode="uat"
         )
-        task_string = render_planner_prompt(envelope)
+        task_string = render_envelope_to_prompt(envelope)
         scaffold_cmd = f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"
-        save_debug_artifacts(args.out_dir, envelope, task_string, scaffold_cmd)
+        save_envelope_artifacts("planner", args.out_dir, envelope, task_string, {"startup_prompt.txt": task_string, "scaffold_contract.txt": scaffold_cmd})
 
     else:
-        envelope = build_planner_envelope(
+        envelope = build_startup_envelope(
+            role="planner",
             workdir=workdir,
             out_dir=args.out_dir,
-            prd_path=os.path.abspath(args.prd_file),
-            playbook_path=playbook_path,
-            template_path=template_path,
-            contract_script=contract_script,
+            references={"prd_file": os.path.abspath(args.prd_file), "playbook_path": playbook_path, "template_path": template_path},
+            contract_params={"scaffold_command": f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"},
             mode="standard"
         )
-        task_string = render_planner_prompt(envelope)
+        task_string = render_envelope_to_prompt(envelope)
         scaffold_cmd = f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>"
-        save_debug_artifacts(args.out_dir, envelope, task_string, scaffold_cmd)
+        save_envelope_artifacts("planner", args.out_dir, envelope, task_string, {"startup_prompt.txt": task_string, "scaffold_contract.txt": scaffold_cmd})
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
 

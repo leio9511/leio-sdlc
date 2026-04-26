@@ -11,7 +11,7 @@ def test_envelope_top_level_keys():
         contract_script="/mock/contract_script.py"
     )
     keys = set(envelope.keys())
-    assert keys == {"execution_contract", "reference_index", "final_checklist"}
+    assert keys == {"execution_contract", "reference_index", "final_checklist", "role"}
     assert "task_brief" not in keys
 
 def test_envelope_reference_index_contents():

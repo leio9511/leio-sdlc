@@ -12,6 +12,7 @@ sys.path.insert(0, current_dir)
 import agent_driver
 import config
 from agent_driver import invoke_agent, build_prompt
+from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn an Auditor agent.")
@@ -85,11 +86,26 @@ def main():
         sys.exit(0)
 
     SDLC_ROOT = os.path.dirname(current_dir)
-    task_string = build_prompt("auditor",
+    playbook_path = os.path.join(SDLC_ROOT, "playbooks", "auditor_playbook.md")
+    run_dir = os.environ.get("SDLC_RUN_DIR", os.path.dirname(prd_file_abs) if prd_file_abs else ".")
+    out_dir = os.environ.get("SDLC_RUN_DIR", ".")
+    
+    envelope = build_startup_envelope(
+        role="auditor",
         workdir=workdir,
-        prd_file=prd_file_abs,
-        base_dir=SDLC_ROOT
+        out_dir=out_dir,
+        references={"prd_file": prd_file_abs, "playbook_path": playbook_path},
+        contract_params={
+            "output_file": os.path.join(run_dir, "auditor_verdict.json"),
+            "output_schema": {
+                "reasoning": "string",
+                "status": "APPROVED|REJECTED",
+                "comments": "string"
+            }
+        }
     )
+    task_string = render_envelope_to_prompt(envelope)
+    save_envelope_artifacts("auditor", run_dir, envelope, task_string)
     
 
 

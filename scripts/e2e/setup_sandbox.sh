@@ -42,6 +42,7 @@ init_hermetic_sandbox() {
     cp "$PROJECT_ROOT/scripts/utils_api_key.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/lock_utils.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/planner_envelope.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/envelope_assembler.py" "$target_dir/" 2>/dev/null || true
 
     local parent_dir="$(dirname "$target_dir")"
     mkdir -p "$parent_dir/config"
