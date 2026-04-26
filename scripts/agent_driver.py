@@ -117,9 +117,10 @@ def get_openclaw_agent_id(model: str) -> str:
     return f"sdlc-generic-openclaw-{normalize_openclaw_model_suffix(model)}"
 
 def openclaw_agent_exists(list_stdout: str, agent_id: str) -> bool:
-    target = f"- {agent_id}"
+    prefix = f"- {agent_id}"
     for line in (list_stdout or '').splitlines():
-        if line.strip() == target:
+        stripped = line.strip()
+        if stripped == prefix or stripped.startswith(f"{prefix} "):
             return True
     return False
 
@@ -144,8 +145,10 @@ def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model:
     lines = list_res.stdout.splitlines()
     agent_block = []
     found = False
+    prefix = f"- {agent_id}"
     for line in lines:
-        if line.strip() == f"- {agent_id}":
+        stripped = line.strip()
+        if not found and (stripped == prefix or stripped.startswith(f"{prefix} ")):
             found = True
             agent_block.append(line)
             continue
@@ -153,7 +156,7 @@ def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model:
             # If we hit another agent block (starts with "- ") or any other 
             # non-indented line that isn't empty, we stop.
             # In practice, agents list output is indented after the "- id" line.
-            if line.strip().startswith("- "):
+            if stripped.startswith("- "):
                 break
             agent_block.append(line)
     

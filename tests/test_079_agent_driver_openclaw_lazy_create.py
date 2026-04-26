@@ -133,5 +133,27 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
             self.assertNotIn("--agent", cmd)
             self.assertNotIn("sdlc-generic-openclaw", cmd)
 
+    def test_openclaw_agent_exists_with_annotations_integration(self):
+        # Setup: agent exists with annotation
+        mock_result_list = MagicMock()
+        mock_result_list.stdout = "- sdlc-generic-openclaw-gpt (default)\n  Model: gpt\n"
+        mock_result_list.returncode = 0
+        
+        mock_result_run = MagicMock()
+        mock_result_run.stdout = "output"
+        mock_result_run.returncode = 0
+        
+        # We call agents list twice: once in openclaw_agent_exists, once in validate_openclaw_agent_model
+        self.mock_run.side_effect = [mock_result_list, mock_result_list, mock_result_run]
+        
+        with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
+            agent_driver.invoke_agent("test task", session_key="session-123")
+        
+        # If it didn't crash and called the agent, it means it correctly detected it.
+        calls = self.mock_run.call_args_list
+        self.assertEqual(calls[0][0][0], ["mock_openclaw", "agents", "list"])
+        cmd = calls[2][0][0]
+        self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
+
 if __name__ == '__main__':
     unittest.main()

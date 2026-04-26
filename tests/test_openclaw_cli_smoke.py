@@ -3,6 +3,11 @@ import subprocess
 import shutil
 import unittest
 import pytest
+import sys
+
+# Add scripts directory to path to import agent_driver
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+import agent_driver
 
 class TestOpenClawCLISmoke(unittest.TestCase):
     @classmethod
@@ -92,6 +97,37 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         self.assertIn("--agent", result.stdout)
         self.assertIn("--message", result.stdout)
         self.assertIn("--session-id", result.stdout)
+
+    def test_agent_driver_compatibility_unit(self):
+        """Test Case 6: Verify agent_driver can parse real CLI output"""
+        if not self.openclaw_path:
+            pytest.skip("openclaw binary not found in PATH")
+
+        result = subprocess.run([self.openclaw_path, "agents", "list"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        
+        # We know 'main' usually exists in this environment
+        if "- main" in result.stdout:
+            self.assertTrue(agent_driver.openclaw_agent_exists(result.stdout, "main"), "Failed to detect 'main' agent in real output")
+            
+            # Find the block for 'main' to test model parsing
+            lines = result.stdout.splitlines()
+            agent_block = []
+            found = False
+            for line in lines:
+                stripped = line.strip()
+                if not found and stripped.startswith("- main"):
+                    found = True
+                    agent_block.append(line)
+                    continue
+                if found:
+                    if stripped.startswith("- "):
+                        break
+                    agent_block.append(line)
+            
+            block_str = "\n".join(agent_block)
+            model = agent_driver.parse_openclaw_agent_model(block_str)
+            self.assertIsNotNone(model, "Failed to parse model from real 'main' agent block")
 
 if __name__ == "__main__":
     unittest.main()
