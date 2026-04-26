@@ -68,6 +68,19 @@ def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_p
         "final_checklist": final_checklist_lines
     }
 
+def save_debug_artifacts(out_dir, envelope_dict, rendered_prompt, scaffold_command):
+    debug_dir = os.path.join(out_dir, "planner_debug")
+    os.makedirs(debug_dir, exist_ok=True)
+    
+    with open(os.path.join(debug_dir, "startup_packet.json"), "w") as f:
+        json.dump(envelope_dict, f, indent=2)
+        
+    with open(os.path.join(debug_dir, "startup_prompt.txt"), "w") as f:
+        f.write(rendered_prompt)
+        
+    with open(os.path.join(debug_dir, "scaffold_contract.txt"), "w") as f:
+        f.write(scaffold_command)
+
 def render_planner_prompt(envelope: dict) -> str:
     prompt_lines = []
     
