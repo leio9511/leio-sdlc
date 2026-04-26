@@ -23,8 +23,8 @@ if [ -z "$LATEST_BACKUP" ]; then
 fi
 
 # Orchestrator standard guardrails: Prevent rollback during active SDLC sessions
-if [ -f "$PROD_DIR/.sdlc_repo.lock" ] || [ -f "$PROD_DIR/.coder_session" ]; then
-    echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock or .coder_session found)."
+if [ -f "$PROD_DIR/.sdlc_repo.lock" ] || [ -f "$PROD_DIR/.coder_session" ] || [ -f "$PROD_DIR/.sdlc_lock_manifest.json" ]; then
+    echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock, .coder_session, or .sdlc_lock_manifest.json found)."
     exit 1
 fi
 

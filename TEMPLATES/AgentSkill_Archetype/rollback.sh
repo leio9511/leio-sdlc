@@ -30,6 +30,12 @@ perform_hard_copy_rollback() {
 
     echo "📦 Found latest backup: $LATEST_BACKUP"
 
+    # Orchestrator standard guardrails: Prevent rollback during active SDLC sessions
+    if [ -f "$PROD_DIR/.sdlc_repo.lock" ] || [ -f "$PROD_DIR/.coder_session" ] || [ -f "$PROD_DIR/.sdlc_lock_manifest.json" ]; then
+        echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock, .coder_session, or .sdlc_lock_manifest.json found)."
+        exit 1
+    fi
+
     # 1. Clear current production directory safely
     local OLD_DIR="$SKILLS_DIR/.old_$SLUG"
     rm -rf "$OLD_DIR"

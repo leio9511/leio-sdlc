@@ -11,6 +11,12 @@ PROD_LINK="$SKILLS_DIR/$SLUG"
 
 echo "⏪ Initiating instant rollback for $SLUG..."
 
+# Orchestrator standard guardrails: Prevent rollback during active SDLC sessions
+if [ -f "$PROD_LINK/.sdlc_repo.lock" ] || [ -f "$PROD_LINK/.coder_session" ] || [ -f "$PROD_LINK/.sdlc_lock_manifest.json" ]; then
+    echo "❌ [FATAL_LOCK] Cannot rollback while another SDLC pipeline is active (.sdlc_repo.lock, .coder_session, or .sdlc_lock_manifest.json found)."
+    exit 1
+fi
+
 if [ ! -L "$PROD_LINK" ]; then
     echo "❌ Error: $PROD_LINK is not a symlink. Cannot rollback."
     exit 1

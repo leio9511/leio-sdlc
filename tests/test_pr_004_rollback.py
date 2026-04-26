@@ -77,3 +77,35 @@ def test_rollback_no_restart_with_mock():
         
         # Verify that it skipped restarting OpenClaw
         assert "Skipping OpenClaw gateway restart (mock environment detected)..." in res.stdout, "Gateway restart was not skipped"
+
+def test_rollback_lock_guardrails():
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    with tempfile.TemporaryDirectory() as mock_home:
+        env = os.environ.copy()
+        env["HOME_MOCK"] = mock_home
+        
+        # 1. Setup mock installation
+        skills_dir = os.path.join(mock_home, ".openclaw", "skills")
+        os.makedirs(skills_dir, exist_ok=True)
+        leio_sdlc_dir = os.path.join(skills_dir, "leio-sdlc")
+        os.makedirs(leio_sdlc_dir, exist_ok=True)
+        
+        releases_dir = os.path.join(mock_home, ".openclaw", ".releases", "leio-sdlc")
+        os.makedirs(releases_dir, exist_ok=True)
+        # Create a dummy backup
+        subprocess.run(["tar", "-czf", os.path.join(releases_dir, "backup_20230101_000000.tar.gz"), "-C", skills_dir, "leio-sdlc"])
+        
+        rollback_script = os.path.join(repo_root, "scripts", "rollback.sh")
+        
+        # Test each lock file
+        for lock_file in [".sdlc_repo.lock", ".coder_session", ".sdlc_lock_manifest.json"]:
+            lock_path = os.path.join(leio_sdlc_dir, lock_file)
+            with open(lock_path, "w") as f:
+                f.write("locked")
+            
+            res = subprocess.run(["bash", rollback_script, "--no-restart"], env=env, cwd=leio_sdlc_dir, capture_output=True, text=True)
+            assert res.returncode != 0, f"Rollback should have failed due to {lock_file}"
+            assert "[FATAL_LOCK] Cannot rollback while another SDLC pipeline is active" in res.stdout
+            
+            os.remove(lock_path)
