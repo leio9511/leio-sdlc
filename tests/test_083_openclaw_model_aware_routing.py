@@ -40,15 +40,15 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
     def test_openclaw_agent_id_is_model_aware_for_alias_model(self):
         self.assertEqual(agent_driver.get_openclaw_agent_id("gpt"), "sdlc-generic-openclaw-gpt")
 
-        list_res = MagicMock(stdout="sdlc-generic-openclaw-gpt\n", returncode=0)
-        show_res = MagicMock(stdout="Model: gpt\n", returncode=0)
+        list_res = MagicMock(stdout="- sdlc-generic-openclaw-gpt\n  Model: gpt\n", returncode=0)
         run_res = MagicMock(stdout="ok", returncode=0)
-        self.mock_run.side_effect = [list_res, show_res, run_res]
+        # 1. exists check, 2. validate model check, 3. run
+        self.mock_run.side_effect = [list_res, list_res, run_res]
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}, clear=False):
             agent_driver.invoke_agent("task", session_key="session-123")
 
-        self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "show", "sdlc-generic-openclaw-gpt"])
+        self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "list"])
         cmd = self.mock_run.call_args_list[2][0][0]
         self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
 
@@ -84,16 +84,16 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
         self.assertTrue(self.mock_copy2.called or self.mock_copytree.called)
 
     def test_openclaw_existing_matching_agent_is_reused_without_recreate(self):
-        list_res = MagicMock(stdout="sdlc-generic-openclaw-gpt\n", returncode=0)
-        show_res = MagicMock(stdout="Model: gpt\n", returncode=0)
+        list_res = MagicMock(stdout="- sdlc-generic-openclaw-gpt\n  Model: gpt\n", returncode=0)
         run_res = MagicMock(stdout="ok", returncode=0)
-        self.mock_run.side_effect = [list_res, show_res, run_res]
+        # 1. exists check, 2. validate model check, 3. run
+        self.mock_run.side_effect = [list_res, list_res, run_res]
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}, clear=False):
             agent_driver.invoke_agent("task", session_key="session-123")
 
         self.assertEqual(len(self.mock_run.call_args_list), 3)
-        self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "show", "sdlc-generic-openclaw-gpt"])
+        self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "list"])
         run_cmd = self.mock_run.call_args_list[2][0][0]
         self.assertEqual(run_cmd[3], "sdlc-generic-openclaw-gpt")
 

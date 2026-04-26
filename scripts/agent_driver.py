@@ -117,10 +117,14 @@ def get_openclaw_agent_id(model: str) -> str:
     return f"sdlc-generic-openclaw-{normalize_openclaw_model_suffix(model)}"
 
 def openclaw_agent_exists(list_stdout: str, agent_id: str) -> bool:
-    return agent_id in {line.strip() for line in (list_stdout or '').splitlines() if line.strip()}
+    target = f"- {agent_id}"
+    for line in (list_stdout or '').splitlines():
+        if line.strip() == target:
+            return True
+    return False
 
-def parse_openclaw_agent_model(agent_show_stdout: str) -> str | None:
-    for raw_line in (agent_show_stdout or '').splitlines():
+def parse_openclaw_agent_model(agent_card_stdout: str) -> str | None:
+    for raw_line in (agent_card_stdout or '').splitlines():
         line = raw_line.strip()
         if not line:
             continue
@@ -134,9 +138,29 @@ def parse_openclaw_agent_model(agent_show_stdout: str) -> str | None:
 def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model: str) -> None:
     from config import OPENCLAW_MODEL_MISMATCH_ERROR
 
-    show_cmd = [cmd_exec, 'agents', 'show', agent_id]
-    show_res = subprocess.run(show_cmd, capture_output=True, text=True)
-    actual_model = parse_openclaw_agent_model(show_res.stdout)
+    list_cmd = [cmd_exec, 'agents', 'list']
+    list_res = subprocess.run(list_cmd, capture_output=True, text=True)
+    
+    lines = list_res.stdout.splitlines()
+    agent_block = []
+    found = False
+    for line in lines:
+        if line.strip() == f"- {agent_id}":
+            found = True
+            agent_block.append(line)
+            continue
+        if found:
+            # If we hit another agent block (starts with "- ") or any other 
+            # non-indented line that isn't empty, we stop.
+            # In practice, agents list output is indented after the "- id" line.
+            if line.strip().startswith("- "):
+                break
+            agent_block.append(line)
+    
+    if not found:
+        return
+
+    actual_model = parse_openclaw_agent_model("\n".join(agent_block))
     if actual_model and actual_model != requested_model:
         print(
             OPENCLAW_MODEL_MISMATCH_ERROR.format(
