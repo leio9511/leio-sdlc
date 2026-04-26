@@ -6,6 +6,7 @@
 - **Active Branch**: `master`
 
 ## 🏆 Recently Completed
+- [x] **[PRD-OpenClaw-CLI-Compatibility] OpenClaw CLI Compatibility Audit & Runtime Hardening**: Fixed `openclaw_agent_exists` and `validate_openclaw_agent_model` to parse current CLI card format. Removed broken `agents show` dependency. Generated durable CLI compatibility audit report. Added real-CLI smoke tests (`tests/test_openclaw_cli_smoke.py`). Implemented `--withdraw` flag in orchestrator for atomic baseline restoration with rollback guardrails. Full UAT passed. (v0.9.4)
 - [x] **[ISSUE-1155] Gemini Load Balancing Architecture**: Implemented stateful key assignment in `orchestrator.py` with anti-drift fingerprints and stateless environment inheritance in `agent_driver.py`. Verified via high-concurrency E2E test harness. (v0.9.3)
 - [x] **[ISSUE-1107] Planner Slice Numbering Prompt Hardening**: Modified `config/prompts.json` to strictly enforce the static pass-through of the `--insert-after` argument, fixing the double-nested sub-numbering hallucination bug.
 - [x] **[ISSUE-1094] Deploy Path and Broadcast Fix**: Injected absolute path anchors to deploy scripts to prevent SLUG extraction drift. Injected CLI `shlex.join` full command broadcast into Orchestrator and Auditor Slack notifications to ensure immediate execution traceability.
