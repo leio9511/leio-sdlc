@@ -226,7 +226,7 @@ class SanityContext:
         import os, sys, subprocess
         baseline_file = os.path.join(self.job_dir, "baseline_commit.txt")
         if not os.path.exists(self.job_dir) or not os.path.exists(baseline_file):
-            print("Handoff_Metadata_Missing: [FATAL_METADATA] Critical SDLC anchors (baseline_commit.txt) are missing. Automatic recovery is impossible. You must manually verify the repository state or use --force-replan true.")
+            print("[FATAL_METADATA] Critical SDLC anchors (baseline_commit.txt) are missing. Automatic recovery is impossible. You must manually verify the repository state or use --force-replan true.")
             sys.exit(1)
 
         res = subprocess.run(["git", "branch", "--show-current"], cwd=self.workdir, capture_output=True, text=True)
@@ -370,7 +370,7 @@ def main():
 
         baseline_file = os.path.join(job_dir, "baseline_commit.txt")
         if not os.path.exists(job_dir) or not os.path.exists(baseline_file):
-            print("Handoff_Metadata_Missing: [FATAL_METADATA] Critical SDLC anchors (baseline_commit.txt) are missing. Automatic recovery is impossible. You must manually verify the repository state or use --force-replan true.")
+            print("[FATAL_METADATA] Critical SDLC anchors (baseline_commit.txt) are missing. Automatic recovery is impossible. You must manually verify the repository state or use --force-replan true.")
             sys.exit(1)
 
         with open(baseline_file, "r") as f:

@@ -187,5 +187,5 @@ def test_withdraw_missing_metadata(repo_env, capfd):
     
     assert "Orchestrator exited with 1" in str(excinfo.value)
     out, err = capfd.readouterr()
-    assert "Handoff_Metadata_Missing" in out
+    assert "[FATAL_METADATA]" in out
 
