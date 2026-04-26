@@ -3,6 +3,7 @@ import tempfile
 import os
 import sys
 from agent_driver import invoke_agent, build_prompt, resolve_cmd
+import envelope_assembler
 import config
 import subprocess
 import uuid
@@ -164,20 +165,47 @@ def main():
     template_content = ""
 
     playbook_path = os.path.join(SDLC_ROOT, "playbooks", "reviewer_playbook.md")
-    playbook_content = ""
-    if os.path.exists(playbook_path):
-        with open(playbook_path, "r") as f:
-            playbook_content = f.read()
 
-    task_string = build_prompt("reviewer",
+    references = {
+        "prd_file": os.path.abspath(args.prd_file) if args.prd_file else "",
+        "pr_contract_file": os.path.abspath(args.pr_file) if args.pr_file else "",
+        "diff_file": os.path.abspath(diff_file),
+        "playbook_path": os.path.abspath(playbook_path),
+    }
+
+    contract_params = {
+        "output_file": os.path.abspath(os.path.join(args.run_dir, args.out_file)),
+        "output_schema": {
+            "overall_assessment": "(EXCELLENT|GOOD_WITH_MINOR_SUGGESTIONS|NEEDS_ATTENTION|NEEDS_IMMEDIATE_REWORK)",
+            "executive_summary": "string",
+            "findings": [
+                {
+                    "file_path": "string",
+                    "line_number": "integer",
+                    "category": "(Correctness|PlanAlignmentViolation|ArchAlignmentViolation|Efficiency|Readability|Maintainability|DesignPattern|Security|Standard|PotentialBug|Documentation)",
+                    "severity": "(CRITICAL|MAJOR|MINOR|SUGGESTION|INFO)",
+                    "description": "string",
+                    "recommendation": "string"
+                }
+            ]
+        }
+    }
+
+    envelope = envelope_assembler.build_startup_envelope(
+        role="reviewer",
         workdir=workdir,
-        playbook_content=playbook_content,
-        pr_content=pr_content,
-        pr_file=os.path.abspath(args.pr_file) if args.pr_file else "",
-        prd_file=os.path.abspath(args.prd_file) if args.prd_file else "",
-        diff_file=diff_file,
-        out_file=os.path.abspath(os.path.join(args.run_dir, args.out_file)), run_dir=args.run_dir,
-        template_content=template_content
+        out_dir=args.run_dir,
+        references=references,
+        contract_params=contract_params
+    )
+
+    task_string = envelope_assembler.render_envelope_to_prompt(envelope)
+    
+    envelope_assembler.save_envelope_artifacts(
+        role="reviewer",
+        out_dir=args.run_dir,
+        envelope=envelope,
+        rendered_prompt=task_string
     )
     
 

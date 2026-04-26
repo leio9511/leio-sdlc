@@ -41,10 +41,11 @@ class TestReviewerContextIsolation(unittest.TestCase):
             prompt_content = f.read()
             
         # Verify the headers exist and are separated
-        self.assertIn("@PRD_PATH:", prompt_content)
-        self.assertIn("@CONTRACT_PATH:", prompt_content)
-        self.assertIn("@DIFF_PATH:", prompt_content)
-        self.assertIn("@OUT_FILE_PATH:", prompt_content)
+        self.assertIn("# EXECUTION CONTRACT", prompt_content)
+        self.assertIn("# REFERENCE INDEX", prompt_content)
+        self.assertIn("prd", prompt_content)
+        self.assertIn("pr_contract", prompt_content)
+        self.assertIn("diff", prompt_content)
 
 if __name__ == '__main__':
     unittest.main()

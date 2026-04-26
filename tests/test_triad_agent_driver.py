@@ -147,8 +147,8 @@ class TestAgentDriverTriad(unittest.TestCase):
             
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for reviewer")
         args, kwargs = mock_invoke_agent.call_args
-        self.assertIn("@CONTRACT_PATH:", args[0])
-        self.assertIn("@DIFF_PATH:", args[0])
+        self.assertIn("# REFERENCE INDEX", args[0])
+        self.assertIn("diff", args[0])
         self.assertEqual(kwargs.get("role"), "reviewer")
         mock_setup_key.assert_called()
 
