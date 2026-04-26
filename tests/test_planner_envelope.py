@@ -7,7 +7,8 @@ def test_envelope_top_level_keys():
         out_dir="/mock/out_dir",
         prd_path="/mock/prd",
         playbook_path="/mock/playbook",
-        template_path="/mock/template"
+        template_path="/mock/template",
+        contract_script="/mock/contract_script.py"
     )
     keys = set(envelope.keys())
     assert keys == {"execution_contract", "reference_index", "final_checklist"}
@@ -19,7 +20,8 @@ def test_envelope_reference_index_contents():
         out_dir="/mock/out_dir",
         prd_path="/mock/prd.md",
         playbook_path="/mock/playbook.md",
-        template_path="/mock/template.md"
+        template_path="/mock/template.md",
+        contract_script="/mock/contract_script.py"
     )
     ref_index = envelope["reference_index"]
     assert len(ref_index) == 3
@@ -48,7 +50,8 @@ def test_rendered_prompt_sections():
         out_dir="/mock/out_dir",
         prd_path="/mock/prd",
         playbook_path="/mock/playbook",
-        template_path="/mock/template"
+        template_path="/mock/template",
+        contract_script="/mock/contract_script.py"
     )
     prompt = render_planner_prompt(envelope)
     
@@ -68,7 +71,8 @@ def test_rendered_prompt_no_inlining():
         out_dir="/mock/out_dir",
         prd_path="/mock/prd_path.md",
         playbook_path="/mock/playbook_path.md",
-        template_path="/mock/template_path.md"
+        template_path="/mock/template_path.md",
+        contract_script="/mock/contract_script.py"
     )
     prompt = render_planner_prompt(envelope)
     

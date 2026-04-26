@@ -126,6 +126,7 @@ def main():
             prd_path=os.path.abspath(args.prd_file),
             playbook_path=playbook_path,
             template_path=template_path,
+            contract_script=contract_script,
             mode="slice",
             failed_pr_id=failed_pr_id
         )
@@ -143,6 +144,7 @@ def main():
             prd_path=os.path.abspath(args.prd_file),
             playbook_path=playbook_path,
             template_path=template_path,
+            contract_script=contract_script,
             mode="uat",
             uat_report_path=os.path.abspath(args.replan_uat_failures)
         )
@@ -157,6 +159,7 @@ def main():
             prd_path=os.path.abspath(args.prd_file),
             playbook_path=playbook_path,
             template_path=template_path,
+            contract_script=contract_script,
             mode="standard"
         )
         task_string = render_planner_prompt(envelope)

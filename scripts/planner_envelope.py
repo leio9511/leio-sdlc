@@ -1,8 +1,7 @@
 import json
 import os
 
-def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_path, mode="standard", uat_report_path=None, failed_pr_id=None):
-    contract_script = "/root/.openclaw/skills/leio-sdlc/scripts/create_pr_contract.py"
+def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_path, contract_script, mode="standard", uat_report_path=None, failed_pr_id=None):
     
     execution_contract_lines = [
         f"The only valid output location for PR contract artifacts in this run is `{out_dir}`.",
