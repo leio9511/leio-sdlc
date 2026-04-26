@@ -914,10 +914,14 @@ def main():
                         if res.returncode != 0:
                             dlog(f"Preflight failed with code {res.returncode}")
                             orch_yellow_counter += 1
+                            system_alert_text = f"Preflight failed:\n{res.stdout}\n{res.stderr}".strip()
+                            notify_channel(effective_channel,
+                                f"❌ Preflight failed for {base_filename} (attempt {orch_yellow_counter}/{yellow_retry_limit}). Retrying Coder...",
+                                "preflight_failed",
+                                {"pr_id": base_filename, "attempt": orch_yellow_counter, "limit": yellow_retry_limit})
                             if orch_yellow_counter >= yellow_retry_limit:
                                 state_5_trigger = True
                                 break
-                            system_alert_text = f"Preflight failed:\n{res.stdout}\n{res.stderr}".strip()
                             continue
 
                     orch_yellow_counter = 0
