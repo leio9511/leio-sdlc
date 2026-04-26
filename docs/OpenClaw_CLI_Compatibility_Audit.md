@@ -13,7 +13,7 @@ The audit identified several critical incompatibilities in the `leio-sdlc` runti
 | `openclaw agents add` | **Confirmed Valid** | Used for lazy agent creation. |
 | `openclaw agent` | **Confirmed Valid** | Primary execution entry point. |
 | `openclaw message send` | **Confirmed Valid** | Used for remote notifications. |
-| `openclaw gateway restart` | **Confirmed Valid** | Used in deploy/rollback scripts. |
+| `openclaw gateway restart` | **Confirmed Valid** | Used in `deploy.sh` and `scripts/rollback.sh`. |
 
 ## 2. Detailed Audit per Call Site
 
@@ -43,11 +43,11 @@ The audit identified several critical incompatibilities in the `leio-sdlc` runti
     *   **Status**: **Confirmed Valid**.
     *   **Usage**: Used by `OpenClawBridgeProvider` for delivering Slack/remote notifications.
 
-### 2.3 Deployment / Lifecycle (`deploy.sh` / `rollback.sh`)
+### 2.3 Deployment / Lifecycle (`deploy.sh` / `scripts/rollback.sh`)
 
 *   **`openclaw gateway restart`**:
     *   **Status**: **Confirmed Valid**.
-    *   **Usage**: Final step in deployment to ensure the gateway picks up updated skills.
+    *   **Usage**: Final step in deployment or rollback to ensure the gateway picks up updated or restored skills.
 
 ## 3. Test Strategy Hardening
 
