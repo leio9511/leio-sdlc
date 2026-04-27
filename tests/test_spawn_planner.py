@@ -1,3 +1,4 @@
+import sys, os; sys.path.insert(0, os.path.abspath("scripts"))
 import pytest
 import os
 import tempfile
@@ -119,3 +120,72 @@ def test_spawn_planner_saves_artifacts():
         assert os.path.exists(os.path.join(debug_dir, "startup_packet.json"))
         assert os.path.exists(os.path.join(debug_dir, "startup_prompt.txt"))
         assert os.path.exists(os.path.join(debug_dir, "scaffold_contract.txt"))
+
+from unittest.mock import patch, MagicMock
+import glob
+
+
+
+def test_planner_success_requires_generated_artifacts():
+    import glob as real_glob_module
+    _orig_glob = real_glob_module.glob
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        job_dir = os.path.join(tmpdir, "job_dir")
+        os.makedirs(job_dir)
+        with patch("sys.argv", ["orchestrator.py", "--workdir", tmpdir, "--prd-file", "dummy.md", "--force-replan", "false", "--enable-exec-from-workspace"]), \
+             patch("orchestrator.dpopen") as mock_dpopen, \
+             patch("orchestrator.glob.glob") as mock_glob, \
+             patch("git_utils.check_git_boundary"), \
+             patch("orchestrator.os.path.exists", side_effect=lambda path, _orig=os.path.exists: True if path in [job_dir, tmpdir] else _orig(path)), \
+             patch("orchestrator.notify_channel"), \
+             patch("orchestrator.subprocess.run"), \
+             patch("orchestrator.drun", side_effect=Exception("Break loop")), \
+             patch("orchestrator.sys.exit") as mock_exit:
+             
+             mock_proc = MagicMock()
+             mock_proc.returncode = 0
+             mock_dpopen.return_value = mock_proc
+             
+             def mock_glob_side_effect(pattern, *args, **kwargs):
+                 if pattern.endswith("*.md"):
+                     return [os.path.join(job_dir, "PR_mock.md")]
+                 return _orig_glob(pattern, *args, **kwargs)
+             
+             mock_glob.side_effect = mock_glob_side_effect
+             mock_exit.side_effect = SystemExit(1)
+             
+             import orchestrator
+             try:
+                 orchestrator.main()
+             except Exception as e:
+                 if str(e) != "Break loop" and not isinstance(e, SystemExit):
+                     raise
+             
+             mock_exit.assert_not_called()
+
+def test_planner_fails_without_artifacts_despite_stdout():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        job_dir = os.path.join(tmpdir, "job_dir")
+        os.makedirs(job_dir)
+        with patch("sys.argv", ["orchestrator.py", "--workdir", tmpdir, "--prd-file", "dummy.md", "--force-replan", "false", "--enable-exec-from-workspace"]), \
+             patch("orchestrator.dpopen") as mock_dpopen, \
+             patch("orchestrator.glob.glob", return_value=[]), \
+             patch("git_utils.check_git_boundary"), \
+             patch("orchestrator.os.path.exists", side_effect=lambda path, _orig=os.path.exists: True if path in [job_dir, tmpdir] else _orig(path)), \
+             patch("orchestrator.notify_channel"), \
+             patch("orchestrator.subprocess.run"), \
+             patch("orchestrator.sys.exit") as mock_exit:
+             
+             mock_proc = MagicMock()
+             mock_proc.returncode = 0
+             mock_dpopen.return_value = mock_proc
+             mock_exit.side_effect = SystemExit(1)
+             
+             import orchestrator
+             try:
+                 orchestrator.main()
+             except SystemExit:
+                 pass
+             
+             mock_exit.assert_called_with(1)
