@@ -125,9 +125,6 @@ def main():
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
     if test_mode:
         run_dir = os.environ.get("SDLC_RUN_DIR", ".")
-        os.makedirs(os.path.join(run_dir, "tests"), exist_ok=True)
-        with open(os.path.join(run_dir, "tests", "auditor_task_string.log"), "w") as f:
-            f.write(task_string)
         if "REJECT" in os.environ.get("MOCK_AUDIT_RESULT", ""):
             output = '{"status": "REJECTED", "comments": "Mock rejected"}'
         else:

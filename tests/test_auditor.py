@@ -47,7 +47,7 @@ def test_auditor_uses_envelope_assembler(run_dir, valid_prd):
     
     assert res.returncode == 0
     
-    log_file = os.path.join(str(run_dir), "tests", "auditor_task_string.log")
+    log_file = os.path.join(str(run_dir), "auditor_debug", "rendered_prompt.txt")
     assert os.path.exists(log_file)
     with open(log_file, "r") as f:
         task_string = f.read()
