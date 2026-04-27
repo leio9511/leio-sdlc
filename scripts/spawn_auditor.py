@@ -136,11 +136,11 @@ def main():
         result = invoke_agent(task_string, session_key=session_id, role="auditor")
         output = result.stdout
 
-    status = "UNKNOWN"
+    stdout_status = "UNKNOWN"
     if '{"status": "APPROVED"' in output or '"status":"APPROVED"' in output or '"status": "APPROVED"' in output:
-        status = "APPROVED"
+        stdout_status = "APPROVED"
     elif '{"status": "REJECTED"' in output or '"status":"REJECTED"' in output or '"status": "REJECTED"' in output:
-        status = "REJECTED"
+        stdout_status = "REJECTED"
 
     import json
     try:
@@ -151,9 +151,32 @@ def main():
             json_match = re.search(r'(\{.*?\})', output, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group(1).strip())
-            status = data.get("status", status)
+            stdout_status = data.get("status", stdout_status)
     except Exception:
         pass
+
+    canonical_file = contract_params["output_file"]
+    file_status = "UNKNOWN"
+    file_parsed_successfully = False
+    
+    if os.path.exists(canonical_file):
+        try:
+            with open(canonical_file, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "status" in data:
+                    file_status = data["status"]
+                    file_parsed_successfully = True
+        except Exception as e:
+            print(f"[WARNING] Canonical verdict file {canonical_file} exists but could not be parsed: {e}")
+
+    status = "UNKNOWN"
+    if file_parsed_successfully:
+        status = file_status
+        if stdout_status != "UNKNOWN" and stdout_status != file_status:
+            print(f"[WARNING] Conflict detected: canonical file says {file_status} but stdout says {stdout_status}. Using file verdict.")
+    else:
+        print(f"[WARNING] Canonical verdict file missing or invalid, falling back to stdout parsing")
+        status = stdout_status
 
     if status == "APPROVED":
         agent_driver.notify_channel(args.channel, "Auditor APPROVED the PRD.", "auditor_approved", {"prd_file": args.prd_file})

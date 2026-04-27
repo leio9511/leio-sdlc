@@ -47,7 +47,8 @@ def test_spawn_auditor_guardrail(capsys):
 
 
 @patch("agent_driver.notify_channel")
-def test_spawn_auditor_valid_channel_success(mock_notify, capsys):
+@patch("agent_driver.send_ignition_handshake")
+def test_spawn_auditor_valid_channel_success(mock_handshake, mock_notify, capsys):
     with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
         f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
         prd_file = f.name
@@ -68,7 +69,8 @@ def test_spawn_auditor_valid_channel_success(mock_notify, capsys):
 
 
 @patch("agent_driver.notify_channel")
-def test_auditor_rejected_returns_exit_0(mock_notify, capsys):
+@patch("agent_driver.send_ignition_handshake")
+def test_auditor_rejected_returns_exit_0(mock_handshake, mock_notify, capsys):
     with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
         f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
         prd_file = f.name
@@ -89,7 +91,8 @@ def test_auditor_rejected_returns_exit_0(mock_notify, capsys):
 
 
 @patch("agent_driver.notify_channel")
-def test_auditor_notifies_on_missing_sections(mock_notify, capsys):
+@patch("agent_driver.send_ignition_handshake")
+def test_auditor_notifies_on_missing_sections(mock_handshake, mock_notify, capsys):
     with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
         # Malformed PRD: missing all mandatory sections
         f.write(b"This is a malformed PRD without any sections.")
@@ -207,3 +210,162 @@ def test_spawn_auditor_startup_validation_rejects_invalid_dir(mock_config):
         with pytest.raises(SystemExit) as e:
             spawn_auditor.main()
         assert e.value.code == 1
+
+# --- Auditor Result-Source Hotfix Tests ---
+
+@patch("agent_driver.notify_channel")
+@patch("agent_driver.send_ignition_handshake")
+@patch("spawn_auditor.invoke_agent")
+def test_auditor_file_first_success(mock_invoke_agent, mock_handshake, mock_notify, capsys):
+    import tempfile
+    import json
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
+            f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
+            prd_file = f.name
+            
+        os.environ["SDLC_RUN_DIR"] = tmpdir
+        os.environ["SDLC_TEST_MODE"] = "false"
+        
+        # Write canonical verdict file
+        canonical_file = os.path.join(tmpdir, "auditor_verdict.json")
+        with open(canonical_file, "w") as f_out:
+            json.dump({"status": "APPROVED", "comments": "File approved"}, f_out)
+            
+        # Mock stdout as non-JSON
+        mock_result = MagicMock()
+        mock_result.stdout = "Here is some conversational text without JSON."
+        mock_invoke_agent.return_value = mock_result
+        
+        with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", tmpdir, "--channel", "test_channel"]):
+            with pytest.raises(SystemExit) as e:
+                spawn_auditor.main()
+            assert e.value.code == 0
+            
+        captured = capsys.readouterr()
+        assert "[ACTION REQUIRED FOR MANAGER] The Auditor APPROVED the PRD." in captured.out
+        mock_notify.assert_any_call("test_channel", "Auditor APPROVED the PRD.", "auditor_approved", {"prd_file": prd_file})
+        os.remove(prd_file)
+
+@patch("agent_driver.notify_channel")
+@patch("agent_driver.send_ignition_handshake")
+@patch("spawn_auditor.invoke_agent")
+def test_auditor_file_first_rejection(mock_invoke_agent, mock_handshake, mock_notify, capsys):
+    import tempfile
+    import json
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
+            f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
+            prd_file = f.name
+            
+        os.environ["SDLC_RUN_DIR"] = tmpdir
+        os.environ["SDLC_TEST_MODE"] = "false"
+        
+        canonical_file = os.path.join(tmpdir, "auditor_verdict.json")
+        with open(canonical_file, "w") as f_out:
+            json.dump({"status": "REJECTED", "comments": "File rejected"}, f_out)
+            
+        mock_result = MagicMock()
+        mock_result.stdout = "Conversational text without JSON."
+        mock_invoke_agent.return_value = mock_result
+        
+        with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", tmpdir, "--channel", "test_channel"]):
+            with pytest.raises(SystemExit) as e:
+                spawn_auditor.main()
+            assert e.value.code == 0
+            
+        captured = capsys.readouterr()
+        assert "[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD." in captured.out
+        os.remove(prd_file)
+
+@patch("agent_driver.notify_channel")
+@patch("agent_driver.send_ignition_handshake")
+@patch("spawn_auditor.invoke_agent")
+def test_auditor_legacy_stdout_fallback(mock_invoke_agent, mock_handshake, mock_notify, capsys):
+    import tempfile
+    import json
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
+            f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
+            prd_file = f.name
+            
+        os.environ["SDLC_RUN_DIR"] = tmpdir
+        os.environ["SDLC_TEST_MODE"] = "false"
+        
+        # DO NOT write canonical verdict file
+        
+        mock_result = MagicMock()
+        mock_result.stdout = '```json\n{"status": "APPROVED", "comments": "Stdout fallback"}\n```'
+        mock_invoke_agent.return_value = mock_result
+        
+        with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", tmpdir, "--channel", "test_channel"]):
+            with pytest.raises(SystemExit) as e:
+                spawn_auditor.main()
+            assert e.value.code == 0
+            
+        captured = capsys.readouterr()
+        assert "[WARNING] Canonical verdict file missing or invalid, falling back to stdout parsing" in captured.out
+        assert "[ACTION REQUIRED FOR MANAGER] The Auditor APPROVED the PRD." in captured.out
+        os.remove(prd_file)
+
+@patch("agent_driver.notify_channel")
+@patch("agent_driver.send_ignition_handshake")
+@patch("spawn_auditor.invoke_agent")
+def test_auditor_conflicting_stdout_and_file(mock_invoke_agent, mock_handshake, mock_notify, capsys):
+    import tempfile
+    import json
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
+            f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
+            prd_file = f.name
+            
+        os.environ["SDLC_RUN_DIR"] = tmpdir
+        os.environ["SDLC_TEST_MODE"] = "false"
+        
+        canonical_file = os.path.join(tmpdir, "auditor_verdict.json")
+        with open(canonical_file, "w") as f_out:
+            json.dump({"status": "REJECTED", "comments": "File says reject"}, f_out)
+            
+        mock_result = MagicMock()
+        # Stdout says APPROVED!
+        mock_result.stdout = '{"status": "APPROVED"}'
+        mock_invoke_agent.return_value = mock_result
+        
+        with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", tmpdir, "--channel", "test_channel"]):
+            with pytest.raises(SystemExit) as e:
+                spawn_auditor.main()
+            assert e.value.code == 0
+            
+        captured = capsys.readouterr()
+        assert "Conflict detected: canonical file says REJECTED but stdout says APPROVED. Using file verdict." in captured.out
+        assert "[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD." in captured.out
+        os.remove(prd_file)
+
+@patch("agent_driver.notify_channel")
+@patch("agent_driver.send_ignition_handshake")
+@patch("spawn_auditor.invoke_agent")
+def test_auditor_missing_file_invalid_stdout(mock_invoke_agent, mock_handshake, mock_notify, capsys):
+    import tempfile
+    import json
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as f:
+            f.write(b"1. Context & Problem\n2. Requirements & User Stories\n3. Architecture & Technical Strategy\n4. Acceptance Criteria\n5. Overall Test Strategy\n6. Framework Modifications\n7. Hardcoded Content")
+            prd_file = f.name
+            
+        os.environ["SDLC_RUN_DIR"] = tmpdir
+        os.environ["SDLC_TEST_MODE"] = "false"
+        
+        # Missing file, invalid stdout
+        mock_result = MagicMock()
+        mock_result.stdout = "Nothing to see here."
+        mock_invoke_agent.return_value = mock_result
+        
+        with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", prd_file, "--workdir", tmpdir, "--channel", "test_channel"]):
+            with pytest.raises(SystemExit) as e:
+                spawn_auditor.main()
+            assert e.value.code == 0
+            
+        captured = capsys.readouterr()
+        # UNKNOWN status falls through to REJECTED logic
+        assert "[ACTION REQUIRED FOR MANAGER] The Auditor REJECTED the PRD." in captured.out
+        os.remove(prd_file)
