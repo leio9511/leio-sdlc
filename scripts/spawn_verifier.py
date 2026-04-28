@@ -7,7 +7,8 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 import agent_driver
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent
+from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn a UAT Verifier agent.")
@@ -32,11 +33,30 @@ def main():
     SDLC_ROOT = os.path.dirname(current_dir)
     playbook_path = os.path.join(SDLC_ROOT, "playbooks", "verifier_playbook.md")
 
-    task_string = build_prompt("verifier",
+    references = {
+        "prd_files": args.prd_files,
+        "playbook_path": playbook_path,
+    }
+    contract_params = {
+        "output_file": os.path.abspath(args.out_file),
+    }
+
+    envelope = build_startup_envelope(
+        role="verifier",
         workdir=workdir,
-        playbook_path=playbook_path,
-        prd_files=args.prd_files,
-        out_file=os.path.abspath(args.out_file)
+        out_dir=os.getcwd(),
+        references=references,
+        contract_params=contract_params
+    )
+    task_string = render_envelope_to_prompt(envelope)
+
+    run_dir = os.environ.get("SDLC_RUN_DIR", ".")
+    save_envelope_artifacts(
+        role="uat",
+        out_dir=run_dir,
+        envelope=envelope,
+        rendered_prompt=task_string,
+        artifact_subdir="initial"
     )
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"

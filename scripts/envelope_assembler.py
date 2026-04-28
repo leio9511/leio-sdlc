@@ -235,6 +235,65 @@ def _build_coder_envelope(workdir, references, contract_params, mode):
     return execution_contract, reference_index, final_checklist
 
 
+def _build_verifier_envelope(workdir, references, contract_params):
+    output_schema = {
+        "status": "(PASS|NEEDS_FIX)",
+        "executive_summary": "A concise summary of the UAT outcome.",
+        "verification_details": [
+            {
+                "requirement": "Description of the requirement extracted from the PRD(s).",
+                "status": "(IMPLEMENTED|MISSING|PARTIAL)",
+                "evidence": "File paths, code snippets, or tool output proving the status.",
+                "comments": "Any notes or suggestions for hotfixes if applicable.",
+            }
+        ],
+    }
+
+    execution_contract = [
+        f"Locked Working Directory: `{workdir}`",
+        f"Output Report File: `{contract_params.get('output_file')}`",
+        f"Output JSON Schema:\n```json\n{json.dumps(output_schema, indent=2)}\n```",
+        "Mandatory Rule: You MUST read all PRDs listed in the reference index before beginning verification.",
+        "Mandatory Rule: Evaluate only. You are an evaluation agent. The execution contract enforces read-only mode. YOU MUST NOT modify, create, or delete any file in the workspace except the final UAT report.",
+    ]
+
+    # Handle multiple PRDs
+    prd_files_str = references.get("prd_files", "")
+    prd_files = [p.strip() for p in prd_files_str.split(",") if p.strip()]
+
+    reference_index = []
+    for i, prd_path in enumerate(prd_files):
+        reference_index.append(
+            {
+                "id": f"prd_{i+1}" if len(prd_files) > 1 else "prd",
+                "kind": "prd",
+                "path": prd_path,
+                "required": True,
+                "priority": 1,
+                "purpose": "requirements_to_verify",
+            }
+        )
+
+    reference_index.append(
+        {
+            "id": "verifier_playbook",
+            "kind": "playbook",
+            "path": references.get("playbook_path"),
+            "required": True,
+            "priority": 1,
+            "purpose": "verification_methodology",
+        }
+    )
+
+    final_checklist = [
+        "Output constraint: Write the JSON UAT report to the specified file path.",
+        "Schema constraint: The output must match the provided JSON schema.",
+        "Safety constraint: Do not modify any code files (Read-Only mode).",
+    ]
+
+    return execution_contract, reference_index, final_checklist
+
+
 def build_startup_envelope(role, workdir, out_dir, references, contract_params, mode="standard"):
     if role == "planner":
         execution_contract, reference_index, final_checklist = _build_planner_envelope(
@@ -251,6 +310,10 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
     elif role == "coder":
         execution_contract, reference_index, final_checklist = _build_coder_envelope(
             workdir, references, contract_params, mode
+        )
+    elif role == "verifier":
+        execution_contract, reference_index, final_checklist = _build_verifier_envelope(
+            workdir, references, contract_params
         )
     else:
         execution_contract, reference_index, final_checklist = [], [], []
