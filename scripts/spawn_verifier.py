@@ -39,6 +39,18 @@ def main():
     }
     contract_params = {
         "output_file": os.path.abspath(args.out_file),
+        "output_schema": {
+            "status": "(PASS|NEEDS_FIX)",
+            "executive_summary": "A concise summary of the UAT outcome.",
+            "verification_details": [
+                {
+                    "requirement": "Description of the requirement extracted from the PRD(s).",
+                    "status": "(IMPLEMENTED|MISSING|PARTIAL)",
+                    "evidence": "File paths, code snippets, or tool output proving the status.",
+                    "comments": "Any notes or suggestions for hotfixes if applicable.",
+                }
+            ],
+        },
     }
 
     envelope = build_startup_envelope(

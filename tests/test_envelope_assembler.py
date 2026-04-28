@@ -66,6 +66,28 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertTrue(all(ref["required"] for ref in refs_by_id.values()))
         self.assertTrue(all(ref["priority"] == 1 for ref in refs_by_id.values()))
 
+    def test_build_verifier_startup_envelope(self):
+        envelope = build_startup_envelope(
+            role="verifier",
+            workdir="/test/workdir",
+            out_dir="/test/run_dir",
+            references={
+                "prd_files": "PRD_1.md, PRD_2.md",
+                "playbook_path": "/test/playbooks/verifier_playbook.md",
+            },
+            contract_params={
+                "output_file": "/test/workdir/uat_report.json",
+            },
+        )
+
+        self.assertEqual(envelope["role"], "verifier")
+        self.assertEqual(len([ref for ref in envelope["reference_index"] if ref["kind"] == "prd"]), 2)
+
+        # Verify specific verifier contract clauses
+        contract_text = "\n".join(envelope["execution_contract"])
+        self.assertIn("Read-Only (EMPHASIZED)", contract_text)
+        self.assertIn("output_file: `/test/workdir/uat_report.json`", contract_text)
+
     def test_rendered_coder_prompt_is_contract_first_and_path_driven(self):
         envelope = build_startup_envelope(
             role="coder",
