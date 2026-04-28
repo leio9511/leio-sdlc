@@ -10,7 +10,7 @@ from pathlib import Path
 
 import config
 import envelope_assembler
-from agent_driver import build_prompt, invoke_agent
+from agent_driver import invoke_agent
 
 
 def extract_pr_id(pr_file_path):
@@ -19,26 +19,6 @@ def extract_pr_id(pr_file_path):
     if match:
         return match.group(1).rstrip("_")
     return basename.split(".")[0]
-
-
-def _load_feedback_content(feedback_file):
-    with open(feedback_file, "r") as f:
-        feedback_content = f.read()
-
-    try:
-        json_match = re.search(r"```json\s*(.*?)\s*```", feedback_content, re.DOTALL)
-        if json_match:
-            feedback_content = json_match.group(1).strip()
-        else:
-            json_match = re.search(r"(\{.*?\})", feedback_content, re.DOTALL)
-            if json_match:
-                feedback_content = json_match.group(1).strip()
-        json_obj = json.loads(feedback_content)
-        feedback_content = json.dumps(json_obj, indent=2)
-    except Exception:
-        pass
-
-    return feedback_content
 
 
 def resolve_coder_artifact_subdir(run_dir, mode):
@@ -100,28 +80,49 @@ def send_feedback(session_key, message, workdir=".", run_dir="."):
     print(f"Sent feedback to session {result.session_key}")
 
 
-def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
+def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False):
     session_file = os.path.join(run_dir, ".coder_session")
-    try:
-        feedback_content = _load_feedback_content(feedback_file)
-        msg = build_prompt("coder_revision", feedback_content=feedback_content)
+    
+    if os.path.exists(session_file):
+        mode = "revision"
+        with open(session_file, "r") as sf:
+            session_key = sf.read().strip()
+    else:
+        mode = "revision_bootstrap"
+        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
 
-        if os.path.exists(session_file):
-            with open(session_file, "r") as sf:
-                session_key = sf.read().strip()
-            send_feedback(session_key, msg, workdir=workdir, run_dir=run_dir)
-            return True, session_key
-        else:
-            session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-            task_string += msg
-            result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=run_dir)
+    envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+        workdir=workdir,
+        run_dir=run_dir,
+        pr_file=pr_file,
+        prd_file=prd_file,
+        playbook_path=playbook_path,
+        mode=mode,
+        feedback_file=feedback_file
+    )
+    
+    save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt)
+
+    if test_mode:
+        Path(run_dir).mkdir(parents=True, exist_ok=True)
+        if mode == "revision_bootstrap":
             with open(session_file, "w") as f:
-                f.write(result.session_key)
-            print(f"Spawned new session {result.session_key} with feedback")
-            return False, result.session_key
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+                f.write("mock-session-key")
+        Path("tests").mkdir(exist_ok=True)
+        with open("tests/tool_calls.log", "a") as f:
+            f.write(rendered_prompt + "\n")
+        print('{"status": "mock_success", "role": "coder", "sessionKey": "' + session_key + '"}')
+        sys.exit(0)
+
+    if mode == "revision":
+        send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir)
+        return True, session_key
+    else:
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir)
+        with open(session_file, "w") as f:
+            f.write(result.session_key)
+        print(f"Spawned new session {result.session_key} with feedback")
+        return False, result.session_key
 
 
 def main():
@@ -197,6 +198,46 @@ def main():
     playbook_path = os.path.join(sdlc_root, "playbooks", "coder_playbook.md")
     session_file = os.path.join(args.run_dir, ".coder_session")
 
+    if args.system_alert:
+        envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+            workdir=workdir,
+            run_dir=args.run_dir,
+            pr_file=args.pr_file,
+            prd_file=args.prd_file,
+            playbook_path=playbook_path,
+            mode="system_alert",
+            system_alert=args.system_alert
+        )
+        save_coder_debug_artifacts(args.run_dir, "system_alert", envelope, rendered_prompt)
+        
+        if test_mode:
+            Path(args.run_dir).mkdir(parents=True, exist_ok=True)
+            Path("tests").mkdir(exist_ok=True)
+            with open("tests/tool_calls.log", "a") as f:
+                f.write(rendered_prompt + "\n")
+            session_key = "mock-session-key" if os.path.exists(session_file) else f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+            if not os.path.exists(session_file):
+                with open(session_file, "w") as f:
+                    f.write(session_key)
+            print('{"status": "mock_success", "role": "coder", "sessionKey": "' + session_key + '"}')
+            sys.exit(0)
+
+        if os.path.exists(session_file):
+            with open(session_file, "r") as sf:
+                session_key = sf.read().strip()
+            send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=args.run_dir)
+        else:
+            session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+            result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir)
+            with open(session_file, "w") as f:
+                f.write(result.session_key)
+            print(f"Spawned new session {result.session_key} with system alert")
+        return
+
+    if args.feedback_file:
+        handle_feedback_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.feedback_file, pr_id, test_mode=test_mode)
+        return
+
     envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
         workdir=workdir,
         run_dir=args.run_dir,
@@ -206,8 +247,9 @@ def main():
         mode="initial",
     )
 
-    if test_mode and not args.feedback_file and not args.system_alert:
-        save_coder_debug_artifacts(args.run_dir, "initial", envelope, rendered_prompt)
+    save_coder_debug_artifacts(args.run_dir, "initial", envelope, rendered_prompt)
+
+    if test_mode:
         Path(args.run_dir).mkdir(parents=True, exist_ok=True)
         with open(session_file, "w") as f:
             f.write("mock-session-key")
@@ -216,29 +258,6 @@ def main():
             f.write(rendered_prompt + "\n")
         print('{"status": "mock_success", "role": "coder", "sessionKey": "mock-session-key"}')
         sys.exit(0)
-
-    if args.system_alert:
-        if os.path.exists(session_file):
-            with open(session_file, "r") as sf:
-                session_key = sf.read().strip()
-        else:
-            session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-        msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
-        if os.path.exists(session_file):
-            send_feedback(session_key, msg, workdir=workdir, run_dir=args.run_dir)
-        else:
-            task_string = rendered_prompt + msg
-            result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
-            with open(session_file, "w") as f:
-                f.write(result.session_key)
-            print(f"Spawned new session {result.session_key} with system alert")
-        return
-
-    if args.feedback_file:
-        handle_feedback_routing(workdir, args.feedback_file, rendered_prompt, pr_id, args.run_dir)
-        return
-
-    save_coder_debug_artifacts(args.run_dir, "initial", envelope, rendered_prompt)
 
     if os.path.exists(session_file):
         with open(session_file, "r") as sf:

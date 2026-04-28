@@ -31,10 +31,11 @@ class TestSpawnCoder(unittest.TestCase):
         mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".")
 
     @patch('spawn_coder.os.path.exists')
+    @patch('envelope_assembler.os.makedirs')
     @patch('spawn_coder.invoke_agent')
-    @patch('spawn_coder.build_prompt')
-    def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_invoke, mock_exists):
-        mock_build.return_value = "Mocked feedback prompt"
+    @patch('spawn_coder.build_coder_startup_packet_and_prompt')
+    def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_invoke, mock_makedirs, mock_exists):
+        mock_build.return_value = ({}, "Mocked feedback prompt")
         mock_exists.return_value = True
 
         def mock_file_open(path, *args, **kwargs):
@@ -46,7 +47,7 @@ class TestSpawnCoder(unittest.TestCase):
 
         with patch('builtins.open', side_effect=mock_file_open):
             mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
-            is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", "feedback.txt", "task string", "PR_001")
+            is_existing, key = spawn_coder.handle_feedback_routing("/tmp/work", ".", "PR.md", "PRD.md", "playbook.md", "feedback.txt", "PR_001")
 
         self.assertTrue(is_existing)
         self.assertEqual(key, "sdlc_coder_PR_001")
@@ -58,9 +59,8 @@ class TestSpawnCoder(unittest.TestCase):
 
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
-    @patch('spawn_coder.build_prompt')
     @patch('utils_api_key.setup_spawner_api_key')
-    def test_initial_mode_uses_envelope_prompt(self, mock_setup_key, mock_build_prompt, mock_invoke, mock_check_output):
+    def test_initial_mode_uses_envelope_prompt(self, mock_setup_key, mock_invoke, mock_check_output):
         mock_check_output.return_value = "feature/test"
         mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
 
@@ -95,7 +95,6 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertIn(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "playbooks", "coder_playbook.md")), task_string)
             self.assertNotIn(pr_content, task_string)
             self.assertNotIn(prd_content, task_string)
-            mock_build_prompt.assert_not_called()
             mock_setup_key.assert_called_once()
 
             packet_file = os.path.join(tmp_dir, "coder_debug", "initial", "startup_packet.json")
@@ -137,10 +136,8 @@ class TestSpawnCoder(unittest.TestCase):
 
         mock_invoke.assert_called()
         prompt_sent = mock_invoke.call_args[0][0]
-        self.assertIn("This is an execution task, not an acknowledgment task", prompt_sent)
-        self.assertIn("You MUST NOT respond with only an acknowledgment such as", prompt_sent)
-        self.assertIn("If you do not make code changes after revision feedback, you have failed the task", prompt_sent)
-        self.assertIn("Commit the required files explicitly", prompt_sent)
+        self.assertIn("Revision work is execution work, not acknowledgment work.", prompt_sent)
+        self.assertIn("Address the reviewer findings with code changes, not acknowledgment-only output.", prompt_sent)
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
@@ -179,10 +176,8 @@ class TestSpawnCoder(unittest.TestCase):
         prompt_sent = mock_invoke.call_args[0][0]
         called_kwargs = mock_invoke.call_args[1]
         self.assertEqual(called_kwargs['session_key'], "sdlc_coder_PR_001_1234abcd")
-        self.assertIn("This is an execution task, not an acknowledgment task", prompt_sent)
-        self.assertIn("You MUST NOT respond with only an acknowledgment such as", prompt_sent)
-        self.assertIn("If you do not make code changes after revision feedback, you have failed the task", prompt_sent)
-        self.assertIn("Commit the required files explicitly", prompt_sent)
+        self.assertIn("Revision work is execution work, not acknowledgment work.", prompt_sent)
+        self.assertIn("Address the reviewer findings with code changes, not acknowledgment-only output.", prompt_sent)
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
@@ -217,9 +212,9 @@ class TestSpawnCoder(unittest.TestCase):
 
         mock_invoke.assert_called()
         prompt_sent = mock_invoke.call_args[0][0]
-        self.assertIn("System Preflight or Git Workspace Check Failed", prompt_sent)
+        self.assertIn("System alert requiring corrective action:", prompt_sent)
         self.assertIn("git dirty", prompt_sent)
-        self.assertIn("This alert requires corrective action, not acknowledgment only", prompt_sent)
+        self.assertIn("Resolve the corrective-action alert completely, not just conversationally.", prompt_sent)
         mock_setup_key.assert_called_once()
 
 

@@ -38,18 +38,18 @@ class TestAgentDriverTriad(unittest.TestCase):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
         mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
-        
+
         pr_file = os.path.join(self.workdir, "PR_001.md")
         prd_file = os.path.join(self.workdir, "PRD.md")
         with open(pr_file, "w") as f:
             f.write("mock_pr_content")
         with open(prd_file, "w") as f:
             f.write("mock_prd_content")
-            
+
         test_args = ["spawn_coder.py", "--pr-file", pr_file, "--prd-file", prd_file, "--workdir", self.workdir, "--enable-exec-from-workspace"]
         with patch.object(sys, 'argv', test_args):
             spawn_coder.main()
-            
+
         self.assertTrue(mock_agent_call.called, "invoke_agent was not called")
         args, kwargs = mock_agent_call.call_args
         self.assertTrue(args[0].startswith("# EXECUTION CONTRACT"))
@@ -67,39 +67,38 @@ class TestAgentDriverTriad(unittest.TestCase):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
         mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')
-        
+
         pr_file = os.path.join(self.workdir, "PR_001.md")
         prd_file = os.path.join(self.workdir, "PRD.md")
         feedback_file = os.path.join(self.workdir, "review_report.json")
-        
+
         with open(pr_file, "w") as f:
             f.write("mock_pr_content")
         with open(prd_file, "w") as f:
             f.write("mock_prd_content")
         with open(feedback_file, "w") as f:
             f.write('```json\n{"overall_assessment": "NEEDS_ATTENTION", "findings": [{"description": "raw JSON test"}]}\n```')
-            
+
         test_args = ["spawn_coder.py", "--pr-file", pr_file, "--prd-file", prd_file, "--workdir", self.workdir, "--feedback-file", feedback_file, "--enable-exec-from-workspace"]
         with patch.object(sys, 'argv', test_args):
             spawn_coder.main()
-            
+
         self.assertTrue(mock_agent_call.called, "invoke_agent was not called")
         args, kwargs = mock_agent_call.call_args
-        
-        # Verify that the markdown wrapper was stripped and pure JSON is in the prompt
+    
+        # Verify that the envelope references the feedback artifact instead of inlining it
         self.assertNotIn("```json", args[0])
-        self.assertIn('"overall_assessment": "NEEDS_ATTENTION"', args[0])
-        self.assertIn('"description": "raw JSON test"', args[0])
+        self.assertNotIn('"overall_assessment": "NEEDS_ATTENTION"', args[0])
+        self.assertIn(feedback_file, args[0])
+        self.assertNotIn('"description": "raw JSON test"', args[0])
         mock_setup_key.assert_called()
 
     def test_build_prompt_resolves_correctly(self):
-        prompt = build_prompt("coder", workdir="/tmp/test", playbook_content="mock_playbook", pr_file="test_pr.md", pr_content="mock_pr_content", prd_file="test_prd.md", prd_content="mock_prd_content")
-        
+        prompt = build_prompt("arbitrator", workdir="/tmp/test", pr_file="test_pr.md", pr_content="mock_pr_content", diff_file="dummy.diff", review_report_path="report.json", run_dir="run")
+
         self.assertNotEqual(prompt, "")
         self.assertIn("/tmp/test", prompt)
-        self.assertIn("mock_playbook", prompt)
         self.assertIn("mock_pr_content", prompt)
-        self.assertIn("mock_prd_content", prompt)
         self.assertIn("ATTENTION:", prompt)
 
     @patch('spawn_planner.invoke_agent')
@@ -107,15 +106,15 @@ class TestAgentDriverTriad(unittest.TestCase):
     def test_spawn_planner_payload_injection(self, mock_setup_key, mock_invoke_agent):
         import spawn_planner
         mock_invoke_agent.return_value = AgentResult(session_key='subtask-planner', stdout='dummy')
-        
+
         prd_file = os.path.join(self.workdir, "PRD.md")
         with open(prd_file, "w") as f:
             f.write("mock_prd_content_for_planner")
-            
+
         test_args = ["spawn_planner.py", "--prd-file", prd_file, "--workdir", self.workdir, "--enable-exec-from-workspace"]
         with patch.object(sys, 'argv', test_args):
             spawn_planner.main()
-            
+
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for planner")
         args, kwargs = mock_invoke_agent.call_args
         self.assertIn(prd_file, args[0])
@@ -128,7 +127,7 @@ class TestAgentDriverTriad(unittest.TestCase):
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_reviewer_payload_injection(self, mock_setup_key, mock_run, mock_invoke_agent):
         import spawn_reviewer
-        
+
         def mock_reviewer_invoke(*args, **kwargs):
             # simulate agent writing the artifact
             with open(os.path.join(self.workdir, "review_report.json"), "w") as f:
@@ -139,16 +138,16 @@ class TestAgentDriverTriad(unittest.TestCase):
         pr_file = os.path.join(self.workdir, "PR_001.md")
         with open(pr_file, "w") as f:
             f.write("mock_pr_content_for_reviewer")
-            
+
         test_args = ["spawn_reviewer.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir, "--out-file", "review_report.json", "--run-dir", self.workdir, "--enable-exec-from-workspace"]
-        
+
         dummy_diff = os.path.join(self.workdir, "dummy.diff")
         with open(dummy_diff, "w") as f:
             f.write("mock diff")
-            
+
         with patch.object(sys, 'argv', test_args):
             spawn_reviewer.main()
-            
+
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for reviewer")
         args, kwargs = mock_invoke_agent.call_args
         self.assertIn("# REFERENCE INDEX", args[0])
@@ -162,7 +161,7 @@ class TestAgentDriverTriad(unittest.TestCase):
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_arbitrator_payload_injection(self, mock_setup_key, mock_run, mock_invoke_agent):
         import spawn_arbitrator
-        
+
         def mock_arbitrator_invoke(*args, **kwargs):
             # simulate agent writing the artifact
             with open(os.path.join(self.workdir, "arbitration_report.txt"), "w") as f:
@@ -173,16 +172,16 @@ class TestAgentDriverTriad(unittest.TestCase):
         pr_file = os.path.join(self.workdir, "PR_001.md")
         with open(pr_file, "w") as f:
             f.write("mock_pr_content_for_arbitrator")
-            
+
         test_args = ["spawn_arbitrator.py", "--pr-file", pr_file, "--diff-target", "master", "--workdir", self.workdir, "--enable-exec-from-workspace"]
-        
+
         dummy_diff = os.path.join(self.workdir, "dummy.diff")
         with open(dummy_diff, "w") as f:
             f.write("mock diff")
-            
+
         with patch.object(sys, 'argv', test_args):
             spawn_arbitrator.main()
-            
+
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for arbitrator")
         args, kwargs = mock_invoke_agent.call_args
         self.assertIn("mock_pr_content_for_arbitrator", args[0])
@@ -194,12 +193,12 @@ class TestAgentDriverTriad(unittest.TestCase):
     def test_spawn_manager_payload_injection(self, mock_setup_key, mock_invoke_agent):
         import spawn_manager
         mock_invoke_agent.return_value = AgentResult(session_key='subtask-manager', stdout='dummy')
-        
+
         test_args = ["spawn_manager.py", "--job-dir", "/tmp/job", "--workdir", self.workdir, "--enable-exec-from-workspace"]
-        
+
         with patch.object(sys, 'argv', test_args):
             spawn_manager.main()
-            
+
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for manager")
         args, kwargs = mock_invoke_agent.call_args
         self.assertEqual(kwargs.get("role"), "manager")
@@ -210,9 +209,9 @@ class TestAgentDriverTriad(unittest.TestCase):
 
     def test_spawn_scripts_keep_runtime_aware_prompt_resolution(self):
         from agent_driver import build_prompt
-        
-        prompt = build_prompt("coder", workdir="/tmp/test", playbook_content="mock_playbook", pr_file="test_pr.md", pr_content="mock_pr_content", prd_file="test_prd.md", prd_content="mock_prd_content")
-        
+
+        prompt = build_prompt("manager", workdir="/tmp/test", job_dir="/tmp/job", skill_text="mock_skill_text")
+
         self.assertNotEqual(prompt, "")
         self.assertIn("/tmp/test", prompt)
 
