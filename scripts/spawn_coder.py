@@ -1,58 +1,117 @@
 #!/usr/bin/env python3
-import re
 import argparse
-import tempfile
+import json
 import os
-import sys
-from agent_driver import build_prompt, invoke_agent
-import config
+import re
 import subprocess
-import time
+import sys
+import uuid
 from pathlib import Path
+
+import config
+import envelope_assembler
+from agent_driver import build_prompt, invoke_agent
+
+
 def extract_pr_id(pr_file_path):
     basename = os.path.basename(pr_file_path)
-    # Match PR prefix followed by digits and underscores (e.g. PR_003_1)
-    match = re.search(r'^(PR_[\d_]+)', basename, re.IGNORECASE)
+    match = re.search(r"^(PR_[\d_]+)", basename, re.IGNORECASE)
     if match:
-        return match.group(1).rstrip('_')
+        return match.group(1).rstrip("_")
     return basename.split(".")[0]
-def send_feedback(session_key, message, workdir='.', run_dir="."):
-    """Function to append reviewer feedback to the existing session."""
+
+
+def _load_feedback_content(feedback_file):
+    with open(feedback_file, "r") as f:
+        feedback_content = f.read()
+
+    try:
+        json_match = re.search(r"```json\s*(.*?)\s*```", feedback_content, re.DOTALL)
+        if json_match:
+            feedback_content = json_match.group(1).strip()
+        else:
+            json_match = re.search(r"(\{.*?\})", feedback_content, re.DOTALL)
+            if json_match:
+                feedback_content = json_match.group(1).strip()
+        json_obj = json.loads(feedback_content)
+        feedback_content = json.dumps(json_obj, indent=2)
+    except Exception:
+        pass
+
+    return feedback_content
+
+
+def resolve_coder_artifact_subdir(run_dir, mode):
+    if mode == "initial":
+        return "initial"
+
+    debug_root = os.path.join(run_dir, "coder_debug")
+    prefix = f"{mode}_"
+    max_index = 0
+    if os.path.isdir(debug_root):
+        for entry in os.listdir(debug_root):
+            if not entry.startswith(prefix):
+                continue
+            suffix = entry[len(prefix) :]
+            if len(suffix) == 3 and suffix.isdigit():
+                max_index = max(max_index, int(suffix))
+    return f"{mode}_{max_index + 1:03d}"
+
+
+def build_coder_startup_packet_and_prompt(workdir, run_dir, pr_file, prd_file, playbook_path, mode, feedback_file=None, system_alert=None):
+    references = {
+        "pr_contract_file": os.path.abspath(pr_file),
+        "prd_file": os.path.abspath(prd_file),
+        "playbook_path": os.path.abspath(playbook_path),
+    }
+    if feedback_file:
+        references["feedback_file"] = os.path.abspath(feedback_file)
+
+    contract_params = {}
+    if system_alert:
+        contract_params["system_alert"] = system_alert
+
+    envelope = envelope_assembler.build_startup_envelope(
+        role="coder",
+        workdir=os.path.abspath(workdir),
+        out_dir=os.path.abspath(run_dir),
+        references=references,
+        contract_params=contract_params,
+        mode=mode,
+    )
+    rendered_prompt = envelope_assembler.render_envelope_to_prompt(envelope)
+    return envelope, rendered_prompt
+
+
+def save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt):
+    artifact_subdir = resolve_coder_artifact_subdir(run_dir, mode)
+    envelope_assembler.save_envelope_artifacts(
+        role="coder",
+        out_dir=run_dir,
+        envelope=envelope,
+        rendered_prompt=rendered_prompt,
+        artifact_subdir=artifact_subdir,
+    )
+    return artifact_subdir
+
+
+def send_feedback(session_key, message, workdir=".", run_dir="."):
     result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir)
     print(f"Sent feedback to session {result.session_key}")
+
+
 def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir="."):
     session_file = os.path.join(run_dir, ".coder_session")
     try:
-        import json
-        with open(feedback_file, "r") as f:
-            feedback_content = f.read()
-            
-        try:
-            # Try to extract pure JSON from the file, as it might be wrapped in markdown
-            import re
-            json_match = re.search(r'```json\s*(.*?)\s*```', feedback_content, re.DOTALL)
-            if json_match:
-                feedback_content = json_match.group(1).strip()
-            else:
-                json_match = re.search(r'(\{.*?\})', feedback_content, re.DOTALL)
-                if json_match:
-                    feedback_content = json_match.group(1).strip()
-                    
-            # Ensure it's valid JSON, then dump it raw
-            json_obj = json.loads(feedback_content)
-            feedback_content = json.dumps(json_obj, indent=2)
-        except Exception:
-            pass # Fall back to raw string if parsing fails
-            
+        feedback_content = _load_feedback_content(feedback_file)
         msg = build_prompt("coder_revision", feedback_content=feedback_content)
-        
+
         if os.path.exists(session_file):
             with open(session_file, "r") as sf:
                 session_key = sf.read().strip()
             send_feedback(session_key, msg, workdir=workdir, run_dir=run_dir)
             return True, session_key
         else:
-            import uuid
             session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
             task_string += msg
             result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=run_dir)
@@ -63,6 +122,8 @@ def handle_feedback_routing(workdir, feedback_file, task_string, pr_id, run_dir=
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Spawn a coder subagent")
     parser.add_argument("--pr-file", required=True, help="Path to the PR Contract file")
@@ -72,24 +133,38 @@ def main():
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--global-dir", required=False, help="Global directory for playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
-    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
-    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
-    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    parser.add_argument(
+        "--engine",
+        choices=["openclaw", "gemini"],
+        default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE),
+        help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})",
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL),
+        help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})",
+    )
+    runtime_dir = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
+
     from handoff_prompter import HandoffPrompter
-    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+
+    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(
+        getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))
+    ):
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
-    # API Key Assignment
+
     from utils_api_key import setup_spawner_api_key
+
     setup_spawner_api_key(args, __file__)
-    
+
     if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
         os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
-        
+
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
     try:
@@ -101,78 +176,82 @@ def main():
             sys.exit(1)
     except subprocess.CalledProcessError:
         pass
+
     if not os.path.exists(args.pr_file):
         print(f"[Pre-flight Failed] Coder cannot start. PR Contract not found at '{args.pr_file}'. You must run spawn_planner.py first.")
         sys.exit(1)
+
     pr_id = extract_pr_id(args.pr_file)
     test_mode = os.environ.get("SDLC_TEST_MODE") == "true"
-    if test_mode:
-        log_entry = str({'tool': 'spawn_coder', 'args': {'pr_file': args.pr_file, 'prd_file': args.prd_file, 'feedback_file': args.feedback_file, 'workdir': workdir}})
-        
-        # Ensure tests dir exists
+
+    try:
+        with open(args.pr_file, "r"):
+            pass
+        with open(args.prd_file, "r"):
+            pass
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    sdlc_root = os.path.dirname(runtime_dir)
+    playbook_path = os.path.join(sdlc_root, "playbooks", "coder_playbook.md")
+    session_file = os.path.join(args.run_dir, ".coder_session")
+
+    envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+        workdir=workdir,
+        run_dir=args.run_dir,
+        pr_file=args.pr_file,
+        prd_file=args.prd_file,
+        playbook_path=playbook_path,
+        mode="initial",
+    )
+
+    if test_mode and not args.feedback_file and not args.system_alert:
+        save_coder_debug_artifacts(args.run_dir, "initial", envelope, rendered_prompt)
+        Path(args.run_dir).mkdir(parents=True, exist_ok=True)
+        with open(session_file, "w") as f:
+            f.write("mock-session-key")
         Path("tests").mkdir(exist_ok=True)
-        
         with open("tests/tool_calls.log", "a") as f:
-            f.write(log_entry + "\n")
-        
+            f.write(rendered_prompt + "\n")
         print('{"status": "mock_success", "role": "coder", "sessionKey": "mock-session-key"}')
         sys.exit(0)
-    else:
-        try:
-            with open(args.pr_file, "r") as f:
-                pr_content = f.read()
-            with open(args.prd_file, "r") as f:
-                prd_content = f.read()
-        except FileNotFoundError as e:
-            print(f"Error: {e}")
-            sys.exit(1)
-            
-        # Inject Coder Playbook (PRD_1005)
-        RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
-        SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
-        playbook_path = os.path.join(SDLC_ROOT, "playbooks", "coder_playbook.md")
-        playbook_content = ""
-        if os.path.exists(playbook_path):
-            with open(playbook_path, "r") as f:
-                playbook_content = f.read()
-        
-        task_string = build_prompt("coder", 
-            workdir=workdir, 
-            playbook_content=playbook_content, 
-            pr_file=args.pr_file, 
-            pr_content=pr_content, 
-            prd_file=args.prd_file, 
-            prd_content=prd_content
-        )
-        
-        session_file = os.path.join(args.run_dir, ".coder_session")
-        
+
+    if args.system_alert:
         if os.path.exists(session_file):
             with open(session_file, "r") as sf:
                 session_key = sf.read().strip()
         else:
-            import uuid
             session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-        
-        if args.system_alert:
-            msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
-            if os.path.exists(session_file):
-                send_feedback(session_key, msg, workdir=workdir, run_dir=args.run_dir)
-            else:
-                task_string += msg
-                result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
-                with open(session_file, "w") as f:
-                    f.write(result.session_key)
-                print(f"Spawned new session {result.session_key} with system alert")
-        elif args.feedback_file:
-            handle_feedback_routing(workdir, args.feedback_file, task_string, pr_id, args.run_dir)
+        msg = build_prompt("coder_system_alert", system_alert=args.system_alert)
+        if os.path.exists(session_file):
+            send_feedback(session_key, msg, workdir=workdir, run_dir=args.run_dir)
         else:
-            if not os.path.exists(session_file):
-                result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
-                with open(session_file, "w") as f:
-                    f.write(result.session_key)
-                print(f"Spawned new session {result.session_key}")
-            else:
-                result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
+            task_string = rendered_prompt + msg
+            result = invoke_agent(task_string, session_key=session_key, role="coder", run_dir=args.run_dir)
+            with open(session_file, "w") as f:
+                f.write(result.session_key)
+            print(f"Spawned new session {result.session_key} with system alert")
+        return
+
+    if args.feedback_file:
+        handle_feedback_routing(workdir, args.feedback_file, rendered_prompt, pr_id, args.run_dir)
+        return
+
+    save_coder_debug_artifacts(args.run_dir, "initial", envelope, rendered_prompt)
+
+    if os.path.exists(session_file):
+        with open(session_file, "r") as sf:
+            session_key = sf.read().strip()
+    else:
+        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+
+    result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir)
+    if not os.path.exists(session_file):
+        with open(session_file, "w") as f:
+            f.write(result.session_key)
+        print(f"Spawned new session {result.session_key}")
+
+
 if __name__ == "__main__":
     main()
