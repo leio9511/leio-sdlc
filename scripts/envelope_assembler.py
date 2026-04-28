@@ -161,6 +161,60 @@ def _build_auditor_envelope(workdir, references, contract_params):
     return execution_contract, reference_index, final_checklist
 
 
+def _split_reference_paths(paths):
+    if not paths:
+        return []
+    if isinstance(paths, str):
+        return [path.strip() for path in paths.split(",") if path.strip()]
+    return [str(path).strip() for path in paths if str(path).strip()]
+
+
+def _build_verifier_envelope(workdir, references, contract_params):
+    output_file = contract_params.get("output_file")
+    output_schema = contract_params.get("output_schema")
+    prd_files = _split_reference_paths(references.get("prd_files"))
+
+    execution_contract = [
+        f"Locked Working Directory: `{workdir}`",
+        f"Output File: `{output_file}`",
+        "Read-Only Constraint: You are an evaluation agent. Do NOT modify, create, or delete any workspace files except writing the final UAT JSON output artifact to the exact Output File path.",
+        "Before verification, you MUST use the read tool to read every reference in the REFERENCE INDEX where required=true and priority=1.",
+        f"Output JSON Schema:\n```json\n{json.dumps(output_schema, indent=2)}\n```",
+    ]
+
+    reference_index = []
+    for idx, prd_file in enumerate(prd_files, start=1):
+        reference_index.append(
+            {
+                "id": f"prd_{idx}",
+                "kind": "prd",
+                "path": prd_file,
+                "required": True,
+                "priority": 1,
+                "purpose": "requirements_to_verify",
+            }
+        )
+
+    reference_index.append(
+        {
+            "id": "verifier_playbook",
+            "kind": "playbook",
+            "path": references.get("playbook_path"),
+            "required": True,
+            "priority": 1,
+            "purpose": "verification_methodology",
+        }
+    )
+
+    final_checklist = [
+        "Read every required priority-1 reference before beginning verification.",
+        f"Read-only constraint: Write only the final UAT JSON output artifact to `{output_file}`.",
+        "Schema constraint: The output must match the provided JSON schema.",
+    ]
+
+    return execution_contract, reference_index, final_checklist
+
+
 def _build_coder_envelope(workdir, references, contract_params, mode):
     execution_contract = [
         f"Locked Working Directory: `{workdir}`",
@@ -246,6 +300,10 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
         )
     elif role == "auditor":
         execution_contract, reference_index, final_checklist = _build_auditor_envelope(
+            workdir, references, contract_params
+        )
+    elif role == "verifier":
+        execution_contract, reference_index, final_checklist = _build_verifier_envelope(
             workdir, references, contract_params
         )
     elif role == "coder":

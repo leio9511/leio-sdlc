@@ -90,6 +90,88 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertNotIn("--- PRD", prompt)
         self.assertNotIn("--- CODER PLAYBOOK ---", prompt)
 
+    def test_build_verifier_startup_envelope_splits_multi_prd_references(self):
+        envelope = build_startup_envelope(
+            role="verifier",
+            workdir="/tmp/workdir",
+            out_dir="/tmp/run_dir",
+            references={
+                "prd_files": "/tmp/PRD_A.md, /tmp/PRD_B.md",
+                "playbook_path": "/tmp/verifier_playbook.md",
+            },
+            contract_params={
+                "output_file": "/tmp/uat_report.json",
+                "output_schema": {"status": "string"},
+            },
+        )
+
+        self.assertEqual(envelope["role"], "verifier")
+        refs_by_id = {ref["id"]: ref for ref in envelope["reference_index"]}
+        self.assertEqual(refs_by_id["prd_1"]["path"], "/tmp/PRD_A.md")
+        self.assertEqual(refs_by_id["prd_2"]["path"], "/tmp/PRD_B.md")
+        self.assertEqual(refs_by_id["verifier_playbook"]["path"], "/tmp/verifier_playbook.md")
+        self.assertTrue(all(ref["required"] for ref in refs_by_id.values()))
+        self.assertTrue(all(ref["priority"] == 1 for ref in refs_by_id.values()))
+
+    def test_rendered_verifier_prompt_is_contract_first_and_path_driven(self):
+        envelope = build_startup_envelope(
+            role="verifier",
+            workdir="/tmp/workdir",
+            out_dir="/tmp/run_dir",
+            references={
+                "prd_files": "/tmp/PRD_A.md, /tmp/PRD_B.md",
+                "playbook_path": "/tmp/verifier_playbook.md",
+            },
+            contract_params={
+                "output_file": "/tmp/uat_report.json",
+                "output_schema": {"status": "string"},
+            },
+        )
+
+        prompt = render_envelope_to_prompt(envelope)
+
+        self.assertTrue(prompt.startswith("# EXECUTION CONTRACT"))
+        self.assertIn("/tmp/PRD_A.md", prompt)
+        self.assertIn("/tmp/PRD_B.md", prompt)
+        self.assertIn("/tmp/verifier_playbook.md", prompt)
+        self.assertIn("/tmp/uat_report.json", prompt)
+        self.assertNotIn("ATTENTION: Your root workspace is rigidly locked", prompt)
+        self.assertNotIn("You are the UAT Verifier Agent", prompt)
+
+    def test_verifier_envelope_includes_read_only_and_output_schema_contract(self):
+        output_schema = {
+            "status": "PASS|FAIL",
+            "executive_summary": "string",
+            "verification_details": [
+                {
+                    "requirement": "string",
+                    "status": "PASS|FAIL",
+                    "evidence": "string",
+                    "comments": "string",
+                }
+            ],
+        }
+        envelope = build_startup_envelope(
+            role="verifier",
+            workdir="/tmp/workdir",
+            out_dir="/tmp/run_dir",
+            references={
+                "prd_files": "/tmp/PRD_A.md",
+                "playbook_path": "/tmp/verifier_playbook.md",
+            },
+            contract_params={
+                "output_file": "/tmp/uat_report.json",
+                "output_schema": output_schema,
+            },
+        )
+
+        execution_contract = "\n".join(envelope["execution_contract"])
+        self.assertIn("Read-Only", execution_contract)
+        self.assertIn("/tmp/uat_report.json", execution_contract)
+        self.assertIn("status", execution_contract)
+        self.assertIn("executive_summary", execution_contract)
+        self.assertIn("verification_details", execution_contract)
+
     def test_render_envelope_to_prompt(self):
         envelope = {
             "execution_contract": ["A clause"],
