@@ -6,8 +6,21 @@ import time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
-import agent_driver
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent
+import envelope_assembler
+
+VERIFIER_OUTPUT_SCHEMA = {
+    "status": "(PASS|NEEDS_FIX)",
+    "executive_summary": "A concise summary of the UAT outcome.",
+    "verification_details": [
+        {
+            "requirement": "Description of the requirement extracted from the PRD(s).",
+            "status": "(IMPLEMENTED|MISSING|PARTIAL)",
+            "evidence": "File paths, code snippets, or tool output proving the status.",
+            "comments": "Any notes or suggestions for hotfixes if applicable.",
+        }
+    ],
+}
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn a UAT Verifier agent.")
@@ -31,17 +44,32 @@ def main():
 
     SDLC_ROOT = os.path.dirname(current_dir)
     playbook_path = os.path.join(SDLC_ROOT, "playbooks", "verifier_playbook.md")
+    run_dir = os.environ.get("SDLC_RUN_DIR", ".")
 
-    task_string = build_prompt("verifier",
+    envelope = envelope_assembler.build_startup_envelope(
+        role="verifier",
         workdir=workdir,
-        playbook_path=playbook_path,
-        prd_files=args.prd_files,
-        out_file=os.path.abspath(args.out_file)
+        out_dir=run_dir,
+        references={
+            "prd_files": args.prd_files,
+            "playbook_path": playbook_path,
+        },
+        contract_params={
+            "output_file": os.path.abspath(args.out_file),
+            "output_schema": VERIFIER_OUTPUT_SCHEMA,
+        },
+    )
+    task_string = envelope_assembler.render_envelope_to_prompt(envelope)
+    envelope_assembler.save_envelope_artifacts(
+        role="uat",
+        out_dir=run_dir,
+        envelope=envelope,
+        rendered_prompt=task_string,
+        artifact_subdir="initial",
     )
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
     if test_mode:
-        import json
         run_dir = os.environ.get("SDLC_RUN_DIR", ".")
         os.makedirs(os.path.join(run_dir, "tests"), exist_ok=True)
         with open(os.path.join(run_dir, "tests", "verifier_task_string.log"), "w") as f:
