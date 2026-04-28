@@ -49,6 +49,8 @@ Accordingly, this PRD must be read as a target-state execution contract for repl
    - The installed runtime may load a local overlay at `config/sdlc_config.json`.
    - Private engines may exist only in the runtime overlay and must not be required in tracked public source.
    - Public code must treat provider identity as config data, not as a hard-coded architectural constant.
+   - **Existing non-engine top-level config keys remain valid.** This PRD does not repurpose `config/sdlc_config.json.template` into an engine-only file. Existing operational keys already used by the control plane (for example retry limits, run-dir settings, lock-related settings, or key-pool settings) must continue to coexist unless a separate explicitly scoped PRD authorizes moving them.
+   - **Validation scope is limited to the engine-registry subtree.** Iteration 1 strict schema validation must apply only to `default_engine`, `role_overrides`, and `engines`. Other existing top-level config keys must be preserved and must not cause startup validation failure merely because they are outside the engine-registry contract.
 
 2. **Engine Registry**
    - The system must load engines from an explicit registry under `engines`.
@@ -136,7 +138,7 @@ Accordingly, this PRD must be read as a target-state execution contract for repl
 13. **Codex Continuity Scope in Iteration 1**
     - Codex is architecturally compatible with `coder`, `planner`, `reviewer`, `auditor`, `verifier`, and `arbitrator`, because local validation confirms a resumable path via `codex exec` plus `codex exec resume`.
     - Codex must use `continuity_mode = stateful` and `handle_acquisition_strategy = emitted_handle_on_start`.
-    - However, Codex coder rollout is gated by completion of the Mandatory Baseline Validation Phase. Iteration-1 architecture may support Codex coder continuity, but production-facing role defaults and rollout decisions must remain conservative until OpenClaw and Gemini baselines are proven stable under the new engine architecture.
+    - **Codex coder rollout is a conservative operational policy in iteration 1, not a runtime-enforced schema gate.** The architecture and public example config may describe Codex as capable of serving `coder`, but production defaults, operator guidance, and staged validation policy must remain conservative until OpenClaw and Gemini baselines are proven stable under the new engine architecture and Codex has completed its own conformance and controlled live validation.
 
 14. **Fail-Fast Observability**
     - Unavailable commands, invalid configs, invalid role bindings, failed handle acquisition, and unsupported continuity must fail with the exact strings defined in Section 7.
@@ -219,6 +221,7 @@ The merge contract is fixed as follows:
 - when the same engine id exists in both template and runtime overlay, object fields are merged by key with runtime overlay winning on conflicts,
 - arrays are always replaced as whole values, never concatenated,
 - setting a field to `null` in runtime overlay is not a deletion primitive unless a future PRD explicitly introduces deletion semantics.
+- **Strict schema validation is limited to the engine-registry subtree only.** That means iteration-1 validation covers `default_engine`, `role_overrides`, and `engines`, but must not reject or delete unrelated existing top-level operational config keys.
 
 ### 3.4 Core Abstraction: Logical Session vs Native Handle
 The engine layer must stop assuming that every provider supports caller-specified session ids.
@@ -305,7 +308,8 @@ Its acceptance target is therefore stronger than “Codex can be invoked”:
 
 However, iteration-1 rollout must remain conservative:
 - Codex coder support is part of the architecture contract,
-- but production-facing enablement for coder must remain gated until the Mandatory Baseline Validation Phase has proven that the OpenClaw and Gemini baselines remain stable under the refactor, and until Codex has completed its own conformance and controlled live validation.
+- but this conservatism is an **operational rollout policy**, not a schema-level or runtime-enforced gate in iteration 1,
+- therefore the PRD must not claim machine-enforced gating unless a future scoped change adds an explicit runtime policy field and fail-fast enforcement path.
 
 ### 3.9 OpenClaw Final Solution
 OpenClaw remains the cleanest path:
@@ -613,7 +617,7 @@ The following scenarios define the required target-state black-box acceptance cr
    - Keep live-provider validation out of default blocking CI
 
 ### Quality Goal
-After this change, `leio-sdlc` must behave as a closed-contract, capability-gated multi-engine runtime. Adding a new compatible CLI should be primarily a config operation, not a business-logic rewrite. The primary regression objective is preservation of SDLC control-plane behavior under a provider-agnostic engine contract.
+After this change, `leio-sdlc` must behave as a closed-contract, policy-governed multi-engine runtime. Adding a new compatible CLI should be primarily a config operation, not a business-logic rewrite. The primary regression objective is preservation of SDLC control-plane behavior under a provider-agnostic engine contract.
 
 ## 6. Framework Modifications (框架防篡改声明)
 - `scripts/agent_driver.py`
@@ -640,6 +644,7 @@ After this change, `leio-sdlc` must behave as a closed-contract, capability-gate
 - **v3.0**: Refined the architecture based on direct local validation of Codex and Gemini continuity behavior. The core correction was to separate `continuity_mode` from `handle_acquisition_strategy`.
 - **v4.0**: Re-centered the PRD away from Codex-specific framing and clarified that OpenClaw, Gemini, and Codex are public conformance cases under one provider-agnostic engine contract.
 - **v5.0**: Refreshed the approved PRD after post-approval OpenClaw baseline progress. This update records that isolated OpenClaw execution routing and deterministic explicit model selection are now already validated and deployed, so Codex is framed as third-engine conformance onboarding against the post-1181 baseline rather than onboarding onto an unresolved OpenClaw substrate.
+- **v6.0**: Narrowed the config contract after Auditor rejection. Existing non-engine top-level keys in `config/sdlc_config.json.template` are now explicitly preserved; strict schema validation applies only to the engine-registry subtree (`default_engine`, `role_overrides`, `engines`). Codex coder rollout is explicitly downgraded from a claimed machine-enforced gate to an operational rollout policy unless and until a future scoped PRD adds runtime-enforced policy fields.
 - **Design pattern correction**: The architecture is explicitly framed as Control Plane / Data Plane Separation + Registry-Driven Strategy + Capability-Based Adapter Contract + Conformance Test Matrix.
 - **Testing correction**: The PRD now requires contract tests, engine conformance matrix tests, smoke validation, and pipeline-preservation E2E so that the existing SDLC control plane can be proven stable before and after the engine refactor.
 - **Private-boundary correction**: Public code and public schema must remain provider-agnostic enough that future private engines can be added through runtime-only config overlays.
@@ -661,8 +666,10 @@ Public example engines are examples and regression fixtures, not the architectur
 If onboarding a future private engine still requires adding a provider-specific branch or hard-coded engine id to public code, the architecture defined by this PRD must be considered failed.
 ```
 
-### 7B. Exact target public example template to be produced (`config/sdlc_config.json.template`)
-The current repository template does not yet implement this target engine schema. The following content defines the exact target template that the implementation under this PRD must create.
+### 7B. Exact target engine-registry example block to be embedded in `config/sdlc_config.json.template`
+The current repository template does not yet implement this target engine schema. The following content defines the exact **engine-registry-related fields** that the implementation under this PRD must add or normalize inside `config/sdlc_config.json.template`.
+
+**This is not a whole-file replacement contract.** Existing non-engine top-level keys already used by the control plane remain valid and must coexist unless a separate explicitly scoped PRD authorizes moving or deleting them.
 ```json
 {
   "default_engine": null,
