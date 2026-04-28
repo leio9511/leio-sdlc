@@ -100,6 +100,10 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertIn("/tmp/test", prompt)
         self.assertIn("mock_pr_content", prompt)
         self.assertIn("ATTENTION:", prompt)
+        
+        coder_prompt = build_prompt("coder")
+        self.assertEqual(coder_prompt, "__DEPRECATED__ use envelope_assembler.py — see spawn_coder.py")
+
 
     @patch('spawn_planner.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
