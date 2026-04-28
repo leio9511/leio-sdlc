@@ -103,6 +103,8 @@ class TestAgentDriverTriad(unittest.TestCase):
         
         coder_prompt = build_prompt("coder")
         self.assertEqual(coder_prompt, "__DEPRECATED__ use envelope_assembler.py — see spawn_coder.py")
+        self.assertEqual(build_prompt("coder_revision"), "__DEPRECATED__ use envelope_assembler.py — see spawn_coder.py")
+        self.assertEqual(build_prompt("coder_system_alert"), "__DEPRECATED__ use envelope_assembler.py — see spawn_coder.py")
 
 
     @patch('spawn_planner.invoke_agent')

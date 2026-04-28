@@ -167,6 +167,76 @@ def test_orchestrator_system_alert_invocation(mock_workdir):
         sys_alert_arg = system_alert_calls[0][0][0]
         assert "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text." in sys_alert_arg
 
+def test_orchestrator_coder_system_alert_invocation(mock_workdir):
+    with patch('orchestrator.SanityContext.perform_healthy_check'), patch('orchestrator.teardown_coder_session'), \
+         patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir]), \
+         patch('orchestrator.drun') as mock_drun, \
+         patch('orchestrator.dpopen') as mock_dpopen, \
+         patch('git_utils.check_git_boundary'), \
+         patch('orchestrator.validate_prd_is_committed'), \
+         patch('orchestrator.parse_affected_projects', return_value=[]), \
+         patch('orchestrator.safe_git_checkout'), \
+         patch('orchestrator.notify_channel'), \
+         patch('orchestrator.glob.glob') as mock_glob, \
+         patch('orchestrator.set_pr_status'):
+         
+        def dummy_drun(cmd, *args, **kwargs):
+            mock_res = MagicMock()
+            if isinstance(cmd, list) and "preflight.sh" in cmd[0]:
+                # Fail preflight on the first attempt
+                if mock_drun.call_count < 10:
+                    mock_res.returncode = 1
+                    mock_res.stdout = "Preflight failed error"
+                    mock_res.stderr = ""
+                else:
+                    mock_res.returncode = 0
+            elif isinstance(cmd, list) and "branch" in cmd:
+                mock_res.stdout = "master\n"
+                mock_res.returncode = 0
+            else:
+                mock_res.returncode = 0
+                mock_res.stdout = ""
+            return mock_res
+            
+        mock_drun.side_effect = dummy_drun
+        
+        target_project_name = os.path.basename(os.path.abspath(mock_workdir))
+        job_dir = os.path.join(mock_workdir, ".sdlc_runs", target_project_name, "dummy_prd")
+        os.makedirs(job_dir, exist_ok=True)
+        
+        # Ensure preflight.sh exists
+        preflight_path = os.path.join(mock_workdir, "preflight.sh")
+        with open(preflight_path, "w") as f:
+            f.write("#!/bin/bash\nexit 1")
+            
+        # Set yellow retry limit to 2 via config
+        config_dir = os.path.join(mock_workdir, "config")
+        os.makedirs(config_dir, exist_ok=True)
+        with open(os.path.join(config_dir, "sdlc_config.json"), "w") as f:
+            json.dump({"YELLOW_RETRY_LIMIT": 2}, f)
+
+        mock_dpopen.return_value.returncode = 0
+        pr_file = os.path.join(mock_workdir, "PR_001_test.md")
+        with open(pr_file, "w") as f:
+            f.write("status: in_progress\n")
+            
+        def dummy_glob(pattern, recursive=False):
+            return [] if ".coder_session" in pattern else [pr_file]
+        mock_glob.side_effect = dummy_glob
+        
+        try:
+            with patch('sys.argv', ['orchestrator.py', '--workdir', mock_workdir, '--prd-file', 'dummy_prd.md', '--force-replan', 'false', '--channel', 'test-channel', '--enable-exec-from-workspace', '--global-dir', mock_workdir, '--max-prs-to-process', '1']):
+                 orchestrator.main()
+        except SystemExit:
+            pass
+            
+        # Check dpopen calls.
+        dpopen_calls = mock_dpopen.call_args_list
+        coder_system_alert_calls = [call for call in dpopen_calls if "spawn_coder.py" in " ".join(call[0][0]) and "--system-alert" in call[0][0]]
+        
+        assert len(coder_system_alert_calls) > 0
+        assert "Preflight failed" in " ".join(coder_system_alert_calls[0][0][0])
+
 def test_parse_review_verdict_success():
     content = '{"overall_assessment": "EXCELLENT"}'
     assert orchestrator.parse_review_verdict(content) == "APPROVED"
