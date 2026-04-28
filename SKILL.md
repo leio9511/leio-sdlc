@@ -142,6 +142,8 @@ Do not use:
 - manual `&`
 - improvised daemon loops
 
+Critical: Do NOT set a timeout parameter on the exec call. The orchestrator may run for hours across multiple coder/reviewer cycles; setting a timeout will kill it at an arbitrary point and corrupt the run.
+
 ## After launch
 
 When the orchestrator completes, inspect the completion output.
