@@ -1,6 +1,7 @@
 ---
 Affected_Projects: [leio-sdlc]
 Context_Workdir: /root/projects/leio-sdlc
+status: completed
 ---
 
 # PRD: Coder Startup Envelope Migration
