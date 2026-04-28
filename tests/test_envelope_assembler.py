@@ -66,6 +66,30 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertTrue(all(ref["required"] for ref in refs_by_id.values()))
         self.assertTrue(all(ref["priority"] == 1 for ref in refs_by_id.values()))
 
+    def test_rendered_coder_prompt_is_contract_first_and_path_driven(self):
+        envelope = build_startup_envelope(
+            role="coder",
+            workdir="/test/workdir",
+            out_dir="/test/run_dir",
+            references={
+                "pr_contract_file": "/test/contracts/PR_001.md",
+                "prd_file": "/test/docs/PRD.md",
+                "playbook_path": "/test/playbooks/coder_playbook.md",
+            },
+            contract_params={},
+            mode="initial",
+        )
+
+        prompt = render_envelope_to_prompt(envelope)
+
+        self.assertTrue(prompt.startswith("# EXECUTION CONTRACT"))
+        self.assertIn("/test/contracts/PR_001.md", prompt)
+        self.assertIn("/test/docs/PRD.md", prompt)
+        self.assertIn("/test/playbooks/coder_playbook.md", prompt)
+        self.assertNotIn("--- PR Contract", prompt)
+        self.assertNotIn("--- PRD", prompt)
+        self.assertNotIn("--- CODER PLAYBOOK ---", prompt)
+
     def test_render_envelope_to_prompt(self):
         envelope = {
             "execution_contract": ["A clause"],
@@ -92,6 +116,33 @@ class TestEnvelopeAssembler(unittest.TestCase):
         with open(os.path.join(debug_dir, "rendered_prompt.txt"), "r") as f:
             text = f.read()
             self.assertEqual(text, "test prompt")
+
+    def test_save_coder_envelope_artifacts_supports_mode_scoped_paths(self):
+        envelope = {
+            "role": "coder",
+            "execution_contract": ["clause"],
+            "reference_index": [],
+            "final_checklist": ["done"],
+        }
+        prompt = "# EXECUTION CONTRACT\n- clause"
+
+        debug_dir = save_envelope_artifacts(
+            "coder",
+            self.temp_dir,
+            envelope,
+            prompt,
+            artifact_subdir="initial",
+        )
+
+        self.assertEqual(debug_dir, os.path.join(self.temp_dir, "coder_debug", "initial"))
+
+        with open(os.path.join(debug_dir, "startup_packet.json"), "r") as f:
+            data = json.load(f)
+            self.assertEqual(data["role"], "coder")
+
+        with open(os.path.join(debug_dir, "rendered_prompt.txt"), "r") as f:
+            text = f.read()
+            self.assertEqual(text, prompt)
 
     def test_planner_backward_compatibility(self):
         import planner_envelope as pe
