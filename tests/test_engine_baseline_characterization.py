@@ -239,6 +239,19 @@ def test_absent_llm_driver_defaults_to_openclaw_in_invoke_agent():
     ]
 
 
+def test_orchestrator_baseline_and_manifest_characterization_still_passes():
+    orchestrator_source_path = os.path.join(os.path.dirname(__file__), "../scripts/orchestrator.py")
+    with open(orchestrator_source_path, "r", encoding="utf-8") as source:
+        orchestrator_source = source.read()
+
+    assert 'from agent_driver import invoke_agent, build_prompt, notify_channel' in orchestrator_source
+    assert 'os.path.join(RUNTIME_DIR, "spawn_planner.py")' in orchestrator_source
+    assert 'dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")' in orchestrator_source
+    assert 'invoke_agent(' not in orchestrator_source
+    assert 'baseline_commit.txt' in orchestrator_source
+    assert 'run_manifest.json' in orchestrator_source
+
+
 def test_no_codex_registry_behavior_exists_in_characterization_pr():
     source_path = os.path.join(os.path.dirname(__file__), "../scripts/agent_driver.py")
     with open(source_path, "r", encoding="utf-8") as source:
