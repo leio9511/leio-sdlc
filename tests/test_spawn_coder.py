@@ -222,9 +222,10 @@ class TestSpawnCoder(unittest.TestCase):
 
         mock_invoke.assert_called()
         prompt_sent = mock_invoke.call_args[0][0]
-        self.assertIn("System alert requiring corrective action:", prompt_sent)
+        self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_sent)
         self.assertIn("git dirty", prompt_sent)
-        self.assertIn("Resolve the corrective-action alert completely, not just conversationally.", prompt_sent)
+        self.assertNotIn("System alert requiring corrective action:", prompt_sent)
+        self.assertIn("not replanning the PR", prompt_sent)
         mock_setup_key.assert_called_once()
 
 

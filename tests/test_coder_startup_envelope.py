@@ -95,15 +95,21 @@ class TestCoderStartupEnvelope(unittest.TestCase):
                 with patch.object(sys, 'argv', test_args):
                     spawn_coder.main()
                     
-            alert_dir = os.path.join(tmp_dir, "coder_debug", "system_alert_001")
+            alert_dir = os.path.join(tmp_dir, "coder_debug", "system_alert_bootstrap_001")
             self.assertTrue(os.path.exists(os.path.join(alert_dir, "startup_packet.json")))
             self.assertTrue(os.path.exists(os.path.join(alert_dir, "rendered_prompt.txt")))
             
             with open(os.path.join(alert_dir, "startup_packet.json")) as f:
                 packet = json.load(f)
-                
-            alert_clauses = [c for c in packet["execution_contract"] if "git status is dirty" in c]
-            self.assertEqual(len(alert_clauses), 1)
+            
+            self.assertEqual(packet["mode"], "system_alert_bootstrap")
+            self.assertEqual(packet["lifecycle"], "recovery_bootstrap_continuation")
+            self.assertFalse(packet["continuation_semantics"]["fresh_task"])
+            
+            with open(os.path.join(alert_dir, "rendered_prompt.txt")) as f:
+                prompt_text = f.read()
+            self.assertIn("git status is dirty", prompt_text)
+            self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_text)
 
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')

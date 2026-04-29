@@ -231,8 +231,6 @@ def _build_coder_envelope(workdir, references, contract_params, mode):
         execution_contract.insert(5, "Revision work is execution work, not acknowledgment work.")
     if mode == "revision_bootstrap":
         execution_contract.insert(6, "Bootstrap rule: Treat this as a fresh coder session that still must fully execute the reviewer feedback.")
-    if mode == "system_alert" and contract_params.get("system_alert"):
-        execution_contract.insert(5, f"System alert requiring corrective action: {contract_params['system_alert']}")
 
     reference_index = [
         {
@@ -281,9 +279,7 @@ def _build_coder_envelope(workdir, references, contract_params, mode):
         "Report the latest commit hash when handing work back.",
     ]
 
-    if mode == "system_alert":
-        final_checklist.insert(1, "Resolve the corrective-action alert completely, not just conversationally.")
-    elif mode in {"revision", "revision_bootstrap"}:
+    if mode in {"revision", "revision_bootstrap"}:
         final_checklist.insert(1, "Address the reviewer findings with code changes, not acknowledgment-only output.")
 
     return execution_contract, reference_index, final_checklist

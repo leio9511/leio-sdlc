@@ -25,11 +25,12 @@ You are started via a structured execution envelope in one of four modes: `initi
 
 - **Contract-First Priority**: The execution contract in your startup prompt is authoritative over general prose.
 - **Required Reference-Read Rule**: Before coding, you MUST read all references in the REFERENCE INDEX marked `required=true` and `priority=1`.
-- **Mode Awareness**:
-  - `initial`: First-time execution of the PR contract.
-  - `revision`: Fix code based on Reviewer feedback.
-  - `system_alert`: Fix preflight or Git failures identified by the orchestrator.
-  - `revision_bootstrap`: Equivalent to `revision` but triggered when your previous session context was lost and a new one was bootstrapped.
+- **Mode Awareness (The A/B/C/D Lifecycle Model)**:
+  - `initial` = full startup envelope. First-time execution of the PR contract.
+  - `revision` = same-session delta continuation. Fix code based on Reviewer feedback; the prompt focuses on the inline review section.
+  - `revision_bootstrap` = recovery-shaped full bootstrap after session loss. Restores context and focuses on the inline review section.
+  - `system_alert` = same-session operational delta continuation. Fix preflight or Git failures, with recovery fallback only when session continuity is lost.
+- **Continuation Target Rule**: Continuation prompts (`revision` and `system_alert`) may not include the full startup envelope. The inline review and alert sections are authoritative action targets. Ensure you address them directly.
 - **Revision Anti-Acknowledgment Rule**: Revision work is execution work, not acknowledgment work. Do not just say you understand; you must fix the code.
 - **System-Alert Completion Rule**: A system alert is not resolved when it is acknowledged; it is resolved only when the required corrective action is completed and the workspace is healthy again.
 

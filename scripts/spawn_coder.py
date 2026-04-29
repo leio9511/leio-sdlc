@@ -171,6 +171,26 @@ def build_coder_continuation_packet(
             "same_session_required": False,
             "inline_review_section": "# REVIEW REPORT JSON",
         }
+    elif mode == "system_alert":
+        lifecycle = "same_session_operational_delta_continuation"
+        prompt_kind = "coder_system_alert_continuation"
+        behavioral_rules = [SYSTEM_ALERT_CONTINUATION_RULE]
+        continuation_semantics = {
+            "fresh_task": False,
+            "existing_branch_state_authoritative": True,
+            "same_session_required": True,
+            "inline_alert_section": "# SYSTEM ALERT YOU MUST FIX",
+        }
+    elif mode == "system_alert_bootstrap":
+        lifecycle = "recovery_bootstrap_continuation"
+        prompt_kind = "coder_system_alert_recovery_bootstrap"
+        behavioral_rules = [RECOVERY_CONTINUATION_WARNING]
+        continuation_semantics = {
+            "fresh_task": False,
+            "existing_branch_state_authoritative": True,
+            "same_session_required": False,
+            "inline_alert_section": "# SYSTEM ALERT YOU MUST FIX",
+        }
     else:
         lifecycle = "coder_continuation"
         prompt_kind = f"coder_{mode}_continuation"
@@ -406,6 +426,70 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         return False, result.session_key
 
 
+def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_path, system_alert, pr_id, test_mode=False):
+    session_file = os.path.join(run_dir, ".coder_session")
+    current_branch = get_current_branch(workdir)
+    latest_commit_hash = get_latest_commit_hash(workdir)
+    
+    if os.path.exists(session_file):
+        mode = "system_alert"
+        session_key = read_text_file(session_file).strip()
+        rendered_prompt = build_coder_system_alert_continuation_prompt(
+            workdir=workdir,
+            pr_file=pr_file,
+            prd_file=prd_file,
+            playbook_path=playbook_path,
+            system_alert=system_alert,
+            current_branch=current_branch,
+            latest_commit_hash=latest_commit_hash,
+        )
+    else:
+        mode = "system_alert_bootstrap"
+        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+        rendered_prompt = build_coder_system_alert_recovery_prompt(
+            workdir=workdir,
+            pr_file=pr_file,
+            prd_file=prd_file,
+            playbook_path=playbook_path,
+            system_alert=system_alert,
+            current_branch=current_branch,
+            latest_commit_hash=latest_commit_hash,
+        )
+
+    packet = build_coder_continuation_packet(
+        mode=mode,
+        workdir=workdir,
+        pr_file=pr_file,
+        prd_file=prd_file,
+        playbook_path=playbook_path,
+        current_branch=current_branch,
+        latest_commit_hash=latest_commit_hash,
+    )
+    
+    save_coder_debug_artifacts(run_dir, mode, packet, rendered_prompt)
+
+    if test_mode:
+        Path(run_dir).mkdir(parents=True, exist_ok=True)
+        if mode == "system_alert_bootstrap":
+            with open(session_file, "w") as f:
+                f.write("mock-session-key")
+        Path("tests").mkdir(exist_ok=True)
+        with open("tests/tool_calls.log", "a") as f:
+            f.write(rendered_prompt + "\n")
+        print('{"status": "mock_success", "role": "coder", "sessionKey": "' + session_key + '"}')
+        sys.exit(0)
+
+    if mode == "system_alert":
+        send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir)
+        return True, session_key
+    else:
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir)
+        with open(session_file, "w") as f:
+            f.write(result.session_key)
+        print(f"Spawned new session {result.session_key} with system alert")
+        return False, result.session_key
+
+
 def main():
     parser = argparse.ArgumentParser(description="Spawn a coder subagent")
     parser.add_argument("--pr-file", required=True, help="Path to the PR Contract file")
@@ -480,39 +564,7 @@ def main():
     session_file = os.path.join(args.run_dir, ".coder_session")
 
     if args.system_alert:
-        envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
-            workdir=workdir,
-            run_dir=args.run_dir,
-            pr_file=args.pr_file,
-            prd_file=args.prd_file,
-            playbook_path=playbook_path,
-            mode="system_alert",
-            system_alert=args.system_alert
-        )
-        save_coder_debug_artifacts(args.run_dir, "system_alert", envelope, rendered_prompt)
-        
-        if test_mode:
-            Path(args.run_dir).mkdir(parents=True, exist_ok=True)
-            Path("tests").mkdir(exist_ok=True)
-            with open("tests/tool_calls.log", "a") as f:
-                f.write(rendered_prompt + "\n")
-            session_key = "mock-session-key" if os.path.exists(session_file) else f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-            if not os.path.exists(session_file):
-                with open(session_file, "w") as f:
-                    f.write(session_key)
-            print('{"status": "mock_success", "role": "coder", "sessionKey": "' + session_key + '"}')
-            sys.exit(0)
-
-        if os.path.exists(session_file):
-            with open(session_file, "r") as sf:
-                session_key = sf.read().strip()
-            send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=args.run_dir)
-        else:
-            session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-            result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir)
-            with open(session_file, "w") as f:
-                f.write(result.session_key)
-            print(f"Spawned new session {result.session_key} with system alert")
+        handle_system_alert_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.system_alert, pr_id, test_mode=test_mode)
         return
 
     if args.feedback_file:
