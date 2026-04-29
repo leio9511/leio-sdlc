@@ -25,8 +25,13 @@ def resolve_coder_artifact_subdir(run_dir, mode):
     if mode == "initial":
         return "initial"
 
-    debug_root = os.path.join(run_dir, "coder_debug")
+    # Use the same prefix for both system_alert and system_alert_bootstrap
+    # to maintain continuity of the alert cycle numbering as requested.
     prefix = f"{mode}_"
+    if mode == "system_alert_bootstrap":
+        prefix = "system_alert_"
+
+    debug_root = os.path.join(run_dir, "coder_debug")
     max_index = 0
     if os.path.isdir(debug_root):
         for entry in os.listdir(debug_root):
@@ -35,7 +40,7 @@ def resolve_coder_artifact_subdir(run_dir, mode):
             suffix = entry[len(prefix) :]
             if len(suffix) == 3 and suffix.isdigit():
                 max_index = max(max_index, int(suffix))
-    return f"{mode}_{max_index + 1:03d}"
+    return f"{prefix}{max_index + 1:03d}"
 
 
 def build_coder_startup_packet_and_prompt(workdir, run_dir, pr_file, prd_file, playbook_path, mode, feedback_file=None, system_alert=None):
@@ -197,6 +202,31 @@ def build_coder_continuation_packet(
         behavioral_rules = []
         continuation_semantics = {}
 
+    if mode in ["revision", "revision_bootstrap"]:
+        final_checklist = [
+            "Address the reviewer findings with code changes, not acknowledgment-only output.",
+            "Keep all work inside the locked working directory and preserve branch guardrails.",
+            "Run the relevant tests and `./preflight.sh` if it exists until green.",
+            "Commit the exact files you changed and leave `git status` clean.",
+            "Report the latest commit hash when handing work back.",
+        ]
+    elif mode in ["system_alert", "system_alert_bootstrap"]:
+        final_checklist = [
+            "Fix the exact operational failure shown in the alert.",
+            "Keep all work inside the locked working directory and preserve branch guardrails.",
+            "Run the relevant tests and `./preflight.sh` if it exists until green.",
+            "Commit the exact files you changed and leave `git status` clean.",
+            "Report the latest commit hash when handing work back.",
+        ]
+    else:
+        final_checklist = [
+            "Address the findings with code changes.",
+            "Keep all work inside the locked working directory and preserve branch guardrails.",
+            "Run the relevant tests and `./preflight.sh` if it exists until green.",
+            "Commit the exact files you changed and leave `git status` clean.",
+            "Report the latest commit hash when handing work back.",
+        ]
+
     return {
         "role": "coder",
         "mode": mode,
@@ -208,13 +238,7 @@ def build_coder_continuation_packet(
         "latest_commit_hash": latest_commit_hash,
         "behavioral_rules": behavioral_rules,
         "continuation_semantics": continuation_semantics,
-        "final_checklist": [
-            "Address the reviewer findings with code changes, not acknowledgment-only output.",
-            "Keep all work inside the locked working directory and preserve branch guardrails.",
-            "Run the relevant tests and `./preflight.sh` if it exists until green.",
-            "Commit the exact files you changed and leave `git status` clean.",
-            "Report the latest commit hash when handing work back.",
-        ],
+        "final_checklist": final_checklist,
     }
 
 

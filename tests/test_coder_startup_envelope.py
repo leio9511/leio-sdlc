@@ -95,7 +95,7 @@ class TestCoderStartupEnvelope(unittest.TestCase):
                 with patch.object(sys, 'argv', test_args):
                     spawn_coder.main()
                     
-            alert_dir = os.path.join(tmp_dir, "coder_debug", "system_alert_bootstrap_001")
+            alert_dir = os.path.join(tmp_dir, "coder_debug", "system_alert_001")
             self.assertTrue(os.path.exists(os.path.join(alert_dir, "startup_packet.json")))
             self.assertTrue(os.path.exists(os.path.join(alert_dir, "rendered_prompt.txt")))
             

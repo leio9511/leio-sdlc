@@ -225,7 +225,7 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_sent)
         self.assertIn("git dirty", prompt_sent)
         self.assertNotIn("System alert requiring corrective action:", prompt_sent)
-        self.assertIn("not replanning the PR", prompt_sent)
+        self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, prompt_sent)
         mock_setup_key.assert_called_once()
 
 
