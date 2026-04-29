@@ -51,7 +51,15 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             
             with open(os.path.join(bootstrap_dir, "startup_packet.json")) as f:
                 packet = json.load(f)
+            with open(os.path.join(bootstrap_dir, "rendered_prompt.txt")) as f:
+                rendered_prompt = f.read()
                 
+            self.assertEqual(packet["mode"], "revision_bootstrap")
+            self.assertEqual(packet["lifecycle"], "recovery_bootstrap_continuation")
+            self.assertFalse(packet["continuation_semantics"]["fresh_task"])
+            self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, rendered_prompt)
+            self.assertIn("# REVIEW REPORT JSON", rendered_prompt)
+            self.assertIn("mock feedback", rendered_prompt)
             feedback_refs = [ref for ref in packet["reference_index"] if ref["id"] == "reviewer_feedback"]
             self.assertEqual(len(feedback_refs), 1)
             self.assertEqual(feedback_refs[0]["path"], feedback_file)

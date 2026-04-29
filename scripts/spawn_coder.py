@@ -68,6 +68,136 @@ SYSTEM_ALERT_CONTINUATION_RULE = "Do not re-plan the whole PR. Fix the exact ope
 RECOVERY_CONTINUATION_WARNING = "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts."
 
 
+def get_current_branch(workdir):
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=workdir,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def get_latest_commit_hash(workdir):
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=workdir,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def read_text_file(path):
+    with open(path, "r") as f:
+        return f.read()
+
+
+def build_coder_continuation_packet(
+    mode,
+    workdir,
+    pr_file,
+    prd_file,
+    playbook_path,
+    feedback_file=None,
+    current_branch=None,
+    latest_commit_hash=None,
+):
+    references = {
+        "pr_contract_file": os.path.abspath(pr_file),
+        "prd_file": os.path.abspath(prd_file),
+        "playbook_path": os.path.abspath(playbook_path),
+    }
+    reference_index = [
+        {
+            "id": "pr_contract",
+            "kind": "pr_contract",
+            "path": references["pr_contract_file"],
+            "required": True,
+            "priority": 1,
+            "purpose": "execution_contract_source",
+        },
+        {
+            "id": "prd",
+            "kind": "prd",
+            "path": references["prd_file"],
+            "required": True,
+            "priority": 1,
+            "purpose": "authoritative_requirements",
+        },
+        {
+            "id": "coder_playbook",
+            "kind": "playbook",
+            "path": references["playbook_path"],
+            "required": True,
+            "priority": 1,
+            "purpose": "coder_operating_rules",
+        },
+    ]
+    if feedback_file:
+        references["feedback_file"] = os.path.abspath(feedback_file)
+        reference_index.append(
+            {
+                "id": "reviewer_feedback",
+                "kind": "feedback",
+                "path": references["feedback_file"],
+                "required": True,
+                "priority": 1,
+                "purpose": "inline_actionable_revision_findings",
+            }
+        )
+
+    if mode == "revision":
+        lifecycle = "same_session_delta_continuation"
+        prompt_kind = "coder_revision_continuation"
+        behavioral_rules = [REVISION_CONTINUATION_RULE]
+        continuation_semantics = {
+            "fresh_task": False,
+            "existing_branch_state_authoritative": True,
+            "same_session_required": True,
+            "inline_review_section": "# REVIEW REPORT JSON",
+        }
+    elif mode == "revision_bootstrap":
+        lifecycle = "recovery_bootstrap_continuation"
+        prompt_kind = "coder_revision_recovery_bootstrap"
+        behavioral_rules = [RECOVERY_CONTINUATION_WARNING]
+        continuation_semantics = {
+            "fresh_task": False,
+            "existing_branch_state_authoritative": True,
+            "same_session_required": False,
+            "inline_review_section": "# REVIEW REPORT JSON",
+        }
+    else:
+        lifecycle = "coder_continuation"
+        prompt_kind = f"coder_{mode}_continuation"
+        behavioral_rules = []
+        continuation_semantics = {}
+
+    return {
+        "role": "coder",
+        "mode": mode,
+        "lifecycle": lifecycle,
+        "prompt_kind": prompt_kind,
+        "references": references,
+        "reference_index": reference_index,
+        "current_branch": current_branch,
+        "latest_commit_hash": latest_commit_hash,
+        "behavioral_rules": behavioral_rules,
+        "continuation_semantics": continuation_semantics,
+        "final_checklist": [
+            "Address the reviewer findings with code changes, not acknowledgment-only output.",
+            "Keep all work inside the locked working directory and preserve branch guardrails.",
+            "Run the relevant tests and `./preflight.sh` if it exists until green.",
+            "Commit the exact files you changed and leave `git status` clean.",
+            "Report the latest commit hash when handing work back.",
+        ],
+    }
+
+
 def _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, feedback_file=None, current_branch=None, latest_commit_hash=None):
     lines.extend(
         [
@@ -110,7 +240,7 @@ def build_coder_revision_continuation_prompt(
 ):
     lines = [
         "# CODER REVISION CONTINUATION",
-        "This is a same-session revision continuation. Existing branch state and code are the starting point.",
+        "This is a same-session revision continuation, not a fresh task. Existing branch state and code are the starting point.",
         REVISION_CONTINUATION_RULE,
         "The current implementation is authoritative; inspect it, patch it, and validate the specific reviewer findings below.",
         "",
@@ -210,26 +340,49 @@ def send_feedback(session_key, message, workdir=".", run_dir="."):
 
 def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False):
     session_file = os.path.join(run_dir, ".coder_session")
+    current_branch = get_current_branch(workdir)
+    latest_commit_hash = get_latest_commit_hash(workdir)
+    review_report_json = read_text_file(feedback_file)
     
     if os.path.exists(session_file):
         mode = "revision"
-        with open(session_file, "r") as sf:
-            session_key = sf.read().strip()
+        session_key = read_text_file(session_file).strip()
+        rendered_prompt = build_coder_revision_continuation_prompt(
+            workdir=workdir,
+            pr_file=pr_file,
+            prd_file=prd_file,
+            playbook_path=playbook_path,
+            review_report_json=review_report_json,
+            feedback_file=feedback_file,
+            current_branch=current_branch,
+            latest_commit_hash=latest_commit_hash,
+        )
     else:
         mode = "revision_bootstrap"
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+        rendered_prompt = build_coder_revision_recovery_prompt(
+            workdir=workdir,
+            pr_file=pr_file,
+            prd_file=prd_file,
+            playbook_path=playbook_path,
+            review_report_json=review_report_json,
+            feedback_file=feedback_file,
+            current_branch=current_branch,
+            latest_commit_hash=latest_commit_hash,
+        )
 
-    envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+    packet = build_coder_continuation_packet(
+        mode=mode,
         workdir=workdir,
-        run_dir=run_dir,
         pr_file=pr_file,
         prd_file=prd_file,
         playbook_path=playbook_path,
-        mode=mode,
-        feedback_file=feedback_file
+        feedback_file=feedback_file,
+        current_branch=current_branch,
+        latest_commit_hash=latest_commit_hash,
     )
     
-    save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt)
+    save_coder_debug_artifacts(run_dir, mode, packet, rendered_prompt)
 
     if test_mode:
         Path(run_dir).mkdir(parents=True, exist_ok=True)

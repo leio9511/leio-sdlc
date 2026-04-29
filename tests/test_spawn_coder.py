@@ -30,12 +30,13 @@ class TestSpawnCoder(unittest.TestCase):
         spawn_coder.send_feedback("sdlc_coder_PR_001", "feedback message")
         mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".")
 
+    @patch('spawn_coder.get_current_branch', return_value='feature/test')
+    @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
     @patch('spawn_coder.os.path.exists')
     @patch('envelope_assembler.os.makedirs')
     @patch('spawn_coder.invoke_agent')
     @patch('spawn_coder.build_coder_startup_packet_and_prompt')
-    def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_invoke, mock_makedirs, mock_exists):
-        mock_build.return_value = ({}, "Mocked feedback prompt")
+    def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_invoke, mock_makedirs, mock_exists, mock_commit, mock_branch):
         mock_exists.return_value = True
 
         def mock_file_open(path, *args, **kwargs):
@@ -55,7 +56,10 @@ class TestSpawnCoder(unittest.TestCase):
         called_msg = mock_invoke.call_args[0][0]
         called_kwargs = mock_invoke.call_args[1]
         self.assertEqual(called_kwargs['session_key'], "sdlc_coder_PR_001")
-        self.assertEqual(called_msg, "Mocked feedback prompt")
+        self.assertIn("# REVIEW REPORT JSON", called_msg)
+        self.assertIn("Fix the bugs.", called_msg)
+        self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, called_msg)
+        self.assertNotIn("# REFERENCE INDEX", called_msg)
 
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
@@ -136,8 +140,11 @@ class TestSpawnCoder(unittest.TestCase):
 
         mock_invoke.assert_called()
         prompt_sent = mock_invoke.call_args[0][0]
-        self.assertIn("Revision work is execution work, not acknowledgment work.", prompt_sent)
-        self.assertIn("Address the reviewer findings with code changes, not acknowledgment-only output.", prompt_sent)
+        self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, prompt_sent)
+        self.assertIn("# REVIEW REPORT JSON", prompt_sent)
+        self.assertIn('{"status": "NEEDS_FIX", "comments": "Missing stuff"}', prompt_sent)
+        self.assertIn(os.path.abspath("feedback.json"), prompt_sent)
+        self.assertNotIn("# REFERENCE INDEX", prompt_sent)
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
@@ -176,8 +183,11 @@ class TestSpawnCoder(unittest.TestCase):
         prompt_sent = mock_invoke.call_args[0][0]
         called_kwargs = mock_invoke.call_args[1]
         self.assertEqual(called_kwargs['session_key'], "sdlc_coder_PR_001_1234abcd")
-        self.assertIn("Revision work is execution work, not acknowledgment work.", prompt_sent)
-        self.assertIn("Address the reviewer findings with code changes, not acknowledgment-only output.", prompt_sent)
+        self.assertIn("# REVIEW REPORT JSON", prompt_sent)
+        self.assertIn('{"status": "NEEDS_FIX", "comments": "Missing stuff"}', prompt_sent)
+        self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, prompt_sent)
+        self.assertIn("not a fresh task", prompt_sent.lower())
+        self.assertNotIn("# REFERENCE INDEX", prompt_sent)
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
