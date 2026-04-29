@@ -63,6 +63,134 @@ def build_coder_startup_packet_and_prompt(workdir, run_dir, pr_file, prd_file, p
     return envelope, rendered_prompt
 
 
+REVISION_CONTINUATION_RULE = "Do not restart problem-solving from scratch. Modify the existing implementation to satisfy the reviewer findings."
+SYSTEM_ALERT_CONTINUATION_RULE = "Do not re-plan the whole PR. Fix the exact operational failure shown below, rerun validation, and continue from the current branch state."
+RECOVERY_CONTINUATION_WARNING = "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts."
+
+
+def _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, feedback_file=None, current_branch=None, latest_commit_hash=None):
+    lines.extend(
+        [
+            "# SUPPORTING CONTEXT",
+            f"- Locked workdir: `{os.path.abspath(workdir)}`",
+            f"- PR contract path: `{os.path.abspath(pr_file)}`",
+            f"- PRD path: `{os.path.abspath(prd_file)}`",
+            f"- Coder playbook path: `{os.path.abspath(playbook_path)}`",
+        ]
+    )
+    if feedback_file:
+        lines.append(f"- Feedback file path: `{os.path.abspath(feedback_file)}`")
+    if current_branch:
+        lines.append(f"- Current branch: `{current_branch}`")
+    if latest_commit_hash:
+        lines.append(f"- Latest commit hash: `{latest_commit_hash}`")
+
+    lines.extend(
+        [
+            "",
+            "# VALIDATION AND GIT HYGIENE REMINDERS",
+            "- Stay on the current feature branch; never switch branches and never work on `master` or `main`.",
+            "- Do not `git push`.",
+            "- Use explicit `git add <file>` only for files you changed; never use `git add .`.",
+            "- Run the relevant tests and `./preflight.sh` if it exists until green.",
+            "- Commit the exact files you changed, leave `git status` clean, then report `LATEST_HASH=$(git rev-parse HEAD)`.",
+        ]
+    )
+
+
+def build_coder_revision_continuation_prompt(
+    workdir,
+    pr_file,
+    prd_file,
+    playbook_path,
+    review_report_json,
+    feedback_file=None,
+    current_branch=None,
+    latest_commit_hash=None,
+):
+    lines = [
+        "# CODER REVISION CONTINUATION",
+        "This is a same-session revision continuation. Existing branch state and code are the starting point.",
+        REVISION_CONTINUATION_RULE,
+        "The current implementation is authoritative; inspect it, patch it, and validate the specific reviewer findings below.",
+        "",
+        "# REVIEW REPORT JSON",
+        review_report_json,
+        "",
+    ]
+    _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, feedback_file, current_branch, latest_commit_hash)
+    return "\n".join(lines)
+
+
+def build_coder_revision_recovery_prompt(
+    workdir,
+    pr_file,
+    prd_file,
+    playbook_path,
+    review_report_json,
+    feedback_file=None,
+    current_branch=None,
+    latest_commit_hash=None,
+):
+    lines = [
+        "# CODER REVISION RECOVERY CONTINUATION",
+        RECOVERY_CONTINUATION_WARNING,
+        "Prioritize restoring task context from the existing branch and fixing the reviewer findings before rereading supporting references.",
+        "The current implementation is authoritative; do not discard or restart the work already present on disk.",
+        "",
+        "# REVIEW REPORT JSON",
+        review_report_json,
+        "",
+    ]
+    _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, feedback_file, current_branch, latest_commit_hash)
+    return "\n".join(lines)
+
+
+def build_coder_system_alert_continuation_prompt(
+    workdir,
+    pr_file,
+    prd_file,
+    playbook_path,
+    system_alert,
+    current_branch=None,
+    latest_commit_hash=None,
+):
+    lines = [
+        "# CODER SYSTEM ALERT CONTINUATION",
+        "This is a same-session operational correction. Focus only on the failure below and preserve the current branch state.",
+        SYSTEM_ALERT_CONTINUATION_RULE,
+        "",
+        "# SYSTEM ALERT YOU MUST FIX",
+        system_alert,
+        "",
+    ]
+    _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, None, current_branch, latest_commit_hash)
+    return "\n".join(lines)
+
+
+def build_coder_system_alert_recovery_prompt(
+    workdir,
+    pr_file,
+    prd_file,
+    playbook_path,
+    system_alert,
+    current_branch=None,
+    latest_commit_hash=None,
+):
+    lines = [
+        "# CODER SYSTEM ALERT RECOVERY CONTINUATION",
+        RECOVERY_CONTINUATION_WARNING,
+        "The immediate objective is corrective action for the operational failure below, not replanning the PR.",
+        "Recover context from the current branch, fix the exact failure, rerun validation, commit if needed, and leave the workspace clean.",
+        "",
+        "# SYSTEM ALERT YOU MUST FIX",
+        system_alert,
+        "",
+    ]
+    _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, None, current_branch, latest_commit_hash)
+    return "\n".join(lines)
+
+
 def save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt):
     artifact_subdir = resolve_coder_artifact_subdir(run_dir, mode)
     envelope_assembler.save_envelope_artifacts(
