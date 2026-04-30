@@ -97,6 +97,9 @@ python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestr
 
 The pipeline is launched through `scripts/orchestrator.py`.
 
+Note: the shell command examples in this skill describe the orchestrator command shape only.
+Actual launch semantics must follow the platform-specific lifecycle rules in `## Execution rule`.
+
 ## Intent-to-command mapping
 
 - If the user asks to start SDLC execution, launch `scripts/orchestrator.py` in normal-start mode.
@@ -135,14 +138,24 @@ python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestr
 
 ## Execution rule
 
-Run the orchestrator as a background process using the `exec` tool with `background: true`.
+The `leio-sdlc` orchestrator is a long-running control-plane process.
 
-Do not use:
-- `nohup`
-- manual `&`
-- improvised daemon loops
+Launch invariant (platform-agnostic):
+- Start it through the host platform's native background-process mechanism.
+- Its lifecycle must remain observable and controllable by the host platform.
+- It must not inherit a finite default process timeout that can kill the run mid-flight.
+- If the host platform applies a default exec/process timeout, that timeout must be explicitly disabled or overridden for this launch.
+- Do not replace the host platform lifecycle mechanism with `nohup`, manual `&`, or improvised daemon loops.
 
-Critical: Do NOT set a timeout parameter on the exec call. The orchestrator may run for hours across multiple coder/reviewer cycles; setting a timeout will kill it at an arbitrary point and corrupt the run.
+OpenClaw mapping:
+- When launching through OpenClaw's `exec` tool, use:
+  - `background: true`
+  - `timeout: 0`
+
+Why this matters:
+- `leio-sdlc` runs may legitimately last for hours across planner / coder / reviewer / UAT cycles.
+- A host-level default timeout can terminate the orchestrator in the middle of a valid run and leave the workflow in a partial state.
+- Therefore, long-running `leio-sdlc` launches must always use a host execution path that preserves lifecycle tracking without imposing a finite default process timeout.
 
 ## After launch
 
