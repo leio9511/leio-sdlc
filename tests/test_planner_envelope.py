@@ -1,5 +1,82 @@
+import os
+import sys
 import pytest
-from scripts.planner_envelope import build_planner_envelope, render_planner_prompt
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+
+from planner_envelope import build_planner_envelope, render_planner_prompt
+
+
+def test_slice_failed_pr_envelope_includes_failed_pr_contract_reference():
+    envelope = build_planner_envelope(
+        workdir="/mock/workdir",
+        out_dir="/mock/out_dir",
+        prd_path="/mock/prd.md",
+        playbook_path="/mock/playbook.md",
+        template_path="/mock/template.md",
+        contract_script="/mock/contract_script.py",
+        mode="slice",
+        failed_pr_id="002",
+        failed_pr_contract_path="/mock/PR_002_failed.md",
+    )
+
+    refs_by_id = {ref["id"]: ref for ref in envelope["reference_index"]}
+    assert refs_by_id["failed_pr_contract"] == {
+        "id": "failed_pr_contract",
+        "kind": "pr_contract",
+        "path": "/mock/PR_002_failed.md",
+        "required": True,
+        "priority": 1,
+        "purpose": "failed_slice_boundary_source",
+    }
+
+
+def test_slice_failed_pr_rendered_prompt_contains_failed_contract_reference_and_insert_after():
+    envelope = build_planner_envelope(
+        workdir="/mock/workdir",
+        out_dir="/mock/out_dir",
+        prd_path="/mock/prd.md",
+        playbook_path="/mock/playbook.md",
+        template_path="/mock/template.md",
+        contract_script="/mock/contract_script.py",
+        mode="slice",
+        failed_pr_id="002",
+        failed_pr_contract_path="/mock/PR_002_failed.md",
+    )
+
+    prompt = render_planner_prompt(envelope)
+
+    assert "failed_pr_contract" in prompt
+    assert "/mock/PR_002_failed.md" in prompt
+    assert "You MUST use the exact same `--insert-after 002` value" in prompt
+
+
+def test_standard_and_uat_planner_envelopes_do_not_include_failed_pr_contract():
+    standard_envelope = build_planner_envelope(
+        workdir="/mock/workdir",
+        out_dir="/mock/out_dir",
+        prd_path="/mock/prd.md",
+        playbook_path="/mock/playbook.md",
+        template_path="/mock/template.md",
+        contract_script="/mock/contract_script.py",
+        failed_pr_contract_path="/mock/PR_002_failed.md",
+    )
+    uat_envelope = build_planner_envelope(
+        workdir="/mock/workdir",
+        out_dir="/mock/out_dir",
+        prd_path="/mock/prd.md",
+        playbook_path="/mock/playbook.md",
+        template_path="/mock/template.md",
+        contract_script="/mock/contract_script.py",
+        mode="uat",
+        uat_report_path="/mock/uat.json",
+        failed_pr_contract_path="/mock/PR_002_failed.md",
+    )
+
+    for envelope in (standard_envelope, uat_envelope):
+        ref_ids = {ref["id"] for ref in envelope["reference_index"]}
+        assert "failed_pr_contract" not in ref_ids
+
 
 def test_envelope_top_level_keys():
     envelope = build_planner_envelope(

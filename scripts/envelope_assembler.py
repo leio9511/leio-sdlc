@@ -57,6 +57,17 @@ def _build_planner_envelope(workdir, out_dir, references, contract_params, mode)
                 "purpose": "uat_missing_requirements",
             }
         )
+    if mode == "slice" and references.get("failed_pr_contract_path"):
+        reference_index.append(
+            {
+                "id": "failed_pr_contract",
+                "kind": "pr_contract",
+                "path": references.get("failed_pr_contract_path"),
+                "required": True,
+                "priority": 1,
+                "purpose": "failed_slice_boundary_source",
+            }
+        )
 
     final_checklist = [
         f"Output path constraint: The only valid output location is `{out_dir}`.",

@@ -87,10 +87,27 @@ def test_spawn_planner_slice_uses_envelope():
             
         assert "# EXECUTION CONTRACT" in content
         assert "You MUST use the exact same `--insert-after 002` value" in content
+        assert "failed_pr_contract" in content
+        assert os.path.abspath(failed_pr_file) in content
+        assert '"required": true' in content
+        assert '"priority": 1' in content
         
         debug_dir = os.path.join(run_dir, "planner_debug")
         assert os.path.exists(debug_dir)
-        assert os.path.exists(os.path.join(debug_dir, "startup_packet.json"))
+        startup_packet = os.path.join(debug_dir, "startup_packet.json")
+        assert os.path.exists(startup_packet)
+        with open(startup_packet, "r") as f:
+            packet = json.load(f)
+        refs_by_id = {ref["id"]: ref for ref in packet["reference_index"]}
+        assert refs_by_id["failed_pr_contract"] == {
+            "id": "failed_pr_contract",
+            "kind": "pr_contract",
+            "path": os.path.abspath(failed_pr_file),
+            "required": True,
+            "priority": 1,
+            "purpose": "failed_slice_boundary_source",
+        }
+        assert "You MUST use the exact same `--insert-after 002` value" in "\n".join(packet["execution_contract"])
 
 def test_spawn_planner_saves_artifacts():
     # Expected: The planner_debug artifacts are correctly persisted in the out_dir during a standard spawn_planner.py run.

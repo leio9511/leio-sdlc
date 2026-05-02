@@ -1,7 +1,18 @@
 # planner_envelope.py — backward-compatible adapter
 from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
 
-def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_path, contract_script, mode="standard", uat_report_path=None, failed_pr_id=None):
+def build_planner_envelope(
+    workdir,
+    out_dir,
+    prd_path,
+    playbook_path,
+    template_path,
+    contract_script,
+    mode="standard",
+    uat_report_path=None,
+    failed_pr_id=None,
+    failed_pr_contract_path=None,
+):
     references = {
         "prd_file": prd_path,
         "playbook_path": playbook_path,
@@ -9,6 +20,8 @@ def build_planner_envelope(workdir, out_dir, prd_path, playbook_path, template_p
     }
     if uat_report_path:
         references["uat_report_path"] = uat_report_path
+    if failed_pr_contract_path:
+        references["failed_pr_contract_path"] = failed_pr_contract_path
         
     contract_params = {
         "scaffold_command": f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {out_dir} --title <title>"

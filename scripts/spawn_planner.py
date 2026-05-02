@@ -56,14 +56,13 @@ def main():
         print(f"[Pre-flight Failed] Planner cannot start. PRD file not found at '{args.prd_file}'. You must read or create the PRD first.")
         sys.exit(1)
 
-    failed_pr_content = None
     failed_pr_id = None
+    failed_pr_contract_path = None
     if args.slice_failed_pr is not None:
         if not (os.path.isfile(args.slice_failed_pr) and os.path.getsize(args.slice_failed_pr) > 0):
             print(f"[Pre-flight Failed] Planner cannot start. Failed PR file not found or empty at '{args.slice_failed_pr}'.")
             sys.exit(1)
-        with open(args.slice_failed_pr, "r") as f:
-            failed_pr_content = f.read()
+        failed_pr_contract_path = os.path.abspath(args.slice_failed_pr)
             
         failed_pr_filename = os.path.basename(args.slice_failed_pr)
         match = re.match(r"^PR_(\d+(?:_\d+)*)_", failed_pr_filename)
@@ -124,7 +123,12 @@ def main():
             role="planner",
             workdir=workdir,
             out_dir=args.out_dir,
-            references={"prd_file": os.path.abspath(args.prd_file), "playbook_path": playbook_path, "template_path": template_path},
+            references={
+                "prd_file": os.path.abspath(args.prd_file),
+                "playbook_path": playbook_path,
+                "template_path": template_path,
+                "failed_pr_contract_path": failed_pr_contract_path,
+            },
             contract_params={"scaffold_command": f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {args.out_dir} --title <title>", "failed_pr_id": failed_pr_id},
             mode="slice"
         )

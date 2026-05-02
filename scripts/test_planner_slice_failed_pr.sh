@@ -65,6 +65,23 @@ if ! grep -q -- "--insert-after 001" tests/task_string.log; then
     echo "❌ Scenario 3 Failed: Missing '--insert-after 001' in task string."
     exit 1
 fi
+FAILED_PR_001_ABS="$(pwd)/PR_001_Failed_PR.md"
+if ! grep -q "failed_pr_contract" tests/task_string.log; then
+    echo "❌ Scenario 3 Failed: Missing failed_pr_contract reference in task string."
+    exit 1
+fi
+if ! grep -q "$FAILED_PR_001_ABS" tests/task_string.log; then
+    echo "❌ Scenario 3 Failed: Missing absolute failed PR contract path in task string."
+    exit 1
+fi
+if ! grep -q '"required": true' tests/task_string.log; then
+    echo "❌ Scenario 3 Failed: Missing required=true in task string."
+    exit 1
+fi
+if ! grep -q '"priority": 1' tests/task_string.log; then
+    echo "❌ Scenario 3 Failed: Missing priority=1 in task string."
+    exit 1
+fi
 echo "✅ Scenario 3 Passed."
 
 # Test Scenario 4: Successful Slice with sub-id
@@ -74,6 +91,12 @@ python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file PRD.md 
 ls -lR "$GLOBAL_MOCK_DIR/.sdlc_runs"
 if ! grep -q -- "--insert-after 002_1" tests/task_string.log; then
     echo "❌ Scenario 4 Failed: Missing '--insert-after 002_1' in task string."
+    cat tests/task_string.log
+    exit 1
+fi
+FAILED_PR_002_1_ABS="$(pwd)/PR_002_1_Failed_PR.md"
+if ! grep -q "$FAILED_PR_002_1_ABS" tests/task_string.log; then
+    echo "❌ Scenario 4 Failed: Missing absolute failed PR contract path in task string."
     cat tests/task_string.log
     exit 1
 fi
