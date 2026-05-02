@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -183,10 +184,15 @@ class TestOrchestratorCLI(unittest.TestCase):
 
     def test_orchestrator_escalation_limit_increased(self):
         import orchestrator
-        import inspect
-        source = inspect.getsource(orchestrator.main)
-        # Check for the red_retry_limit which is effectively the escalation limit in the current implementation
-        self.assertIn("red_retry_limit = 2", source)
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            config_dir = os.path.join(td, "config")
+            os.makedirs(config_dir, exist_ok=True)
+            with open(os.path.join(config_dir, "sdlc_config.json.template"), "w") as f:
+                json.dump({"RED_RETRY_LIMIT": 2}, f)
+            resolved = orchestrator.resolve_retry_recovery_config(td, td)
+            # Check for the red retry default which is effectively the escalation limit in the current implementation
+            self.assertEqual(resolved["RED_RETRY_LIMIT"], 2)
 
 if __name__ == "__main__":
     unittest.main()

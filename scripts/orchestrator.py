@@ -60,6 +60,44 @@ def load_or_merge_config(sdlc_root):
                 json.dump(config_template, f, indent=4)
         return config_template
 
+RETRY_RECOVERY_CONFIG_KEYS = (
+    "YELLOW_RETRY_LIMIT",
+    "RED_RETRY_LIMIT",
+    "max_uat_recovery_attempts",
+)
+
+def _load_retry_recovery_overlay(config_path):
+    if not config_path or not os.path.exists(config_path):
+        return {}
+    try:
+        with open(config_path, "r") as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+def _same_config_path(left, right):
+    if not left or not right:
+        return False
+    return os.path.abspath(os.path.normpath(left)) == os.path.abspath(os.path.normpath(right))
+
+def resolve_retry_recovery_config(sdlc_root, global_dir):
+    template_path = os.path.join(sdlc_root, "config", "sdlc_config.json.template")
+    framework_config_path = os.path.join(sdlc_root, "config", "sdlc_config.json")
+    local_config_path = os.path.join(global_dir, "config", "sdlc_config.json") if global_dir else None
+
+    config_paths = [template_path, framework_config_path]
+    if local_config_path and not _same_config_path(local_config_path, framework_config_path):
+        config_paths.append(local_config_path)
+
+    resolved = {}
+    for config_path in config_paths:
+        overlay = _load_retry_recovery_overlay(config_path)
+        for key in RETRY_RECOVERY_CONFIG_KEYS:
+            if key in overlay:
+                resolved[key] = overlay[key]
+    return resolved
+
 def dlog(msg):
     import logging
     logger = logging.getLogger("sdlc_orchestrator")
@@ -291,6 +329,10 @@ def main():
         resolved_global_dir = os.path.abspath(app_config.get("GLOBAL_RUN_DIR"))
         
     global_dir = resolved_global_dir if resolved_global_dir else os.path.abspath(args.workdir)
+    retry_recovery_config = resolve_retry_recovery_config(sdlc_root, global_dir)
+    yellow_retry_limit = int(retry_recovery_config.get("YELLOW_RETRY_LIMIT", 3))
+    red_retry_limit = int(retry_recovery_config.get("RED_RETRY_LIMIT", 2))
+    max_uat_recovery_attempts = int(retry_recovery_config.get("max_uat_recovery_attempts", 5))
 
 
     if args.cleanup:
@@ -705,21 +747,6 @@ def main():
     try:
         loops = 0
         
-        # Load Retry Config
-        yellow_retry_limit = 3
-        red_retry_limit = 2
-        max_uat_recovery_attempts = 5
-        config_path = os.path.join(global_dir, "config", "sdlc_config.json")
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r") as f:
-                    app_config_data = json.load(f)
-                    yellow_retry_limit = app_config_data.get("YELLOW_RETRY_LIMIT", 3)
-                    red_retry_limit = app_config_data.get("RED_RETRY_LIMIT", 2)
-                    max_uat_recovery_attempts = app_config_data.get("max_uat_recovery_attempts", 5)
-            except Exception:
-                pass
-                
         uat_recovery_count = 0
         while True:
             if args.max_prs_to_process > 0 and loops >= args.max_prs_to_process:
