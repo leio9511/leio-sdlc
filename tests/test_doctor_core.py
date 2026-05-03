@@ -69,15 +69,27 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
     custom_root = "/tmp/custom_skills_root"
     env = os.environ.copy()
     env["SDLC_RUNTIME_DIR"] = custom_root
-    
+
+    # TDD Test Case 4: set up a git repo with an outdated managed hook so that
+    # both the runtime-aware JIT fix path AND the outdated-hook upgrade message coexist.
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    hook_dir = tmp_path / ".git" / "hooks"
+    hook_dir.mkdir(parents=True, exist_ok=True)
+    hook_path = hook_dir / "pre-commit"
+    hook_path.write_text("#!/bin/bash\n# SDLC_MANAGED_HOOK=leio-sdlc\n# SDLC_HOOK_SCHEMA_VERSION=1\n")
+    os.chmod(hook_path, 0o755)
+
     script = Path(__file__).parent.parent / "scripts" / "doctor.py"
-    
+
     result = subprocess.run(
         ["python3", str(script), str(tmp_path), "--check"],
         capture_output=True, text=True, env=env
     )
     assert result.returncode == 1
+    # Runtime-aware JIT fix path remains correct
     assert f"[JIT] To fix: Execute `python3 {custom_root}/leio-sdlc/scripts/doctor.py --fix" in result.stdout
+    # Outdated-hook detection coexists with the JIT hint
+    assert "Managed hook requires upgrade: .git/hooks/pre-commit" in result.stdout
 
 
 def test_doctor_detects_outdated_managed_hook(tmp_path):

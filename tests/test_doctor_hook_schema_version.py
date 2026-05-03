@@ -3,8 +3,10 @@ import sys
 import subprocess
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parents[1]))
 from scripts.doctor import _read_managed_hook_schema_version
+
+DOCTOR_SCRIPT = Path(__file__).parents[1] / "scripts" / "doctor.py"
 
 
 def test_doctor_check_flags_missing_managed_hook_metadata(tmp_path):
@@ -19,9 +21,8 @@ def test_doctor_check_flags_missing_managed_hook_metadata(tmp_path):
     hook_path.write_text("#!/bin/bash\necho 'legacy hook'\n")
     os.chmod(hook_path, 0o755)
 
-    doctor_script = Path(__file__).parent.parent / "scripts" / "doctor.py"
     result = subprocess.run(
-        [sys.executable, str(doctor_script), str(tmp_path), "--check"],
+        [sys.executable, str(DOCTOR_SCRIPT), str(tmp_path), "--check"],
         capture_output=True,
         text=True,
     )
@@ -44,9 +45,8 @@ def test_doctor_check_flags_outdated_hook_schema_version(tmp_path):
     )
     os.chmod(hook_path, 0o755)
 
-    doctor_script = Path(__file__).parent.parent / "scripts" / "doctor.py"
     result = subprocess.run(
-        [sys.executable, str(doctor_script), str(tmp_path), "--check"],
+        [sys.executable, str(DOCTOR_SCRIPT), str(tmp_path), "--check"],
         capture_output=True,
         text=True,
     )
@@ -69,11 +69,12 @@ def test_doctor_fix_replaces_outdated_hook_with_current_managed_version(tmp_path
     )
     os.chmod(hook_path, 0o755)
 
-    doctor_script = Path(__file__).parent.parent / "scripts" / "doctor.py"
+    # --enforce-git-lock is required to trigger the managed hook installation into
+    # .git/hooks/; --fix alone handles scaffold/overlay compliance only.
     res = subprocess.run(
         [
             sys.executable,
-            str(doctor_script),
+            str(DOCTOR_SCRIPT),
             str(tmp_path),
             "--fix",
             "--enforce-git-lock",
