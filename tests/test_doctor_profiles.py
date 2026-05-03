@@ -52,6 +52,10 @@ def test_doctor_enforce_git_lock():
         assert hook_path.exists()
         assert os.access(hook_path, os.X_OK)
         assert _read_managed_hook_schema_version(hook_path) == "2"
+        with open(hook_path, "r") as f:
+            content = f.read()
+        assert "# SDLC_MANAGED_HOOK=leio-sdlc" in content
+        assert "# SDLC_HOOK_SCHEMA_VERSION=2" in content
 
 
 def test_doctor_fix_upgrades_outdated_managed_hook(tmp_path):
