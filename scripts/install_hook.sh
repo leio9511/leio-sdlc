@@ -3,7 +3,7 @@
 # Usage: ./scripts/install_hook.sh [target_git_dir]
 
 TARGET_DIR="${1:-.git}"
-HOOK_SOURCE="$(dirname "$0")/pre-commit-payload.sh"
+HOOK_SOURCE="$(dirname "$0")/../.sdlc_hooks/pre-commit"
 
 if [ ! -d "$TARGET_DIR" ]; then
     echo "ERROR: Target directory '$TARGET_DIR' is not a git directory."

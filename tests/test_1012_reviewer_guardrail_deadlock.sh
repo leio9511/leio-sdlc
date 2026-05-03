@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 WORK_DIR="/tmp/test_1012_workspace_$$"
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
@@ -26,7 +29,7 @@ git add benign_file.py
 git commit -m "feat: benign feature"
 
 export SDLC_TEST_MODE="true"
-python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR_001.md --diff-target master --workdir "$WORK_DIR" --global-dir "$WORK_DIR" > output.log
+python3 "$PROJECT_ROOT"/scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR_001.md --diff-target master --workdir "$WORK_DIR" --global-dir "$WORK_DIR" > output.log
 
 if grep -q "\[EMPTY DIFF\]" current_review.diff; then
     echo "FAILED: Test 1 - current_review.diff is empty."
@@ -47,7 +50,7 @@ echo "PASSED: Test 2 - Historical Immunity Test"
 echo "tampered code" > scripts/spawn_reviewer.py
 git commit -am "Malicious tamper"
 
-python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR_001.md --diff-target master --workdir "$WORK_DIR" --global-dir "$WORK_DIR" > output.log || true
+python3 "$PROJECT_ROOT"/scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR_001.md --diff-target master --workdir "$WORK_DIR" --global-dir "$WORK_DIR" > output.log || true
 
 if ! grep -iq "guardrail violation" output.log; then
     echo "FAILED: Test 3 - Did not detect active tamper."

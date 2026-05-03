@@ -111,6 +111,27 @@ def test_pre_commit_hook_output(tmp_path):
     
     assert result.returncode == 1
     assert f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stdout or f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stderr
+
+    # Verify runtime administrative commit succeeds through the role-aware policy
+    with open("test2.txt", "w") as f:
+        f.write("test2")
+    subprocess.run(["git", "add", "test2.txt"])
+    result_runtime = subprocess.run(
+        [
+            "git",
+            "-c", "sdlc.runtime=1",
+            "-c", "sdlc.role=commit_state",
+            "commit", "-m", "chore(state): runtime admin commit",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result_runtime.returncode == 0, (
+        f"Runtime administrative commit with commit_state role failed: "
+        f"{result_runtime.stdout + result_runtime.stderr}"
+    )
+
     # Setup mock git repo
     os.chdir(tmp_path)
     subprocess.run(["git", "init"])
