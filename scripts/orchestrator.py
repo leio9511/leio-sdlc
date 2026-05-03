@@ -12,6 +12,7 @@ import time
 import fcntl
 import signal
 import traceback
+from runtime_git_identity import run_runtime_git
 
 # Global marker for Git Hook authentication (PRD-1012)
 os.environ["SDLC_ORCHESTRATOR_RUNNING"] = "1"
@@ -191,7 +192,7 @@ def set_pr_status(pr_file, new_status):
     _update_status(pr_file, new_status)
     # PRD 1060: PR status updates are now untracked artifacts to prevent pollution
     # subprocess.run(["git", "add", pr_file], check=False)
-    # subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
+    # run_runtime_git("orchestrator", ["commit", "-m", f"chore(state): update PR state to {new_status}"], check=False)
 
 def get_pr_slice_depth(pr_file):
     with open(pr_file, 'r', encoding='utf-8') as f:
@@ -358,7 +359,7 @@ def main():
             sys.exit(1)
             
         drun(["git", "add", "-A"], check=False)
-        drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+        run_runtime_git("orchestrator", ["commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
         timestamp = int(time.time())
         drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
         drun(["git", "checkout", get_mainline_branch(args.workdir)], check=False)
@@ -430,7 +431,7 @@ def main():
                 drun(["git", "stash", "push", "-m", "SDLC Withdrawal Emergency Stash"], check=False)
             else:
                 drun(["git", "add", "-A"], check=False)
-                drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+                run_runtime_git("orchestrator", ["commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
                 timestamp = int(time.time())
                 drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
                 drun(["git", "checkout", get_mainline_branch(args.workdir)], check=False)
@@ -446,7 +447,7 @@ def main():
         diff_check = drun(["git", "diff", "--cached", "--quiet"])
         if diff_check.returncode != 0:
             commit_msg = f"chore: force baseline alignment of PRD {base_name} to baseline"
-            drun(["git", "commit", "-m", commit_msg], check=True)
+            run_runtime_git("orchestrator", ["commit", "-m", commit_msg], check=True)
 
         # Job Teardown
         teardown_coder_session(args.workdir, run_dir=job_dir)
@@ -551,7 +552,7 @@ def main():
                 drun(["git", "stash", "push", "-m", "SDLC Withdrawal Emergency Stash"], check=False)
             else:
                 drun(["git", "add", "-A"], check=False)
-                drun(["git", "commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
+                run_runtime_git("orchestrator", ["commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"], check=False)
                 timestamp = int(time.time())
                 drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
                 drun(["git", "checkout", get_mainline_branch(workdir)], check=False)

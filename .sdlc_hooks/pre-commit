@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# SDLC_MANAGED_HOOK=leio-sdlc
+# SDLC_HOOK_SCHEMA_VERSION=2
+
 # Enforce SDLC via Git Pre-Commit Hook (ISSUE-1012)
 
 # 1. Opt-in Guardrail
@@ -16,9 +19,27 @@ fi
 # 3. Authentication via Native Git Configuration
 SDLC_RUNTIME=$(git config sdlc.runtime || echo "0")
 SDLC_OVERRIDE=$(git config sdlc.override || echo "false")
+SDLC_ROLE=$(git config sdlc.role || echo "")
 
-if [[ "$SDLC_RUNTIME" == "1" || "$SDLC_OVERRIDE" == "true" ]]; then
+if [[ "$SDLC_OVERRIDE" == "true" ]]; then
     exit 0
+fi
+
+if [[ "$SDLC_RUNTIME" == "1" ]]; then
+    if [[ -z "$SDLC_ROLE" ]]; then
+        echo "❌ Commit rejected: runtime commit requires explicit sdlc.role."
+        exit 1
+    fi
+
+    case "$SDLC_ROLE" in
+        coder|orchestrator|merge_code|commit_state)
+            exit 0
+            ;;
+        *)
+            echo "❌ Commit rejected: SDLC runtime role '$SDLC_ROLE' is not authorized to commit."
+            exit 1
+            ;;
+    esac
 fi
 
 # 4. Glass-Break Emergency Override & JIT Prompt Enforcement

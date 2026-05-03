@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import subprocess
+from runtime_git_identity import run_runtime_git
 
 def main():
     parser = argparse.ArgumentParser(description="Safely commit administrative files like STATE.md and PRDs")
@@ -48,7 +49,7 @@ def main():
     # Add and commit
     try:
         subprocess.run(["git", "add"] + valid_files, check=True)
-        subprocess.run(["git", "-c", "sdlc.runtime=1", "commit", "-m", "chore(state): update manager state"], check=True)
+        run_runtime_git("commit_state", ["commit", "-m", "chore(state): update manager state"], check=True)
         print("Successfully baselined PRD/state files.")
     except subprocess.CalledProcessError as e:
         print(f"Failed to commit files: {e}")

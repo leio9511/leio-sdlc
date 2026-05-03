@@ -29,5 +29,24 @@ class TestMergeCode(unittest.TestCase):
         content2 = '```json\n{"overall_assessment": "EXCELLENT", "findings": [\n```'
         self.assertIsNone(merge_code.parse_review_verdict(content2))
 
+    @patch("merge_code.run_runtime_git")
+    @patch("merge_code.os.path.isfile", return_value=True)
+    @patch("builtins.open")
+    def test_merge_code_uses_runtime_helper_with_merge_code_role(self, mock_open, mock_isfile, mock_run_runtime_git):
+        mock_open.return_value.__enter__.return_value.read.return_value = '{"overall_assessment": "EXCELLENT"}'
+        mock_run_runtime_git.return_value = MagicMock(stdout="merged\n")
+
+        with patch.dict(os.environ, {"SDLC_TEST_MODE": ""}, clear=False):
+            with patch.object(sys, "argv", ["merge_code.py", "--branch", "feature/test", "--review-file", "review.json"]):
+                merge_code.main()
+
+        mock_run_runtime_git.assert_called_once_with(
+            "merge_code",
+            ["merge", "feature/test"],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
 if __name__ == '__main__':
     unittest.main()

@@ -6,6 +6,12 @@ import subprocess
 from pathlib import Path
 import config
 
+HOOK_SCHEMA_VERSION = "2"
+MANAGED_HOOK_HEADER = [
+    "# SDLC_MANAGED_HOOK=leio-sdlc",
+    f"# SDLC_HOOK_SCHEMA_VERSION={HOOK_SCHEMA_VERSION}",
+]
+
 def check_vcs(target_dir):
     git_dir = os.path.join(target_dir, ".git")
     if not os.path.exists(git_dir):
@@ -64,6 +70,33 @@ def apply_overlay(target_dir, overlay_path, check_only=False):
                         
     return issues
 
+def _read_managed_hook_schema_version(hook_path):
+    if not os.path.exists(hook_path):
+        return None
+
+    try:
+        with open(hook_path, "r") as f:
+            for _ in range(10):
+                line = f.readline()
+                if not line:
+                    break
+                if line.startswith("# SDLC_HOOK_SCHEMA_VERSION="):
+                    return line.strip().split("=", 1)[1]
+    except OSError:
+        return None
+
+    return None
+
+
+def _managed_hook_needs_upgrade(src_hook, dest_hook):
+    if not os.path.exists(dest_hook):
+        return True
+
+    expected_version = _read_managed_hook_schema_version(src_hook)
+    actual_version = _read_managed_hook_schema_version(dest_hook)
+    return expected_version is not None and actual_version != expected_version
+
+
 def main():
     parser = argparse.ArgumentParser(description="SDLC Doctor")
     parser.add_argument("target_dir", help="Target project directory")
@@ -111,8 +144,8 @@ def main():
         
         if pre_commit_src.exists():
             if not args.fix:
-                if not pre_commit_dest.exists():
-                    issues.append("Missing file .git/hooks/pre-commit")
+                if _managed_hook_needs_upgrade(pre_commit_src, pre_commit_dest):
+                    issues.append("Managed hook requires upgrade: .git/hooks/pre-commit")
             else:
                 pre_commit_dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(pre_commit_src, pre_commit_dest)
@@ -120,6 +153,8 @@ def main():
     
     if not args.fix and issues:
         print('[FATAL] Project is not SDLC compliant.')
+        for issue in issues:
+            print(f'[ISSUE] {issue}')
         # Provide runtime-aware compliance guidance using config.SDLC_RUNTIME_DIR
         print(f'[JIT] To fix: Execute `python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix {target_dir}`')
         sys.exit(1)

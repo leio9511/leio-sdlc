@@ -2,9 +2,12 @@ import os
 import subprocess
 import pytest
 import sys
+from unittest.mock import patch
 
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
 import config
+import commit_state
+
 
 def test_commit_state_validates_files(tmp_path):
     # Setup mock git repo
@@ -51,14 +54,36 @@ def test_commit_state_success(tmp_path):
         
     with open("docs/PRDs/PRD_001_Test.md", "w") as f:
         f.write("prd")
-        
-    script_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/commit_state.py"
-    
-    # Commit state files
-    result = subprocess.run(["python3", script_path, "--files", "STATE.md", "docs/PRDs/PRD_001_Test.md"], capture_output=True, text=True)
-    
-    assert result.returncode == 0
-    assert "Successfully baselined PRD/state files." in result.stdout
+
+    with patch("commit_state.run_runtime_git") as mock_run_runtime_git:
+        with patch.object(sys, "argv", ["commit_state.py", "--files", "STATE.md", "docs/PRDs/PRD_001_Test.md"]):
+            commit_state.main()
+
+    mock_run_runtime_git.assert_called_once_with(
+        "commit_state",
+        ["commit", "-m", "chore(state): update manager state"],
+        check=True,
+    )
+
+
+def test_commit_state_uses_runtime_helper_with_commit_state_role(tmp_path):
+    os.chdir(tmp_path)
+    subprocess.run(["git", "init"])
+    subprocess.run(["git", "config", "user.email", "test@example.com"])
+    subprocess.run(["git", "config", "user.name", "Test User"])
+
+    with open("STATE.md", "w") as f:
+        f.write("state")
+
+    with patch("commit_state.run_runtime_git") as mock_run_runtime_git:
+        with patch.object(sys, "argv", ["commit_state.py", "--files", "STATE.md"]):
+            commit_state.main()
+
+    mock_run_runtime_git.assert_called_once_with(
+        "commit_state",
+        ["commit", "-m", "chore(state): update manager state"],
+        check=True,
+    )
 
 def test_pre_commit_hook_output(tmp_path):
     os.chdir(tmp_path)

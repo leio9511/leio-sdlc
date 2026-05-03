@@ -96,6 +96,7 @@ class TestOrchestratorResume(unittest.TestCase):
             )
             self.assertFalse(rename_called, "git branch -m should NOT be called on master")
 
+    @patch("orchestrator.run_runtime_git")
     @patch("orchestrator.drun")
     @patch("orchestrator.os.open", return_value=999)
     @patch("fcntl.flock")
@@ -103,7 +104,7 @@ class TestOrchestratorResume(unittest.TestCase):
     @patch("orchestrator.validate_prd_is_committed")
     @patch("orchestrator.parse_affected_projects", return_value=[])
     @patch("git_utils.check_git_boundary")
-    def test_resume_workspace_purification_feature(self, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun):
+    def test_resume_workspace_purification_feature(self, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun, mock_run_runtime_git):
         import orchestrator
         import tempfile
         
@@ -136,12 +137,15 @@ class TestOrchestratorResume(unittest.TestCase):
             
             calls = mock_drun.call_args_list
             add_called = any("add" in call.args[0] and "-A" in call.args[0] for call in calls)
-            commit_called = any("commit" in call.args[0] for call in calls)
             rename_called = any("branch" in call.args[0] and "-m" in call.args[0] for call in calls)
             checkout_called = any("checkout" in call.args[0] and "master" in call.args[0] for call in calls)
             
             self.assertTrue(add_called)
-            self.assertTrue(commit_called)
+            mock_run_runtime_git.assert_called_once_with(
+                "orchestrator",
+                ["commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"],
+                check=False,
+            )
             self.assertTrue(rename_called)
             self.assertTrue(checkout_called)
 

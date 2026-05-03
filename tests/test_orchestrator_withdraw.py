@@ -4,6 +4,7 @@ import tempfile
 import subprocess
 import shutil
 import pytest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
 
@@ -117,6 +118,44 @@ def test_withdraw_job_teardown(repo_env):
     
     assert not os.path.exists(job_dir)
     assert os.path.exists(job_dir + ".withdrawn")
+
+
+def test_withdraw_alignment_commit_uses_runtime_helper_with_orchestrator_role(repo_env):
+    import orchestrator
+
+    workdir = repo_env["workdir"]
+    with open(os.path.join(workdir, "file.txt"), "w") as f:
+        f.write("v2")
+    run_git(["add", "file.txt"], cwd=workdir)
+    run_git(["commit", "-m", "interrupted WIP"], cwd=workdir)
+
+    with patch("orchestrator.run_runtime_git") as mock_run_runtime_git:
+        run_orchestrator_withdraw(workdir, repo_env["global_dir"], repo_env["prd_name"])
+
+    assert any(
+        call.args[0] == "orchestrator"
+        and call.args[1][0] == "commit"
+        and any("chore: force baseline alignment of PRD" in arg for arg in call.args[1])
+        for call in mock_run_runtime_git.call_args_list
+    )
+
+
+def test_forensic_or_cleanup_commit_paths_use_runtime_helper_with_orchestrator_role(repo_env):
+    import orchestrator
+
+    workdir = repo_env["workdir"]
+    run_git(["checkout", "-b", "feature/test"], cwd=workdir)
+    with open(os.path.join(workdir, "scratch.txt"), "w") as f:
+        f.write("dirty")
+
+    with patch("orchestrator.run_runtime_git") as mock_run_runtime_git:
+        run_orchestrator_withdraw(workdir, repo_env["global_dir"], repo_env["prd_name"])
+
+    assert any(
+        call.args[0] == "orchestrator"
+        and call.args[1] == ["commit", "--allow-empty", "-m", "WIP: 🚨 FORENSIC CRASH STATE"]
+        for call in mock_run_runtime_git.call_args_list
+    )
 
 
 @pytest.fixture

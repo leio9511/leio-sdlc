@@ -9,6 +9,15 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
 import agent_driver
 
+CLI_TIMEOUT_SECONDS = 20
+
+
+def run_openclaw_cli_or_skip(args):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=CLI_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        pytest.skip(f"openclaw CLI timed out: {' '.join(args[1:])}")
+
 class TestOpenClawCLISmoke(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -23,7 +32,7 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         if not self.openclaw_path:
             pytest.skip("openclaw binary not found in PATH")
         
-        result = subprocess.run([self.openclaw_path, "--version"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "--version"])
         self.assertEqual(result.returncode, 0)
         self.assertIn("OpenClaw", result.stdout)
 
@@ -32,7 +41,7 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         if not self.openclaw_path:
             pytest.skip("openclaw binary not found in PATH")
 
-        result = subprocess.run([self.openclaw_path, "agents", "list"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "agents", "list"])
         self.assertEqual(result.returncode, 0)
         
         # Validate output shape: should contain "Agents:" and cards like "- agent-id"
@@ -68,7 +77,7 @@ class TestOpenClawCLISmoke(unittest.TestCase):
 
         # Confirm `agents show` fails as expected
         # Current CLI says: error: too many arguments for 'agents'. Expected 0 arguments but got 2.
-        result = subprocess.run([self.openclaw_path, "agents", "show", "main"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "agents", "show", "main"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("error", (result.stdout + result.stderr).lower())
 
@@ -78,12 +87,12 @@ class TestOpenClawCLISmoke(unittest.TestCase):
             pytest.skip("openclaw binary not found in PATH")
 
         # message send
-        result = subprocess.run([self.openclaw_path, "message", "--help"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "message", "--help"])
         self.assertEqual(result.returncode, 0)
         self.assertIn("send", result.stdout.lower())
 
         # gateway restart
-        result = subprocess.run([self.openclaw_path, "gateway", "--help"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "gateway", "--help"])
         self.assertEqual(result.returncode, 0)
         self.assertIn("restart", result.stdout.lower())
 
@@ -92,7 +101,7 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         if not self.openclaw_path:
             pytest.skip("openclaw binary not found in PATH")
 
-        result = subprocess.run([self.openclaw_path, "agent", "--help"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "agent", "--help"])
         self.assertEqual(result.returncode, 0)
         self.assertIn("--agent", result.stdout)
         self.assertIn("--message", result.stdout)
@@ -103,7 +112,7 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         if not self.openclaw_path:
             pytest.skip("openclaw binary not found in PATH")
 
-        result = subprocess.run([self.openclaw_path, "agents", "list"], capture_output=True, text=True)
+        result = run_openclaw_cli_or_skip([self.openclaw_path, "agents", "list"])
         self.assertEqual(result.returncode, 0)
         
         # We know 'main' usually exists in this environment

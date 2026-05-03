@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scripts.doctor import check_vcs, apply_overlay
+from scripts.doctor import check_vcs, apply_overlay, _read_managed_hook_schema_version
 
 import pytest
 def test_doctor_append_logic_idempotent():
@@ -78,3 +78,21 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
     )
     assert result.returncode == 1
     assert f"[JIT] To fix: Execute `python3 {custom_root}/leio-sdlc/scripts/doctor.py --fix" in result.stdout
+
+
+def test_doctor_detects_outdated_managed_hook(tmp_path):
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    hook_dir = tmp_path / ".git" / "hooks"
+    hook_dir.mkdir(parents=True, exist_ok=True)
+    hook_path = hook_dir / "pre-commit"
+    hook_path.write_text("#!/bin/bash\n# SDLC_MANAGED_HOOK=leio-sdlc\n")
+
+    script = Path(__file__).parent.parent / "scripts" / "doctor.py"
+    result = subprocess.run(
+        ["python3", str(script), str(tmp_path), "--check"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Managed hook requires upgrade: .git/hooks/pre-commit" in result.stdout

@@ -24,6 +24,7 @@ GLOBAL_DIR="/tmp/global_mock_$$"
 mkdir -p $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd
 mkdir -p scripts
 cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
+cp "${PROJECT_ROOT}/scripts/runtime_git_identity.py" scripts/
 cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
     cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
 cp "${PROJECT_ROOT}/scripts/utils_notification.py" scripts/

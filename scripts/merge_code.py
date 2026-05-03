@@ -4,6 +4,7 @@ import sys
 import argparse
 import subprocess
 from utils_json import extract_and_parse_json
+from runtime_git_identity import run_runtime_git
 
 # Global marker for Git Hook authentication (PRD-1012)
 os.environ["SDLC_ORCHESTRATOR_RUNNING"] = "1"
@@ -57,8 +58,7 @@ def main():
         sys.exit(0)
     else:
         try:
-            # Use -c flag to pass runtime authentication to hook
-            result = subprocess.run(["git", "-c", "sdlc.runtime=1", "merge", branch], check=True, text=True, capture_output=True)
+            result = run_runtime_git("merge_code", ["merge", branch], check=True, text=True, capture_output=True)
             print(result.stdout)
         except subprocess.CalledProcessError as e:
             print(f"Merge failed: {e.stderr}. Aborting merge.", file=sys.stderr)

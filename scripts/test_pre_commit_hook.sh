@@ -44,19 +44,51 @@ echo "Test 2: Expecting success with override flag..."
 git -c sdlc.override=true commit --allow-empty -m "override commit"
 echo "✅ PASSED: Override flag works as expected."
 
-# 5. Test: Runtime flag should succeed
-echo "Test 3: Expecting success with runtime flag..."
-git -c sdlc.runtime=1 commit --allow-empty -m "runtime commit"
-echo "✅ PASSED: Runtime flag works as expected."
+# 5. Test: Runtime flag without role should fail
+echo "Test 3: Expecting rejection for runtime flag without role..."
+set +e
+git -c sdlc.runtime=1 commit --allow-empty -m "runtime commit missing role" > runtime-missing-role.log 2>&1
+EXIT_CODE=$?
+set -e
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "❌ FAILED: Runtime commit without role was not blocked."
+    exit 1
+fi
+if ! grep -q "❌ Commit rejected: runtime commit requires explicit sdlc.role." runtime-missing-role.log; then
+    echo "❌ FAILED: Missing explicit-role rejection message."
+    exit 1
+fi
+echo "✅ PASSED: Runtime commit without role rejected."
 
-# 6. Test: Commit on feature branch should succeed
-echo "Test 4: Expecting success on feature branch..."
+# 6. Test: Unauthorized runtime role should fail
+echo "Test 4: Expecting rejection for unauthorized runtime role..."
+set +e
+git -c sdlc.runtime=1 -c sdlc.role=verifier commit --allow-empty -m "runtime commit verifier" > runtime-unauthorized-role.log 2>&1
+EXIT_CODE=$?
+set -e
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "❌ FAILED: Unauthorized runtime role was not blocked."
+    exit 1
+fi
+if ! grep -q "❌ Commit rejected: SDLC runtime role 'verifier' is not authorized to commit." runtime-unauthorized-role.log; then
+    echo "❌ FAILED: Missing unauthorized-role rejection message."
+    exit 1
+fi
+echo "✅ PASSED: Unauthorized runtime role rejected."
+
+# 7. Test: Authorized runtime role should succeed
+echo "Test 5: Expecting success with authorized runtime role..."
+git -c sdlc.runtime=1 -c sdlc.role=coder commit --allow-empty -m "runtime commit coder"
+echo "✅ PASSED: Authorized runtime role works as expected."
+
+# 8. Test: Commit on feature branch should succeed
+echo "Test 6: Expecting success on feature branch..."
 git checkout -b feature/test > /dev/null
 git commit --allow-empty -m "feature commit"
 echo "✅ PASSED: Commit on feature branch allowed."
 
-# 7. Test: No guardrail file should succeed
-echo "Test 5: Expecting success without .sdlc_guardrail..."
+# 9. Test: No guardrail file should succeed
+echo "Test 7: Expecting success without .sdlc_guardrail..."
 git checkout master > /dev/null
 rm .sdlc_guardrail
 git commit --allow-empty -m "no guardrail commit"
