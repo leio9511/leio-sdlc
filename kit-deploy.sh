@@ -10,10 +10,4 @@ for skill_deploy_script in skills/*/deploy.sh; do
     fi
 done
 
-if [ -z "$HOME_MOCK" ]; then
-    if command -v openclaw >/dev/null 2>&1; then
-        echo "🔄 Restarting OpenClaw gateway for Kit..."
-        openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
-    fi
-fi
 echo "✅ Kit deployment complete."

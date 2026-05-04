@@ -57,9 +57,3 @@ if command -v gemini >/dev/null 2>&1; then
     echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
     gemini skills link "$PROD_DIR" --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
 fi
-
-if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
-    if command -v openclaw >/dev/null 2>&1; then
-        openclaw gateway restart || true
-    fi
-fi

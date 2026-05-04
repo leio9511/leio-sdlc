@@ -83,7 +83,7 @@ perform_hard_copy_deployment() {
     mkdir -p "$TMP_DIR"
 
     if [ -d ".dist" ] && [ "$(ls -A .dist 2>/dev/null)" ]; then
-        cp -a .dist/* "$TMP_DIR/"
+        cp -a .dist/. "$TMP_DIR/"
     else
         rsync -a --exclude-from='.gitignore' --exclude-from='.release_ignore' . "$TMP_DIR/"
     fi
@@ -137,15 +137,7 @@ perform_hard_copy_deployment() {
         git config core.hooksPath .sdlc_hooks
     fi
 
-    # 7. Gateway Reload (MUST BE THE FINAL STEP)
-    if [ -z "$HOME_MOCK" ] && [ "$NO_RESTART" != "true" ]; then
-        if command -v openclaw >/dev/null 2>&1; then
-            echo "🔄 Restarting OpenClaw gateway..."
-            openclaw gateway restart || echo "⚠️ Gateway restart failed or not available."
-        fi
-    fi
-
-    # 8. Gemini CLI Dual-Compatibility Link
+    # 7. Gemini CLI Dual-Compatibility Link
     if command -v gemini >/dev/null 2>&1; then
         echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
         # Added --consent to avoid stalling during headless deploy
