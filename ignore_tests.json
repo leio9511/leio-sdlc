@@ -1,0 +1,14 @@
+{
+  "bash": [
+    "scripts/test_planner_slice_failed_pr.sh"
+  ],
+  "pytest": [
+    "tests/test_orchestrator_session_strategy.py",
+    "tests/test_079_agent_driver_openclaw_lazy_create.py",
+    "tests/test_083_openclaw_model_aware_routing.py",
+    "tests/test_handoff_integration.py",
+    "tests/test_orchestrator_handoff.py",
+    "tests/test_planner_envelope_forward_compatibility.py",
+    "tests/test_spawn_auditor.py"
+  ]
+}
