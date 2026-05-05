@@ -178,6 +178,10 @@ Context_Workdir: /home/openclaw/projects/leio-sdlc
    - 其调用时机从“SDLC 启动前补做”迁移到“PRD 审核通过后的 PM completion step”。
    - 该 completion step 由 Agent 在获得明确用户指令后执行，不在 Auditor APPROVED 后自动触发。
    - 若执行了 issue 更新，更新内容应包含 baseline commit hash。
+   - 上述 contract 变更必须同步写回 `leio-sdlc/skills/pm-skill/SKILL.md`，至少更新以下章节：
+     - `Workflow`
+     - `Auditor gate and anti-YOLO rule`
+     - `Baseline rule`
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 - **Scenario 1: PRD template exposes optional issue-tracking metadata**
@@ -266,8 +270,9 @@ Context_Workdir: /home/openclaw/projects/leio-sdlc
 
 ## 6. Framework Modifications (框架防篡改声明)
 - `leio-sdlc/skills/pm-skill/TEMPLATES/PRD.md.template`
+- `leio-sdlc/skills/pm-skill/SKILL.md`（必须同步更新 PM skill 的正式 contract，至少覆盖 `Workflow`、`Auditor gate and anti-YOLO rule`、`Baseline rule`）
 - `leio-sdlc/scripts/orchestrator.py`（仅限 pre-flight guardrail 文案调整）
-- `~/.openclaw/skills/pm-skill/SKILL.md`（如需要同步更新 PM completion 约定文案，但不作为源码改动要求）
+- `~/.openclaw/skills/pm-skill/SKILL.md`（如需在部署环境中即时生效，可作为运行时同步验证对象，但不作为源码真源）
 
 ---
 
@@ -280,6 +285,7 @@ Context_Workdir: /home/openclaw/projects/leio-sdlc
 - **v2.0 Revision Rationale**: 将 #2 收缩为最小可交付接口：PRD 中新增通用 issue-tracking 字段，并将 PRD baseline 责任明确移回 PM/Auditor 收尾阶段。GitHub issue / PR 更新动作由 Agent 在流程边界手动执行。
 - **v3.0 Revision Rationale**: 进一步澄清 Auditor 只审不执行副作用；APPROVED 后由 Agent 进入半自动 completion step，等待用户明确下达 `commit baseline` 或 `commit并更新issue` 指令，再执行 baseline 并用 commit hash 更新相关 issue。
 - **v4.0 Revision Rationale**: 收缩模板作用域为源码唯一真源 `leio-sdlc/skills/pm-skill/TEMPLATES/PRD.md.template`，并将 frontmatter 默认值写死为 YAML 安全的确定形式：`Primary_Issue: ""`、`Related_Issues: []`。
+- **v5.0 Revision Rationale**: 明确这次不仅改 PRD 模板，还必须把 PM completion contract 回写到源码 `leio-sdlc/skills/pm-skill/SKILL.md`，避免新流程只存在于单份 PRD 中而未进入 skill 的正式规范。
 
 ---
 
