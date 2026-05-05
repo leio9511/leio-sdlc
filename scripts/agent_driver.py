@@ -266,9 +266,9 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
                 validate_openclaw_agent_model(cmd_exec, agent_id, model)
 
             if actual_id:
-                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "-m", secure_msg]
+                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "--thinking", "high", "-m", secure_msg]
             else:
-                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", session_key, "-m", secure_msg]
+                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", session_key, "--thinking", "high", "-m", secure_msg]
             
         print(f"[{role or 'system'}] Invoking agent driver: {' '.join(cmd)}")
         
