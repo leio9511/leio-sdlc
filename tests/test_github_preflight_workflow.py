@@ -5,7 +5,23 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
+RUNBOOK_PATH = REPO_ROOT / "docs" / "ci" / "preflight-soft-gate.md"
 GATE_COMMAND = "bash preflight.sh"
+SOFT_GATE_SEMANTICS_STATEMENT = (
+    "Phase 2 soft gate means the GitHub Actions result is visible and truthful, "
+    "but not yet configured as a required merge blocker."
+)
+MASKING_PROHIBITION_STATEMENT = (
+    "Do not use continue-on-error or any equivalent masking mechanism to convert a real "
+    "preflight failure into a successful CI result."
+)
+LOCAL_CONTRACT_TEST_EXPECTATION = (
+    "The primary correctness checks for this phase must be implemented as "
+    "repository-local automated contract tests against .github/workflows/preflight.yml "
+    "rather than as live GitHub-only verification."
+)
+SUCCESS_FAILURE_MAPPING = """bash preflight.sh exit 0 -> CI job success
+bash preflight.sh non-zero exit -> CI job failure"""
 REQUIRED_STEP_IDS = [
     "checkout",
     "python-runtime-setup",
@@ -17,6 +33,10 @@ REQUIRED_STEP_IDS = [
 def load_workflow():
     with WORKFLOW_PATH.open("r", encoding="utf-8") as workflow_file:
         return yaml.safe_load(workflow_file)
+
+
+def load_runbook():
+    return RUNBOOK_PATH.read_text(encoding="utf-8")
 
 
 def workflow_on(workflow):
@@ -64,6 +84,54 @@ def assert_no_masking(run_command):
         "set +e",
     ]
     assert all(fragment not in run_command for fragment in prohibited_fragments)
+
+
+def test_preflight_soft_gate_runbook_exists():
+    assert RUNBOOK_PATH.exists()
+    assert RUNBOOK_PATH.is_file()
+    assert RUNBOOK_PATH.is_relative_to(REPO_ROOT)
+
+    runbook = load_runbook()
+    forbidden_live_dependency_terms = [
+        "api.github.com",
+        "gh api",
+        "curl",
+        "requests.get",
+    ]
+
+    assert str(RUNBOOK_PATH.relative_to(REPO_ROOT)) == "docs/ci/preflight-soft-gate.md"
+    assert all(term not in runbook for term in forbidden_live_dependency_terms)
+
+
+def test_preflight_soft_gate_runbook_preserves_required_statements():
+    runbook = load_runbook()
+
+    assert ".github/workflows/preflight.yml" in runbook
+    assert GATE_COMMAND in runbook
+    assert SOFT_GATE_SEMANTICS_STATEMENT in runbook
+    assert MASKING_PROHIBITION_STATEMENT in runbook
+    assert LOCAL_CONTRACT_TEST_EXPECTATION in runbook
+    assert SUCCESS_FAILURE_MAPPING in runbook
+
+
+def test_preflight_soft_gate_runbook_defines_low_frequency_external_witness():
+    runbook = load_runbook().lower()
+
+    assert "low-frequency external witness" in runbook
+    assert "push" in runbook
+    assert "pull_request" in runbook
+    assert "preflight" in runbook
+    assert "terminal result" in runbook
+    assert "success" in runbook
+    assert "failure" in runbook
+    assert "not as the primary local coder-loop validation" in runbook
+    assert "must not require network access" in runbook
+
+
+def test_preflight_workflow_documents_soft_gate_as_truthful_non_required_status():
+    runbook = load_runbook()
+
+    assert SOFT_GATE_SEMANTICS_STATEMENT in runbook
 
 
 def test_preflight_workflow_file_exists_at_required_path():
