@@ -7,6 +7,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
 RUNBOOK_PATH = REPO_ROOT / "docs" / "ci" / "preflight-soft-gate.md"
 GATE_COMMAND = "bash preflight.sh"
+GITHUB_DISCOVERY_WORKFLOW_NAME = "Preflight"
+GITHUB_DISCOVERY_WORKFLOW_FILENAME = "preflight.yml"
 SOFT_GATE_SEMANTICS_STATEMENT = (
     "Phase 2 soft gate means the GitHub Actions result is visible and truthful, "
     "but not yet configured as a required merge blocker."
@@ -138,7 +140,16 @@ def test_preflight_workflow_file_exists_at_required_path():
     assert WORKFLOW_PATH.exists()
     workflow = load_workflow()
     assert isinstance(workflow, dict)
-    assert workflow.get("name") == "Preflight"
+    assert workflow.get("name") == GITHUB_DISCOVERY_WORKFLOW_NAME
+
+
+def test_preflight_workflow_uses_stable_github_discovery_identifiers():
+    workflow = load_workflow()
+
+    assert WORKFLOW_PATH.name == GITHUB_DISCOVERY_WORKFLOW_FILENAME
+    assert str(WORKFLOW_PATH.relative_to(REPO_ROOT)) == ".github/workflows/preflight.yml"
+    assert workflow.get("name") == GITHUB_DISCOVERY_WORKFLOW_NAME
+    assert workflow.get("name", "").strip() == GITHUB_DISCOVERY_WORKFLOW_NAME
 
 
 def test_preflight_workflow_declares_push_and_pull_request_triggers():
