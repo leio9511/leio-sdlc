@@ -38,6 +38,7 @@ TRIGGER_FILTER_KEYS = {
     "tags",
     "tags-ignore",
 }
+RUN_SELECTION_EVENTS = {"push", "pull_request"}
 
 
 def load_workflow():
@@ -181,6 +182,13 @@ def test_preflight_workflow_triggers_are_unfiltered_for_published_refs():
             event_config = {}
         assert isinstance(event_config, dict)
         assert TRIGGER_FILTER_KEYS.isdisjoint(event_config)
+
+
+def test_preflight_workflow_exposes_only_events_allowed_for_run_selection():
+    workflow = load_workflow()
+    triggers = workflow_on(workflow)
+
+    assert set(triggers) == RUN_SELECTION_EVENTS
 
 
 def test_preflight_job_runs_on_github_hosted_clean_runner():
