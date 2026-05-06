@@ -39,6 +39,15 @@ TRIGGER_FILTER_KEYS = {
     "tags-ignore",
 }
 RUN_SELECTION_EVENTS = {"push", "pull_request"}
+RUN_SELECTION_STATUSES = {"queued", "in_progress", "completed", "waiting", "requested", "pending"}
+RUN_SELECTION_TERMINAL_CONCLUSIONS = {
+    "success",
+    "failure",
+    "cancelled",
+    "skipped",
+    "timed_out",
+    "action_required",
+}
 RUN_SELECTION_HANDOFF_REQUIRED_FIELDS = {
     "status",
     "conclusion",
@@ -113,10 +122,20 @@ def assert_no_masking(run_command):
 def build_preflight_run_selection_handoff(run, *, remote_branch, intended_head_sha):
     missing_fields = RUN_SELECTION_HANDOFF_REQUIRED_FIELDS - set(run)
     assert not missing_fields
+    assert isinstance(run["databaseId"], int)
+    assert run["databaseId"] > 0
     assert run["headSha"] == intended_head_sha
     assert run["event"] in RUN_SELECTION_EVENTS
     assert run["workflowName"] in {GITHUB_DISCOVERY_WORKFLOW_NAME, GITHUB_DISCOVERY_WORKFLOW_FILENAME}
     assert run["headBranch"] == remote_branch
+    assert run["status"] in RUN_SELECTION_STATUSES
+    assert run["url"] == f"https://github.com/leio9511/leio-sdlc/actions/runs/{run['databaseId']}"
+    assert isinstance(run["createdAt"], str) and "T" in run["createdAt"] and run["createdAt"].endswith("Z")
+    assert isinstance(run["updatedAt"], str) and "T" in run["updatedAt"] and run["updatedAt"].endswith("Z")
+    if run["status"] == "completed":
+        assert run["conclusion"] in RUN_SELECTION_TERMINAL_CONCLUSIONS
+    else:
+        assert run["conclusion"] is None
 
     return {
         "remote_branch": remote_branch,
@@ -320,6 +339,50 @@ def test_preflight_run_selection_handoff_requires_run_view_fields():
     except AssertionError:
         return
     raise AssertionError("accepted incomplete selected-run evidence")
+
+
+def test_preflight_run_selection_rejects_non_reviewable_handoff_values():
+    intended_sha = "0123456789abcdef0123456789abcdef01234567"
+    remote_branch = "intended-branch"
+    valid_run = {
+        "status": "completed",
+        "conclusion": "failure",
+        "databaseId": 123456789,
+        "headSha": intended_sha,
+        "event": "push",
+        "url": "https://github.com/leio9511/leio-sdlc/actions/runs/123456789",
+        "workflowName": "Preflight",
+        "headBranch": remote_branch,
+        "createdAt": "2026-05-07T02:50:00Z",
+        "updatedAt": "2026-05-07T02:55:00Z",
+    }
+    non_reviewable_overrides = [
+        {"databaseId": None, "url": "https://github.com/leio9511/leio-sdlc/actions/runs/None"},
+        {"databaseId": 0, "url": "https://github.com/leio9511/leio-sdlc/actions/runs/0"},
+        {"url": ""},
+        {"url": "https://github.com/leio9511/leio-sdlc/actions/runs/987654321"},
+        {"status": ""},
+        {"status": "unknown"},
+        {"createdAt": ""},
+        {"updatedAt": ""},
+        {"createdAt": "2026-05-07 02:50:00"},
+        {"updatedAt": "2026-05-07 02:55:00"},
+        {"status": "completed", "conclusion": None},
+        {"status": "completed", "conclusion": "neutral"},
+        {"status": "in_progress", "conclusion": "failure"},
+    ]
+
+    for override in non_reviewable_overrides:
+        candidate = {**valid_run, **override}
+        try:
+            build_preflight_run_selection_handoff(
+                candidate,
+                remote_branch=remote_branch,
+                intended_head_sha=intended_sha,
+            )
+        except AssertionError:
+            continue
+        raise AssertionError(f"accepted non-reviewable selected-run evidence: {override}")
 
 
 def test_preflight_job_runs_on_github_hosted_clean_runner():
