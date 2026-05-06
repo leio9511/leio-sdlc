@@ -162,6 +162,14 @@ def test_preflight_workflow_uses_expected_pre_publish_discovery_identifiers():
     assert workflow.get("name", "").strip() == GITHUB_DISCOVERY_WORKFLOW_NAME
 
 
+def test_preflight_workflow_run_name_exposes_run_selection_identity():
+    workflow = load_workflow()
+
+    assert workflow.get("run-name") == (
+        "Preflight ${{ github.event_name }} ${{ github.ref_name }} ${{ github.sha }}"
+    )
+
+
 def test_preflight_workflow_declares_push_and_pull_request_triggers():
     workflow = load_workflow()
     triggers = workflow_on(workflow)
