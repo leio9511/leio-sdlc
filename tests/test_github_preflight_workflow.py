@@ -143,7 +143,9 @@ def test_preflight_workflow_file_exists_at_required_path():
     assert workflow.get("name") == GITHUB_DISCOVERY_WORKFLOW_NAME
 
 
-def test_preflight_workflow_uses_stable_github_discovery_identifiers():
+def test_preflight_workflow_uses_expected_pre_publish_discovery_identifiers():
+    # This is a local pre-publish guard only; remote discovery is verified with
+    # GitHub Actions inspection after the workflow exists on a remote ref.
     workflow = load_workflow()
 
     assert WORKFLOW_PATH.name == GITHUB_DISCOVERY_WORKFLOW_FILENAME
