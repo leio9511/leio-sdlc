@@ -14,6 +14,29 @@ from agent_driver import AgentResult
 SYSTEM_ALERT_TEXT = "git dirty\nerror: preflight failed"
 SYSTEM_ALERT_CONTINUATION_RULE = "Do not re-plan the whole PR. Fix the exact operational failure shown below, rerun validation, and continue from the current branch state."
 RECOVERY_WARNING = "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts."
+NULL_OUTPUT_SYSTEM_ALERT = """SYSTEM ALERT: Your previous coder round produced no implementation artifacts.
+
+Detected state:
+- no file delta
+- no commit delta
+
+This means your previous round is INVALID for SDLC automation.
+Acknowledgment-only completion (for example “I’ve read the task”, “I’m ready”, or similar readiness/status-only replies) does NOT count as progress.
+
+You must continue autonomously from the current branch state and produce real implementation artifacts that satisfy the PR contract:
+- create/modify the required files
+- run the relevant tests and ./preflight.sh if required
+- commit the changed files
+- leave git status clean
+- report the new HEAD commit hash
+
+Forbidden outcomes:
+- “I’m ready for the next step”
+- “I understand the task”
+- any status-only or acknowledgment-only response without implementation artifacts
+
+A narrative explanation without code, tests, and commit does not count as successful completion.
+If you again produce no implementation artifacts, the orchestrator will escalate through the existing recovery path."""
 
 class TestCoderSystemAlertRouting(unittest.TestCase):
     def _write_common_files(self, tmp_dir):
@@ -100,6 +123,34 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
             self.assertEqual(second_artifact.read_text(encoding="utf-8"), second_prompt)
             self.assertIn("alert 1", first_artifact.read_text(encoding="utf-8"))
             self.assertIn("alert 2", second_artifact.read_text(encoding="utf-8"))
+
+    @patch('spawn_coder.get_current_branch', return_value='feature/system-alert-routing')
+    @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
+    @patch('spawn_coder.invoke_agent')
+    def test_null_output_system_alert_prompt_preserves_exact_contract_text(self, mock_invoke, mock_commit, mock_branch):
+        mock_invoke.return_value = AgentResult(session_key="existing-session", stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file, prd_file, playbook_file = self._write_common_files(tmp_dir)
+            Path(os.path.join(tmp_dir, ".coder_session")).write_text("existing-session", encoding="utf-8")
+
+            is_existing, key = spawn_coder.handle_system_alert_routing(
+                tmp_dir, tmp_dir, pr_file, prd_file, playbook_file, NULL_OUTPUT_SYSTEM_ALERT, "PR_001"
+            )
+
+            self.assertTrue(is_existing)
+            self.assertEqual(key, "existing-session")
+            prompt = mock_invoke.call_args[0][0]
+            self.assertIn("# CODER SYSTEM ALERT CONTINUATION", prompt)
+            self.assertIn(SYSTEM_ALERT_CONTINUATION_RULE, prompt)
+            self.assertIn(NULL_OUTPUT_SYSTEM_ALERT, prompt)
+            self.assertIn("Acknowledgment-only completion", prompt)
+            self.assertIn("create/modify the required files", prompt)
+            self.assertIn("run the relevant tests and ./preflight.sh if required", prompt)
+            self.assertIn("commit the changed files", prompt)
+            self.assertIn("leave git status clean", prompt)
+            self.assertIn("report the new HEAD commit hash", prompt)
+            self.assertNotIn("# REFERENCE INDEX", prompt)
 
     def test_coder_playbook_documents_abcd_lifecycle_model(self):
         playbook_path = os.path.join(os.path.dirname(__file__), '..', 'playbooks', 'coder_playbook.md')

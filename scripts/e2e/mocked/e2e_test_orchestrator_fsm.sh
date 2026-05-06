@@ -74,8 +74,14 @@ INNER_EOF
     git commit -m "add PR" > /dev/null 2>&1
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
-os.system("git add . && git commit -m 'clean' >/dev/null 2>&1")
+import os
+import subprocess
+import sys
+
+with open("green_feature.txt", "w") as f:
+    f.write("green path artifact\n")
+subprocess.run(["git", "add", "green_feature.txt"], check=True)
+subprocess.run(["git", "commit", "-m", "clean"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.exit(0)
 INNER_EOF
     
@@ -270,8 +276,14 @@ INNER_EOF
     git commit -m "add pr 4" > /dev/null 2>&1
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
-os.system("git add . && git commit -m 'clean' >/dev/null 2>&1")
+import os
+import subprocess
+import sys
+
+with open("noise_target_feature.txt", "w") as f:
+    f.write("noise path artifact\n")
+subprocess.run(["git", "add", "noise_target_feature.txt"], check=True)
+subprocess.run(["git", "commit", "-m", "clean"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.exit(0)
 INNER_EOF
     
@@ -352,8 +364,14 @@ with open(os.environ["RUN_DIR"] + "/MyProject/PR_001_Mock.md", "w") as f:
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
-os.system("git add . && git commit -m 'clean' >/dev/null 2>&1")
+import os
+import subprocess
+import sys
+
+with open("pure_start_feature.txt", "w") as f:
+    f.write("pure start artifact\n")
+subprocess.run(["git", "add", "pure_start_feature.txt"], check=True)
+subprocess.run(["git", "commit", "-m", "clean"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.exit(0)
 INNER_EOF
 
@@ -405,8 +423,14 @@ sys.exit(1)
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
-os.system("git add . && git commit -m 'clean' >/dev/null 2>&1")
+import os
+import subprocess
+import sys
+
+with open("idempotency_feature.txt", "w") as f:
+    f.write("idempotency artifact\n")
+subprocess.run(["git", "add", "idempotency_feature.txt"], check=True)
+subprocess.run(["git", "commit", "-m", "clean"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.exit(0)
 INNER_EOF
 
@@ -465,8 +489,14 @@ with open(os.environ["RUN_DIR"] + "/MyProject/PR_New.md", "w") as f:
 INNER_EOF
 
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
-os.system("git add . && git commit -m 'clean' >/dev/null 2>&1")
+import os
+import subprocess
+import sys
+
+with open("force_replan_feature.txt", "w") as f:
+    f.write("force replan artifact\n")
+subprocess.run(["git", "add", "force_replan_feature.txt"], check=True)
+subprocess.run(["git", "commit", "-m", "clean"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 sys.exit(0)
 INNER_EOF
 

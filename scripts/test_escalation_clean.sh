@@ -63,19 +63,28 @@ status: open
 slice_depth: 0
 INNER_EOF
 
-# Mock Coder: make dirty workspace and fail ONCE
+# Mock Coder: make dirty workspace and fail ONCE, then produce a real commit
 cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
+import os
+import subprocess
+import sys
+
 flag_file = "/tmp/coder_failed_once.flag"
 if not os.path.exists(flag_file):
     with open(flag_file, "w") as f:
         f.write("yes")
     # Make workspace dirty and fail
-    with open("dirty_untracked.txt", "w") as f: f.write("dirty")
-    with open("init.txt", "w") as f: f.write("modified")
-    sys.exit(1) # Fail the first time
+    with open("dirty_untracked.txt", "w") as f:
+        f.write("dirty")
+    with open("init.txt", "w") as f:
+        f.write("modified")
+    sys.exit(1)  # Fail the first time
 else:
-    # On the second run, succeed. The orchestrator will clean up the flag.
+    # On the second run, produce a real implementation artifact and commit it.
+    with open("recovered.txt", "w") as f:
+        f.write("recovered")
+    subprocess.run(["git", "add", "recovered.txt"], check=True)
+    subprocess.run(["git", "commit", "-m", "mock recovery artifact"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     sys.exit(0)
 INNER_EOF
 

@@ -67,6 +67,30 @@ RETRY_RECOVERY_CONFIG_KEYS = (
     "max_uat_recovery_attempts",
 )
 
+NULL_OUTPUT_SYSTEM_ALERT = """SYSTEM ALERT: Your previous coder round produced no implementation artifacts.
+
+Detected state:
+- no file delta
+- no commit delta
+
+This means your previous round is INVALID for SDLC automation.
+Acknowledgment-only completion (for example “I’ve read the task”, “I’m ready”, or similar readiness/status-only replies) does NOT count as progress.
+
+You must continue autonomously from the current branch state and produce real implementation artifacts that satisfy the PR contract:
+- create/modify the required files
+- run the relevant tests and ./preflight.sh if required
+- commit the changed files
+- leave git status clean
+- report the new HEAD commit hash
+
+Forbidden outcomes:
+- “I’m ready for the next step”
+- “I understand the task”
+- any status-only or acknowledgment-only response without implementation artifacts
+
+A narrative explanation without code, tests, and commit does not count as successful completion.
+If you again produce no implementation artifacts, the orchestrator will escalate through the existing recovery path."""
+
 def _load_retry_recovery_overlay(config_path):
     if not config_path or not os.path.exists(config_path):
         return {}
@@ -247,6 +271,26 @@ def parse_review_verdict(content):
     except Exception:
         pass
     return None
+
+
+def get_head_commit_hash(workdir):
+    res = drun(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=workdir)
+    if res.returncode != 0:
+        return None
+    head = res.stdout.strip()
+    return head or None
+
+
+def classify_coder_null_output(workdir, attempt_head, coder_returncode):
+    status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=workdir).stdout
+    current_head = get_head_commit_hash(workdir)
+    is_null_output = (
+        coder_returncode == 0
+        and not status_output.strip()
+        and bool(attempt_head)
+        and attempt_head == current_head
+    )
+    return is_null_output, status_output, current_head
 
 
 
@@ -906,7 +950,8 @@ def main():
                     if system_alert_text:
                         coder_cmd.extend(["--system-alert", system_alert_text])
                         system_alert_text = None
-                        
+
+                    coder_attempt_head = get_head_commit_hash(workdir)
                     proc = dpopen(coder_cmd, start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_coder", gemini_api_keys, global_dir))
                     try:
                         proc.wait(timeout=MAX_RUNTIME)
@@ -926,7 +971,11 @@ def main():
                         state_5_trigger = True
                         break
 
-                    status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
+                    is_null_output, status_output, current_head = classify_coder_null_output(
+                        workdir,
+                        coder_attempt_head,
+                        coder_result.returncode,
+                    )
                     if status_output.strip():
                         dlog(f"Dirty status detected: {repr(status_output)}")
                         orch_yellow_counter += 1
@@ -934,6 +983,18 @@ def main():
                             state_5_trigger = True
                             break
                         system_alert_text = status_output.strip()
+                        continue
+
+                    if is_null_output:
+                        dlog(
+                            f"Null-output coder round detected for {base_filename}: "
+                            f"baseline_head={coder_attempt_head}, current_head={current_head}"
+                        )
+                        orch_yellow_counter += 1
+                        if orch_yellow_counter >= yellow_retry_limit:
+                            state_5_trigger = True
+                            break
+                        system_alert_text = NULL_OUTPUT_SYSTEM_ALERT
                         continue
                     
                     preflight_script = os.path.join(workdir, "preflight.sh")

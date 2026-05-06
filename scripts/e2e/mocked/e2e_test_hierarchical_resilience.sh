@@ -62,14 +62,28 @@ INNER_EOF
 
     # Stub coder
     cat << 'INNER_EOF' > scripts/spawn_coder.py
-import sys, os
+import os
+import subprocess
+import sys
+
+counter_file = "/tmp/coder_runs.counter"
+run_number = 0
+if os.path.exists(counter_file):
+    with open(counter_file, "r") as f:
+        run_number = int(f.read().strip() or "0")
+run_number += 1
+with open(counter_file, "w") as f:
+    f.write(str(run_number))
+
 with open("/tmp/coder_runs.log", "a") as f:
     f.write("coder_run\n")
-# Create a dummy file to simulate work
+
+# Create a unique commit each run so this fixture exercises reviewer yellow/red
+# resilience rather than the null-output recovery path.
 with open("feature.txt", "w") as f:
-    f.write("code")
-os.system("git add feature.txt")
-os.system("git commit -m 'feat'")
+    f.write(f"code-{run_number}\n")
+subprocess.run(["git", "add", "feature.txt"], check=True)
+subprocess.run(["git", "commit", "-m", f"feat-{run_number}"], check=True)
 sys.exit(0)
 INNER_EOF
     chmod +x scripts/spawn_coder.py
