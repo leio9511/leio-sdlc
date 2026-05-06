@@ -30,6 +30,14 @@ REQUIRED_STEP_IDS = [
     "node-runtime-setup",
     "minimal-bootstrap",
 ]
+TRIGGER_FILTER_KEYS = {
+    "branches",
+    "branches-ignore",
+    "paths",
+    "paths-ignore",
+    "tags",
+    "tags-ignore",
+}
 
 
 def load_workflow():
@@ -161,6 +169,18 @@ def test_preflight_workflow_declares_push_and_pull_request_triggers():
     assert isinstance(triggers, dict)
     assert "push" in triggers
     assert "pull_request" in triggers
+
+
+def test_preflight_workflow_triggers_are_unfiltered_for_published_refs():
+    workflow = load_workflow()
+    triggers = workflow_on(workflow)
+
+    for required_event in ("push", "pull_request"):
+        event_config = triggers[required_event]
+        if event_config is None:
+            event_config = {}
+        assert isinstance(event_config, dict)
+        assert TRIGGER_FILTER_KEYS.isdisjoint(event_config)
 
 
 def test_preflight_job_runs_on_github_hosted_clean_runner():
