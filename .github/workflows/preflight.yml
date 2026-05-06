@@ -9,6 +9,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
+        id: checkout
         uses: actions/checkout@v4
+      - name: Set up Python runtime
+        id: python-runtime-setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Node runtime
+        id: node-runtime-setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Minimal bootstrap
+        id: minimal-bootstrap
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml
       - name: Run preflight
         run: bash preflight.sh

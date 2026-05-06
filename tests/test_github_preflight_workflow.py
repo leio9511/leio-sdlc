@@ -6,6 +6,12 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
 GATE_COMMAND = "bash preflight.sh"
+REQUIRED_STEP_IDS = [
+    "checkout",
+    "python-runtime-setup",
+    "node-runtime-setup",
+    "minimal-bootstrap",
+]
 
 
 def load_workflow():
@@ -24,6 +30,12 @@ def preflight_job(workflow):
     return jobs["preflight"]
 
 
+def preflight_steps(workflow):
+    steps = preflight_job(workflow).get("steps", [])
+    assert steps
+    return steps
+
+
 def all_steps(workflow):
     steps = []
     for job in workflow.get("jobs", {}).values():
@@ -31,8 +43,27 @@ def all_steps(workflow):
     return steps
 
 
+def step_ids(workflow):
+    return [step.get("id") for step in preflight_steps(workflow)]
+
+
+def step_by_id(workflow, step_id):
+    matches = [step for step in preflight_steps(workflow) if step.get("id") == step_id]
+    assert len(matches) == 1
+    return matches[0]
+
+
 def gate_steps(workflow):
     return [step for step in all_steps(workflow) if step.get("run") == GATE_COMMAND]
+
+
+def assert_no_masking(run_command):
+    prohibited_fragments = [
+        "|| true",
+        "exit 0",
+        "set +e",
+    ]
+    assert all(fragment not in run_command for fragment in prohibited_fragments)
 
 
 def test_preflight_workflow_file_exists_at_required_path():
@@ -69,7 +100,8 @@ def test_preflight_workflow_executes_real_gate_command_once():
     assert len(gate_steps(workflow)) == 1
 
     run_commands = [step.get("run") for step in steps if "run" in step]
-    assert run_commands == [GATE_COMMAND]
+    assert run_commands[-1] == GATE_COMMAND
+    assert run_commands.count(GATE_COMMAND) == 1
 
 
 def test_preflight_workflow_does_not_mask_gate_failures():
@@ -82,11 +114,78 @@ def test_preflight_workflow_does_not_mask_gate_failures():
 
     gate_step = gate_steps(workflow)[0]
     gate_run = gate_step["run"]
-    prohibited_fragments = [
-        "|| true",
-        "exit 0",
-        "if ",
-        "fi",
-        "set +e",
+    assert_no_masking(gate_run)
+    assert "if " not in gate_run
+    assert "fi" not in gate_run
+
+
+def test_preflight_workflow_contains_required_runtime_and_bootstrap_steps():
+    workflow = load_workflow()
+    ids = step_ids(workflow)
+
+    for required_step_id in REQUIRED_STEP_IDS:
+        assert required_step_id in ids
+    assert len(gate_steps(workflow)) == 1
+
+
+def test_preflight_workflow_orders_bootstrap_before_real_gate():
+    workflow = load_workflow()
+    steps = preflight_steps(workflow)
+    ids = step_ids(workflow)
+    gate_index = next(index for index, step in enumerate(steps) if step.get("run") == GATE_COMMAND)
+
+    checkout_index = ids.index("checkout")
+    python_index = ids.index("python-runtime-setup")
+    node_index = ids.index("node-runtime-setup")
+    bootstrap_index = ids.index("minimal-bootstrap")
+
+    assert checkout_index < python_index
+    assert checkout_index < node_index
+    assert python_index < bootstrap_index
+    assert node_index < bootstrap_index
+    assert bootstrap_index < gate_index
+
+
+def test_preflight_workflow_uses_supported_setup_actions():
+    workflow = load_workflow()
+
+    checkout = step_by_id(workflow, "checkout")
+    python_setup = step_by_id(workflow, "python-runtime-setup")
+    node_setup = step_by_id(workflow, "node-runtime-setup")
+
+    assert checkout.get("uses", "").startswith("actions/checkout@")
+    assert python_setup.get("uses", "").startswith("actions/setup-python@")
+    assert python_setup.get("with", {}).get("python-version", "").startswith("3.")
+    assert node_setup.get("uses", "").startswith("actions/setup-node@")
+    assert node_setup.get("with", {}).get("node-version") in {"20", "22"}
+
+
+def test_minimal_bootstrap_does_not_replace_preflight_gate():
+    workflow = load_workflow()
+    bootstrap = step_by_id(workflow, "minimal-bootstrap")
+    bootstrap_run = bootstrap.get("run", "")
+    forbidden_bootstrap_fragments = [
+        "pytest",
+        "preflight.sh",
+        "scripts/test_",
+        "for f in",
+        "npm test",
+        "python3 scripts/test_",
+        "bash scripts/test_",
     ]
-    assert all(fragment not in gate_run for fragment in prohibited_fragments)
+
+    assert bootstrap_run
+    assert all(fragment not in bootstrap_run for fragment in forbidden_bootstrap_fragments)
+    assert len(gate_steps(workflow)) == 1
+    assert gate_steps(workflow)[0] == preflight_steps(workflow)[-1]
+
+
+def test_preflight_workflow_does_not_mask_failures_after_bootstrap_hardening():
+    workflow = load_workflow()
+    jobs = workflow.get("jobs", {})
+
+    assert all("continue-on-error" not in job for job in jobs.values())
+    for step in all_steps(workflow):
+        assert "continue-on-error" not in step
+        if "run" in step:
+            assert_no_masking(step["run"])
