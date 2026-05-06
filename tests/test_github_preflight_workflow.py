@@ -39,6 +39,19 @@ TRIGGER_FILTER_KEYS = {
     "tags-ignore",
 }
 RUN_SELECTION_EVENTS = {"push", "pull_request"}
+RUN_SELECTION_HANDOFF_REQUIRED_FIELDS = {
+    "status",
+    "conclusion",
+    "databaseId",
+    "headSha",
+    "event",
+    "url",
+    "workflowName",
+    "headBranch",
+    "createdAt",
+    "updatedAt",
+}
+TERMINAL_CONCLUSION_DEFERRED_NOTE = "terminal conclusion is intentionally deferred to PR-002_2_2"
 
 
 def load_workflow():
@@ -95,6 +108,31 @@ def assert_no_masking(run_command):
         "set +e",
     ]
     assert all(fragment not in run_command for fragment in prohibited_fragments)
+
+
+def build_preflight_run_selection_handoff(run, *, remote_branch, intended_head_sha):
+    missing_fields = RUN_SELECTION_HANDOFF_REQUIRED_FIELDS - set(run)
+    assert not missing_fields
+    assert run["headSha"] == intended_head_sha
+    assert run["event"] in RUN_SELECTION_EVENTS
+    assert run["workflowName"] in {GITHUB_DISCOVERY_WORKFLOW_NAME, GITHUB_DISCOVERY_WORKFLOW_FILENAME}
+    assert run["headBranch"] == remote_branch
+
+    return {
+        "remote_branch": remote_branch,
+        "intended_head_sha": intended_head_sha,
+        "selected_run_head_sha": run["headSha"],
+        "event": run["event"],
+        "database_id": run["databaseId"],
+        "url": run["url"],
+        "status": run["status"],
+        "conclusion": run["conclusion"],
+        "workflow_identity": run["workflowName"],
+        "head_branch": run["headBranch"],
+        "created_at": run["createdAt"],
+        "updated_at": run["updatedAt"],
+        "terminal_conclusion_note": TERMINAL_CONCLUSION_DEFERRED_NOTE,
+    }
 
 
 def test_preflight_soft_gate_runbook_exists():
@@ -184,11 +222,104 @@ def test_preflight_workflow_triggers_are_unfiltered_for_published_refs():
         assert TRIGGER_FILTER_KEYS.isdisjoint(event_config)
 
 
-def test_preflight_workflow_exposes_only_events_allowed_for_run_selection():
-    workflow = load_workflow()
-    triggers = workflow_on(workflow)
+def test_preflight_run_selection_handoff_requires_complete_reviewable_evidence():
+    intended_sha = "0123456789abcdef0123456789abcdef01234567"
+    remote_branch = "PRD_Introduce_early_GitHub_CI_for_preflight_as_a_soft_gate/PR_002_2_1_3_Harden_run_selection_evidence_against_stale_candidates"
+    run = {
+        "status": "in_progress",
+        "conclusion": None,
+        "databaseId": 123456789,
+        "headSha": intended_sha,
+        "event": "push",
+        "url": "https://github.com/leio9511/leio-sdlc/actions/runs/123456789",
+        "workflowName": "Preflight",
+        "headBranch": remote_branch,
+        "createdAt": "2026-05-07T02:50:00Z",
+        "updatedAt": "2026-05-07T02:55:00Z",
+    }
 
-    assert set(triggers) == RUN_SELECTION_EVENTS
+    handoff = build_preflight_run_selection_handoff(
+        run,
+        remote_branch=remote_branch,
+        intended_head_sha=intended_sha,
+    )
+
+    assert handoff == {
+        "remote_branch": remote_branch,
+        "intended_head_sha": intended_sha,
+        "selected_run_head_sha": intended_sha,
+        "event": "push",
+        "database_id": 123456789,
+        "url": "https://github.com/leio9511/leio-sdlc/actions/runs/123456789",
+        "status": "in_progress",
+        "conclusion": None,
+        "workflow_identity": "Preflight",
+        "head_branch": remote_branch,
+        "created_at": "2026-05-07T02:50:00Z",
+        "updated_at": "2026-05-07T02:55:00Z",
+        "terminal_conclusion_note": TERMINAL_CONCLUSION_DEFERRED_NOTE,
+    }
+
+
+def test_preflight_run_selection_rejects_stale_or_mismatched_candidates():
+    intended_sha = "0123456789abcdef0123456789abcdef01234567"
+    remote_branch = "intended-branch"
+    valid_run = {
+        "status": "completed",
+        "conclusion": "failure",
+        "databaseId": 123456789,
+        "headSha": intended_sha,
+        "event": "pull_request",
+        "url": "https://github.com/leio9511/leio-sdlc/actions/runs/123456789",
+        "workflowName": "preflight.yml",
+        "headBranch": remote_branch,
+        "createdAt": "2026-05-07T02:50:00Z",
+        "updatedAt": "2026-05-07T02:55:00Z",
+    }
+    stale_or_mismatched_overrides = [
+        {"headSha": "fedcba9876543210fedcba9876543210fedcba98"},
+        {"event": "workflow_dispatch"},
+        {"workflowName": "Other workflow"},
+        {"headBranch": "stale-branch"},
+    ]
+
+    for override in stale_or_mismatched_overrides:
+        candidate = {**valid_run, **override}
+        try:
+            build_preflight_run_selection_handoff(
+                candidate,
+                remote_branch=remote_branch,
+                intended_head_sha=intended_sha,
+            )
+        except AssertionError:
+            continue
+        raise AssertionError(f"accepted stale or mismatched candidate: {override}")
+
+
+def test_preflight_run_selection_handoff_requires_run_view_fields():
+    intended_sha = "0123456789abcdef0123456789abcdef01234567"
+    remote_branch = "intended-branch"
+    incomplete_run = {
+        "status": "completed",
+        "databaseId": 123456789,
+        "headSha": intended_sha,
+        "event": "push",
+        "url": "https://github.com/leio9511/leio-sdlc/actions/runs/123456789",
+        "workflowName": "Preflight",
+        "headBranch": remote_branch,
+        "createdAt": "2026-05-07T02:50:00Z",
+        "updatedAt": "2026-05-07T02:55:00Z",
+    }
+
+    try:
+        build_preflight_run_selection_handoff(
+            incomplete_run,
+            remote_branch=remote_branch,
+            intended_head_sha=intended_sha,
+        )
+    except AssertionError:
+        return
+    raise AssertionError("accepted incomplete selected-run evidence")
 
 
 def test_preflight_job_runs_on_github_hosted_clean_runner():
