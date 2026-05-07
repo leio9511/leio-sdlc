@@ -18,8 +18,7 @@ export OPENCLAW_SESSION_KEY="mock:channel"
 WORK_DIR="$TEST_DIR/workdir"
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
-git init >/dev/null 2>&1
-git commit --allow-empty -m "Initial" >/dev/null 2>&1
+init_git_test_sandbox "$WORK_DIR" --baseline-commit
 
 # Initialize hermetic sandbox with all required scripts
 init_hermetic_sandbox "$WORK_DIR/scripts"
@@ -53,7 +52,7 @@ echo ".sdlc_runs/" >> "$WORK_DIR/.gitignore"
 echo ".sdlc_repo.lock" >> "$WORK_DIR/.gitignore"
 echo ".tmp/" >> "$WORK_DIR/.gitignore"
 
-git add -A >/dev/null 2>&1 || true
+git add .gitignore "$PRD_FILE" scripts/preflight.sh >/dev/null 2>&1 || true
 git commit -m "setup test" >/dev/null 2>&1 || true
 
 ORCHESTRATOR="$TEST_DIR/scripts/orchestrator.py"

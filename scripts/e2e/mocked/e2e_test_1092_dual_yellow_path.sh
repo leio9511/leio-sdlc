@@ -11,8 +11,10 @@ source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 SDLC_ROOT="$PROJECT_ROOT"
 
 cd "$TEST_DIR"
-git init > /dev/null
 echo "Affected_Projects: [mock2]" > PRD.md
+# Use the canonical clean-runner-safe git sandbox bootstrap so this test does
+# not depend on any host-global git identity.
+init_git_test_sandbox "$TEST_DIR"
 git add PRD.md
 git commit -m "init" > /dev/null
 
@@ -93,9 +95,8 @@ setup_fake_pr() {
     rm -rf "$TEST_DIR/mock2"
     mkdir -p "$TEST_DIR/mock2"
     cd "$TEST_DIR/mock2"
-    git init > /dev/null
+    init_git_test_sandbox "$TEST_DIR/mock2" --baseline-commit
     git branch -m master 2>/dev/null || true
-    git commit --allow-empty -m "init" > /dev/null
     mkdir -p .sdlc_runs/mock2/PRD
     git rev-parse HEAD > .sdlc_runs/mock2/PRD/baseline_commit.txt
     echo ".sdlc_repo.lock" > .gitignore
@@ -103,7 +104,7 @@ setup_fake_pr() {
     echo "---
 status: in_progress
 ---" > .sdlc_runs/mock2/PRD/PR_001.md
-    git add .
+    git add .gitignore .sdlc_runs/mock2/PRD/baseline_commit.txt .sdlc_runs/mock2/PRD/PR_001.md
     git commit -m "add pr" > /dev/null
     python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR/mock2" --fix
     git add .

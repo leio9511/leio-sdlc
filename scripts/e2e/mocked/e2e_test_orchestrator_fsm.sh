@@ -20,16 +20,13 @@ exit 0
 INNER_EOF
     chmod +x "bin/openclaw"
     export PATH="$(pwd)/bin:$PATH"
-    git init > /dev/null 2>&1
-    git config user.name "E2E Test"
-    git config user.email "e2e@example.com"
-    git commit --allow-empty -m "init" > /dev/null 2>&1
+    init_git_test_sandbox "$sandbox_dir" --baseline-commit
     echo "*.log" > .gitignore
-echo ".sdlc_repo.lock" >> .gitignore
+    echo ".sdlc_repo.lock" >> .gitignore
     git add .gitignore
     git commit -m "add gitignore" > /dev/null 2>&1
 
-    mkdir -p $RUN_DIR/dummy_prd
+    mkdir -p "$RUN_DIR/dummy_prd"
     mkdir -p scripts config
     
     # We copy the real orchestrator.py --force-replan false to run
