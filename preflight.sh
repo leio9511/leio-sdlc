@@ -38,6 +38,7 @@ declare -a BLOCKED_CHECKS=()
 BASH_IGNORE_COUNT=0
 PYTEST_IGNORE_COUNT=0
 TOTAL_PASSED=0
+TEMPLATE_COMPLIANCE_FAILED=0
 
 echo "[$(date '+%H:%M:%S')] Starting Smart Preflight Checks ($MODE mode)..."
 
@@ -159,6 +160,7 @@ run_test() {
         return 1
     fi
     ((TOTAL_PASSED++))
+    return 0
 }
 
 run_test_argv() {
@@ -170,6 +172,7 @@ run_test_argv() {
         return 1
     fi
     ((TOTAL_PASSED++))
+    return 0
 }
 
 run_live_llm_test() {
@@ -226,7 +229,9 @@ rm -rf tests/planner_sandbox_* tests/manager_sandbox_* 2>/dev/null || true
 shopt -s nullglob
 
 # 0. Structural Gates
-run_test "pytest tests/test_template_compliance.py" "Template Compliance Gate"
+if ! run_test "pytest tests/test_template_compliance.py" "Template Compliance Gate"; then
+    TEMPLATE_COMPLIANCE_FAILED=1
+fi
 
 # 1. Bash Tests Discovery
 for f in scripts/test_*.sh; do
@@ -238,7 +243,11 @@ done
 
 # 2. Python Tests Discovery
 if [ -d "tests" ]; then
-    run_test_argv "Pytest functional & unittest suite" pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"
+    if [[ "$MODE" == "$REPORT_ALL_MODE_NAME" && $TEMPLATE_COMPLIANCE_FAILED -eq 1 ]]; then
+        mark_test_blocked "Pytest functional & unittest suite" "Template Compliance Gate failed earlier; broader pytest suite would only duplicate non-actionable structural failures"
+    else
+        run_test_argv "Pytest functional & unittest suite" pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"
+    fi
 fi
 
 for f in scripts/test_*.py; do

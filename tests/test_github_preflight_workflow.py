@@ -85,7 +85,7 @@ def test_preflight_workflow_declares_required_triggers_and_step_inventory():
 
 def test_preflight_workflow_uses_real_gate_command():
     run_preflight_step = _get_steps_by_id()["run-preflight"]
-    assert run_preflight_step.get("run", "").strip() == "bash preflight.sh"
+    assert run_preflight_step.get("run", "").strip() == "bash preflight.sh --report-all"
 
 
 def test_preflight_workflow_preserves_truthful_failure_semantics():
@@ -98,7 +98,7 @@ def test_preflight_workflow_preserves_truthful_failure_semantics():
             assert "|| true" not in run_command
 
     run_preflight_step = _get_steps_by_id()["run-preflight"]
-    assert run_preflight_step.get("run", "").strip() == "bash preflight.sh"
+    assert run_preflight_step.get("run", "").strip() == "bash preflight.sh --report-all"
 
 
 def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(monkeypatch):
@@ -116,4 +116,4 @@ def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(
 
     assert REQUIRED_TRIGGER_KEYS.issubset(workflow["on"].keys())
     assert REQUIRED_STEP_IDS.issubset(steps_by_id.keys())
-    assert steps_by_id["run-preflight"]["run"].strip() == "bash preflight.sh"
+    assert steps_by_id["run-preflight"]["run"].strip() == "bash preflight.sh --report-all"

@@ -224,3 +224,39 @@ def test_report_all_never_converts_a_failure_into_success(tmp_path: Path):
     assert result.returncode != 0
     assert "FINAL FAILURE SUMMARY (report-all)" in result.stdout
     assert "✅" not in result.stdout
+
+
+def test_report_all_marks_invalidated_pytest_suite_as_blocked_not_passed(tmp_path: Path):
+    repo = _create_fixture_repo(
+        tmp_path,
+        bash_scripts=[
+            (
+                "scripts/test_010_alpha.sh",
+                "#!/bin/bash\n"
+                "echo 'bash-alpha' >> order.log\n"
+                "exit 0\n",
+            )
+        ],
+    )
+
+    _write(
+        repo / "tests" / "test_template_compliance.py",
+        "def test_template_compliance_placeholder():\n"
+        "    assert False, 'template gate failure'\n",
+    )
+    _write(
+        repo / "tests" / "test_pytest_probe.py",
+        "from pathlib import Path\n\n"
+        "def test_pytest_probe():\n"
+        "    Path('order.log').write_text('pytest-ran\\n', encoding='utf-8')\n"
+        "    assert True\n",
+    )
+
+    result = _run_preflight(repo, "--report-all")
+
+    assert result.returncode != 0
+    assert "❌ CHECK FAILED (continuing due to report-all): Template Compliance Gate" in result.stdout
+    assert "⚠️ BLOCKED: Pytest functional & unittest suite" in result.stdout
+    assert "=== BLOCKED / NOT RUN ===" in result.stdout
+    assert "Pytest functional & unittest suite :: Template Compliance Gate failed earlier" in result.stdout
+    assert (repo / "order.log").read_text(encoding="utf-8") == "bash-alpha\n"
