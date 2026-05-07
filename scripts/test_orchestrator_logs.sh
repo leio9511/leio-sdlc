@@ -1,10 +1,12 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "--- Running Orchestrator File Logging Test ---"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SANDBOX_DIR=$(mktemp -d)
+GLOBAL_MOCK_DIR=$(mktemp -d)
+trap 'rm -rf "$SANDBOX_DIR" "$GLOBAL_MOCK_DIR"' EXIT
 cd "$SANDBOX_DIR"
 
 # Simulate a clean runner by preventing fallback to host git config.
@@ -21,8 +23,13 @@ echo "dummy prd content" > docs/PRDs/dummy.md
 
 # Initialize Git to pass boundary check
 git init > /dev/null
-git config user.name "Test User"
-git config user.email "test@example.com"
+git config --local user.name "Test User"
+git config --local user.email "test@example.com"
+if [ "$(git config --local --get user.name)" != "Test User" ] || [ "$(git config --local --get user.email)" != "test@example.com" ]; then
+    echo "❌ test_orchestrator_logs.sh FAILED: Sandbox repo-local git identity was not configured correctly."
+    exit 1
+fi
+
 # Apply SDLC infrastructure
 python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
 
@@ -38,17 +45,18 @@ if ! git rev-parse --verify HEAD > /dev/null 2>&1; then
 fi
 
 # Create .sdlc_runs/dummy/PR_001.md with in_progress status
-mkdir -p /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy
-git rev-parse HEAD > /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy/baseline_commit.txt
-echo -e "status: in_progress\nslice_depth: 1" > /tmp/global_mock_$$/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy/PR_001.md
+SANDBOX_NAME="$(basename "$SANDBOX_DIR")"
+mkdir -p "$GLOBAL_MOCK_DIR/.sdlc_runs/$SANDBOX_NAME/dummy"
+git rev-parse HEAD > "$GLOBAL_MOCK_DIR/.sdlc_runs/$SANDBOX_NAME/dummy/baseline_commit.txt"
+echo -e "status: in_progress\nslice_depth: 1" > "$GLOBAL_MOCK_DIR/.sdlc_runs/$SANDBOX_NAME/dummy/PR_001.md"
 
 # Run orchestrator
-export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
+export PYTHONPATH="${PROJECT_ROOT}/scripts:${PYTHONPATH:-}"
 export SDLC_BYPASS_BRANCH_CHECK=1
 export SDLC_TEST_MODE=true
 set +e
 # Use timeout to avoid hang if it tries to spawn something
-timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "/tmp/global_mock_$$" > test_output.log 2>&1
+timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "$GLOBAL_MOCK_DIR" > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 
@@ -62,7 +70,7 @@ if [ ! -d "$LOG_DIR" ]; then
 fi
 
 # Check if a log file exists
-LOG_FILE=$(ls $LOG_DIR/orchestrator_*.log 2>/dev/null | head -n 1)
+LOG_FILE=$(ls "$LOG_DIR"/orchestrator_*.log 2>/dev/null | head -n 1)
 if [ -z "$LOG_FILE" ]; then
     echo "❌ test_orchestrator_logs.sh FAILED: No log file found in $LOG_DIR."
     exit 1
@@ -79,11 +87,5 @@ if ! grep -q "Scanning job_dir" "$LOG_FILE"; then
 fi
 
 echo "✅ test_orchestrator_logs.sh PASSED"
-rm -rf "$SANDBOX_DIR"
 exit 0
 
-# Check that .git/info/exclude does NOT contain .sdlc_runs/
-if grep -q ".sdlc_runs/" .git/info/exclude 2>/dev/null; then
-    echo "❌ test_orchestrator_logs.sh FAILED: .git/info/exclude contains .sdlc_runs/"
-    exit 1
-fi
