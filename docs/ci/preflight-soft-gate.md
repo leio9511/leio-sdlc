@@ -1,0 +1,72 @@
+# Preflight soft gate acceptance and manual GitHub witness
+
+This document is the canonical repository-local explanation of how the preflight soft gate is accepted and observed.
+
+## Workflow contract anchor
+
+- Workflow name: `Preflight`
+- Workflow path: `.github/workflows/preflight.yml`
+- Real gate command: `bash preflight.sh`
+- Soft-gate meaning: visible and truthful status, but not yet a required merge blocker.
+
+Phase 2 soft gate means the GitHub Actions result is visible and truthful, but not yet configured as a required merge blocker.
+
+Do not use `continue-on-error` or any equivalent masking mechanism to convert a real preflight failure into a successful CI result.
+
+## Layered acceptance model
+
+### Layer A — local contract validation
+
+Layer A is repository-local static and contract validation of `.github/workflows/preflight.yml`.
+It verifies that the workflow file exists, declares the required `push` and `pull_request` triggers, and preserves `bash preflight.sh` as the real gate entrypoint.
+This is the primary correctness layer because it is local, repeatable, and does not depend on live GitHub access.
+
+### Layer B — local behavior and semantics validation
+
+Layer B is repository-local behavior and semantics validation.
+It proves that the real gate is `bash preflight.sh` and that success and failure propagation remain truthful:
+
+- `bash preflight.sh` exit 0 -> CI job success
+- `bash preflight.sh` non-zero exit -> CI job failure
+
+Layer B also confirms that bootstrap steps do not replace or bypass the repository gate.
+
+### Layer C — external GitHub witness
+
+Layer C is an external GitHub witness.
+It is a low-frequency manual verification step after SDLC completion.
+Layer C confirms that GitHub Actions produces a real, visible run for the `Preflight` workflow and that the run reaches a terminal conclusion that can be observed by a maintainer or external QA operator.
+
+## Manual witness boundary
+
+External GitHub verification is manual and post-SDLC.
+It is not part of the automated coder, reviewer, or UAT closed loop.
+Do not treat live GitHub witness collection as a required step for every local implementation, review, or UAT cycle.
+
+## Manual witness checklist
+
+When a maintainer or external QA operator performs the manual witness verification, capture the following fields:
+
+- workflow name
+- workflow path
+- trigger event
+- head SHA
+- run URL or run id
+- terminal conclusion
+- timestamp
+
+Recommended concrete values for this repository:
+
+- workflow name: `Preflight`
+- workflow path: `.github/workflows/preflight.yml`
+- trigger event: `push` or `pull_request`
+- head SHA: the commit under verification
+- run URL or run id: the GitHub Actions run reference
+- terminal conclusion: `success`, `failure`, or other GitHub-visible terminal conclusion
+- timestamp: when the witness was captured
+
+## Practical handoff guidance
+
+Complete Layers A and B inside the repository first.
+After SDLC is complete, hand Layer C to a maintainer or external QA operator for one manual GitHub witness run.
+A truthful red result is still useful in Phase 2 because the soft gate is meant to expose clean-runner debt rather than hide it.
