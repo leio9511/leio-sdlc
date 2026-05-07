@@ -11,20 +11,35 @@ TMP_PYTEST_IGNORE=$(mktemp)
 IGNORE_MANIFEST="$PROJECT_DIR/ignore_tests.json"
 FAIL_CLOSED_STATEMENT="If ignore_tests.json is missing or malformed, preflight must fail closed."
 QUARANTINE_GREEN_STATEMENT="A non-empty ignore list may produce debt-quarantine green, which is distinct from true full green."
+FAIL_FAST_MODE_NAME="fail-fast"
+REPORT_ALL_MODE_NAME="report-all"
+
+MODE="$FAIL_FAST_MODE_NAME"
+RUN_LIVE_LLM=0
+for arg in "$@"; do
+    case "$arg" in
+        --live-llm)
+            RUN_LIVE_LLM=1
+            ;;
+        --report-all)
+            MODE="$REPORT_ALL_MODE_NAME"
+            ;;
+        *)
+            echo "❌ PREFLIGHT FAILED: Unknown argument: $arg"
+            exit 1
+            ;;
+    esac
+done
 
 declare -A IGNORE_BASH=()
 declare -a PYTEST_IGNORE_ARGS=()
+declare -a FAILED_CHECKS=()
+declare -a BLOCKED_CHECKS=()
 BASH_IGNORE_COUNT=0
 PYTEST_IGNORE_COUNT=0
+TOTAL_PASSED=0
 
-RUN_LIVE_LLM=0
-for arg in "$@"; do
-    if [[ "$arg" == "--live-llm" ]]; then
-        RUN_LIVE_LLM=1
-    fi
-done
-
-echo "[$(date '+%H:%M:%S')] Starting Smart Preflight Checks..."
+echo "[$(date '+%H:%M:%S')] Starting Smart Preflight Checks ($MODE mode)..."
 
 cd "$PROJECT_DIR" || exit 1
 export PYTHONPATH="$PROJECT_DIR:$PYTHONPATH"
@@ -101,27 +116,47 @@ PY
     done < "$TMP_PYTEST_IGNORE"
 }
 
-TOTAL_PASSED=0
-
-report_test_failure() {
-    local desc="$1"
-    echo "❌ PREFLIGHT FAILED: $desc"
-    echo "=== ERROR DETAILS (Extracting relevant logs to save tokens) ==="
+print_log_excerpt() {
     if grep -iE -A 10 -B 2 "error:|exception|failed|unresolved|expecting|traceback|❌" "$TMP_TEST_LOG" | head -n 50; then
         :
     else
         tail -n 50 "$TMP_TEST_LOG"
     fi
+}
+
+report_test_failure() {
+    local desc="$1"
+
+    if [[ "$MODE" == "$FAIL_FAST_MODE_NAME" ]]; then
+        echo "❌ PREFLIGHT FAILED: $desc"
+        echo "=== ERROR DETAILS (Extracting relevant logs to save tokens) ==="
+        print_log_excerpt
+        echo "==============================================================="
+        exit 1
+    fi
+
+    FAILED_CHECKS+=("$desc")
+    echo "❌ CHECK FAILED (continuing due to $REPORT_ALL_MODE_NAME): $desc"
+    echo "=== ERROR DETAILS (Extracting relevant logs to save tokens) ==="
+    print_log_excerpt
     echo "==============================================================="
-    exit 1
+}
+
+mark_test_blocked() {
+    local desc="$1"
+    local reason="$2"
+
+    BLOCKED_CHECKS+=("$desc :: $reason")
+    echo "⚠️ BLOCKED: $desc ($reason)"
 }
 
 run_test() {
     local cmd="$1"
     local desc="$2"
-    
+
     if ! eval "$cmd" > "$TMP_TEST_LOG" 2>&1; then
         report_test_failure "$desc"
+        return 1
     fi
     ((TOTAL_PASSED++))
 }
@@ -132,6 +167,7 @@ run_test_argv() {
 
     if ! "$@" > "$TMP_TEST_LOG" 2>&1; then
         report_test_failure "$desc"
+        return 1
     fi
     ((TOTAL_PASSED++))
 }
@@ -139,19 +175,47 @@ run_test_argv() {
 run_live_llm_test() {
     local cmd="$1"
     local desc="$2"
-    
+
     if ! eval "$cmd" > "$TMP_TEST_LOG" 2>&1; then
         echo "[E2E WARNING] $desc failed. Continuing."
         echo "=== WARNING DETAILS ==="
-        if grep -iE -A 10 -B 2 "error:|exception|failed|unresolved|expecting|traceback|❌" "$TMP_TEST_LOG" | head -n 50; then
-            :
-        else
-            tail -n 50 "$TMP_TEST_LOG"
-        fi
+        print_log_excerpt
         echo "======================="
     else
         ((TOTAL_PASSED++))
     fi
+}
+
+finalize_preflight() {
+    if (( BASH_IGNORE_COUNT + PYTEST_IGNORE_COUNT > 0 )); then
+        echo "⚠️ $QUARANTINE_GREEN_STATEMENT"
+        echo "⚠️ Debt quarantine ignored $BASH_IGNORE_COUNT bash target(s) and $PYTEST_IGNORE_COUNT pytest target(s)."
+    fi
+
+    if (( ${#FAILED_CHECKS[@]} > 0 )); then
+        echo "❌ PREFLIGHT FAILED: ${#FAILED_CHECKS[@]} check(s) failed in $REPORT_ALL_MODE_NAME mode."
+        echo "=== FINAL FAILURE SUMMARY ($REPORT_ALL_MODE_NAME) ==="
+        local idx=1
+        for desc in "${FAILED_CHECKS[@]}"; do
+            echo "$idx. $desc"
+            ((idx++))
+        done
+
+        if (( ${#BLOCKED_CHECKS[@]} > 0 )); then
+            echo "=== BLOCKED / NOT RUN ==="
+            idx=1
+            for blocked in "${BLOCKED_CHECKS[@]}"; do
+                echo "$idx. $blocked"
+                ((idx++))
+            done
+        fi
+
+        echo "==============================================="
+        exit 1
+    fi
+
+    echo "✅ $TOTAL_PASSED tests/test-suites passed."
+    exit 0
 }
 
 load_ignore_manifest
@@ -207,10 +271,4 @@ if [ -f "scripts/agent_driver.py" ]; then
     run_test "python3 -m py_compile scripts/agent_driver.py" "Syntax Check: agent_driver.py"
 fi
 
-if (( BASH_IGNORE_COUNT + PYTEST_IGNORE_COUNT > 0 )); then
-    echo "⚠️ $QUARANTINE_GREEN_STATEMENT"
-    echo "⚠️ Debt quarantine ignored $BASH_IGNORE_COUNT bash target(s) and $PYTEST_IGNORE_COUNT pytest target(s)."
-fi
-
-echo "✅ $TOTAL_PASSED tests/test-suites passed."
-exit 0
+finalize_preflight
