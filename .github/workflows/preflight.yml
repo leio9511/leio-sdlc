@@ -32,4 +32,5 @@ jobs:
 
       - name: Run preflight
         id: run-preflight
-        run: bash preflight.sh --report-all
+        run: |
+          bash preflight.sh --report-all
