@@ -10,6 +10,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
+REQUIRED_WORKFLOW_NAME = "Preflight"
+DEFAULT_PREFLIGHT_COMMAND = "bash preflight.sh"
+REPORT_ALL_PREFLIGHT_COMMAND = "bash preflight.sh --report-all"
 REQUIRED_TRIGGER_KEYS = {"push", "pull_request"}
 REQUIRED_STEP_IDS = {
     "checkout",
@@ -74,6 +77,7 @@ def test_preflight_workflow_declares_required_triggers_and_step_inventory():
     workflow = _load_workflow()
     trigger_block = workflow.get("on")
     assert isinstance(trigger_block, dict), "Workflow must define an 'on' mapping."
+    assert workflow.get("name") == REQUIRED_WORKFLOW_NAME
     assert REQUIRED_TRIGGER_KEYS.issubset(trigger_block.keys())
 
     preflight_job = _get_preflight_job()
@@ -83,12 +87,12 @@ def test_preflight_workflow_declares_required_triggers_and_step_inventory():
     assert REQUIRED_STEP_IDS.issubset(steps_by_id.keys())
 
 
-def test_preflight_workflow_uses_real_gate_command():
+def test_preflight_workflow_uses_report_all_gate_command():
     run_preflight_step = _get_steps_by_id()["run-preflight"]
-    assert run_preflight_step.get("run", "").strip() == "bash preflight.sh --report-all"
+    assert run_preflight_step.get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
 
 
-def test_preflight_workflow_preserves_truthful_failure_semantics():
+def test_preflight_workflow_preserves_truthful_failure_semantics_in_report_all_mode():
     preflight_job = _get_preflight_job()
     _assert_no_continue_on_error(preflight_job)
 
@@ -96,9 +100,10 @@ def test_preflight_workflow_preserves_truthful_failure_semantics():
         run_command = step.get("run")
         if isinstance(run_command, str):
             assert "|| true" not in run_command
+            assert DEFAULT_PREFLIGHT_COMMAND in run_command or REPORT_ALL_PREFLIGHT_COMMAND in run_command or step.get("id") != "run-preflight"
 
     run_preflight_step = _get_steps_by_id()["run-preflight"]
-    assert run_preflight_step.get("run", "").strip() == "bash preflight.sh --report-all"
+    assert run_preflight_step.get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
 
 
 def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(monkeypatch):
@@ -114,6 +119,7 @@ def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(
     workflow = _load_workflow()
     steps_by_id = _get_steps_by_id()
 
+    assert workflow["name"] == REQUIRED_WORKFLOW_NAME
     assert REQUIRED_TRIGGER_KEYS.issubset(workflow["on"].keys())
     assert REQUIRED_STEP_IDS.issubset(steps_by_id.keys())
-    assert steps_by_id["run-preflight"]["run"].strip() == "bash preflight.sh --report-all"
+    assert steps_by_id["run-preflight"]["run"].strip() == REPORT_ALL_PREFLIGHT_COMMAND

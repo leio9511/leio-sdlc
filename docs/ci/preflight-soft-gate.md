@@ -12,7 +12,9 @@ This document is the canonical repository-local explanation of how the preflight
 
 Phase 2 soft gate means the GitHub Actions result is visible and truthful, but not yet configured as a required merge blocker.
 Do not use `continue-on-error` or any equivalent masking mechanism to convert a real preflight failure into a successful CI result.
+The repository has one real gate, with default fail-fast local and agent usage and explicit report-all GitHub CI usage.
 Fail-fast and report-all must execute the same repository preflight gate. They may differ only in stopping behavior and output aggregation.
+If any preflight check fails, both fail-fast and report-all modes must exit non-zero. Report-all must never convert a failing preflight run into success.
 
 ## Layered acceptance model
 
