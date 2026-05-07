@@ -1,19 +1,29 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "=== Testing Pre-Commit Hook Integration ==="
 
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$WORKSPACE_ROOT/scripts/e2e/setup_sandbox.sh"
 
 # 1. Setup Sandbox
-SANDBOX_DIR=$(mktemp -d)
+SANDBOX_DIR="$(mktemp -d)"
+HOME_DIR="$(mktemp -d)"
+trap 'rm -rf "$SANDBOX_DIR" "$HOME_DIR"' EXIT
+
+export HOME="$HOME_DIR"
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+
 cd "$SANDBOX_DIR"
-git init > /dev/null
-git config user.name "Test"
-git config user.email "test@example.com"
+init_git_test_sandbox "$(pwd)"
 touch .sdlc_guardrail
 git add .sdlc_guardrail
 git commit -m "init" > /dev/null
+if [ "$(git branch --show-current)" != "master" ]; then
+    git branch -m master > /dev/null
+fi
 cp -r "$WORKSPACE_ROOT/.sdlc_hooks" .
 
 # 2. Configure hooksPath
@@ -94,6 +104,4 @@ rm .sdlc_guardrail
 git commit --allow-empty -m "no guardrail commit"
 echo "✅ PASSED: Commit without guardrail allowed."
 
-
-rm -rf "$SANDBOX_DIR"
 echo "✅ All pre-commit hook tests passed."

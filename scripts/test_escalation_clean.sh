@@ -1,6 +1,6 @@
 #!/bin/bash
 export SDLC_TEST_MODE=true
-set -e
+set -euo pipefail
 
 # test_escalation_clean.sh - Verify workspace cleanup logic in State 5 Escalation
 
@@ -9,42 +9,29 @@ FLAG_FILE="/tmp/coder_failed_once.flag"
 rm -f "$FLAG_FILE"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SANDBOX_DIR=$(mktemp -d)
-cd "$SANDBOX_DIR"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
-git init > /dev/null 2>&1
-git config user.name "E2E Test"
-git config user.email "e2e@example.com"
+SANDBOX_DIR="$(mktemp -d)"
+HOME_DIR="$(mktemp -d)"
+GLOBAL_DIR="/tmp/global_mock_$$"
+trap 'rm -rf "$SANDBOX_DIR" "$HOME_DIR" "$GLOBAL_DIR"; rm -f "$FLAG_FILE"' EXIT
+
+export HOME="$HOME_DIR"
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+
+cd "$SANDBOX_DIR"
+init_git_test_sandbox "$(pwd)"
 
 echo "initial" > init.txt
 git add init.txt
 git commit -m "init" > /dev/null 2>&1
 
-GLOBAL_DIR="/tmp/global_mock_$$"
-mkdir -p $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd
-mkdir -p scripts
-cp "${PROJECT_ROOT}/scripts/orchestrator.py" scripts/
-cp "${PROJECT_ROOT}/scripts/runtime_git_identity.py" scripts/
-cp "${PROJECT_ROOT}/scripts/setup_logging.py" scripts/ || true
-    cp "${PROJECT_ROOT}/scripts/agent_driver.py" scripts/
-cp "${PROJECT_ROOT}/scripts/utils_notification.py" scripts/
-cp "${PROJECT_ROOT}/scripts/get_next_pr.py" scripts/
-cp "${PROJECT_ROOT}/scripts/structured_state_parser.py" scripts/
-cp "${PROJECT_ROOT}/scripts/update_pr_status.py" scripts/
-cp "${PROJECT_ROOT}/scripts/config.py" scripts/
-cp "${PROJECT_ROOT}/scripts/git_utils.py" scripts/
-cp "${PROJECT_ROOT}/scripts/utils_json.py" scripts/
-cp "${PROJECT_ROOT}/scripts/handoff_prompter.py" scripts/
-cp "${PROJECT_ROOT}/scripts/notification_formatter.py" scripts/
-cp "${PROJECT_ROOT}/scripts/spawn_planner.py" scripts/
-cp "${PROJECT_ROOT}/scripts/spawn_verifier.py" scripts/
-cp "${PROJECT_ROOT}/scripts/envelope_assembler.py" scripts/
-cp "${PROJECT_ROOT}/scripts/utils_api_key.py" scripts/ || true
-cp "${PROJECT_ROOT}/scripts/lock_utils.py" scripts/ || true
+mkdir -p "$GLOBAL_DIR/.sdlc_runs/$(basename "$SANDBOX_DIR")/dummy_prd"
+init_hermetic_sandbox "$SANDBOX_DIR/scripts"
 mkdir -p playbooks
 cp "${PROJECT_ROOT}/playbooks/verifier_playbook.md" playbooks/
-mkdir -p config
-cp "${PROJECT_ROOT}/config/prompts.json" config/
 
 echo ".sdlc_run.lock" > .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
@@ -52,11 +39,11 @@ echo "__pycache__/" >> .gitignore
 echo "*.pyc" >> .gitignore
 echo "*.log" >> .gitignore
 echo "config/" >> .gitignore
-git add .gitignore scripts
+git add .gitignore scripts playbooks
 git commit -m "setup" > /dev/null 2>&1
 
-git rev-parse HEAD > $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd/baseline_commit.txt
-cat << 'INNER_EOF' > $GLOBAL_DIR/.sdlc_runs/$(basename $SANDBOX_DIR)/dummy_prd/PR_001_Test.md
+git rev-parse HEAD > "$GLOBAL_DIR/.sdlc_runs/$(basename "$SANDBOX_DIR")/dummy_prd/baseline_commit.txt"
+cat << 'INNER_EOF' > "$GLOBAL_DIR/.sdlc_runs/$(basename "$SANDBOX_DIR")/dummy_prd/PR_001_Test.md"
 ---
 status: open
 ---
@@ -101,7 +88,6 @@ with open(args.out_file, "w") as f:
 ''')
 INNER_EOF
 
-
 cat << 'INNER_EOF' > scripts/merge_code.py
 import sys
 sys.exit(0)
@@ -112,14 +98,14 @@ import sys
 sys.exit(1)
 INNER_EOF
 
-chmod +x scripts/*.py
-git add .
-git add -A && git commit -m "pre-run clean state" > /dev/null 2>&1
+chmod +x scripts/spawn_coder.py scripts/spawn_reviewer.py scripts/merge_code.py scripts/spawn_arbitrator.py
+git add scripts/spawn_coder.py scripts/spawn_reviewer.py scripts/merge_code.py scripts/spawn_arbitrator.py
+git commit -m "pre-run clean state" > /dev/null 2>&1
 
 echo "DEBUG: git status before orchestrator"
 git status
 # Run Orchestrator
-export PYTHONPATH="$(pwd)/scripts:$PYTHONPATH"
+export PYTHONPATH="$(pwd)/scripts:${PYTHONPATH:-}"
 SDLC_BYPASS_BRANCH_CHECK=1 python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --channel "valid:id" --channel "valid:id" --workdir "$(pwd)" --global-dir "$GLOBAL_DIR" --prd-file dummy_prd.md --max-prs-to-process 2 --coder-session-strategy always > orchestrator.log 2>&1 || true
 
 # Assertions
@@ -132,7 +118,7 @@ if [ -f "dirty_untracked.txt" ]; then
     exit 1
 fi
 
-MODIFIED_CONTENT=$(cat init.txt)
+MODIFIED_CONTENT="$(cat init.txt)"
 if [ "$MODIFIED_CONTENT" != "initial" ]; then
     echo "❌ test_escalation_clean.sh FAILED: init.txt was not reset to its original state."
     exit 1
@@ -154,6 +140,4 @@ if ! grep -q "UAT Passed" orchestrator.log; then
 fi
 
 echo "✅ test_escalation_clean.sh PASSED: Dirty workspace cleaned and pipeline recovered."
-rm -rf "$SANDBOX_DIR"
-rm -f "$FLAG_FILE"
 exit 0

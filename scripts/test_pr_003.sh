@@ -1,18 +1,27 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "--- Running PR-003 JIT Prompts & Default Engine Tests ---"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SANDBOX_DIR=$(mktemp -d)
-cd "$SANDBOX_DIR"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
-git init > /dev/null
+SANDBOX_DIR="$(mktemp -d)"
+HOME_DIR="$(mktemp -d)"
+trap 'rm -rf "$SANDBOX_DIR" "$HOME_DIR"' EXIT
+
+export HOME="$HOME_DIR"
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+
+cd "$SANDBOX_DIR"
+init_git_test_sandbox "$(pwd)"
 python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
 git add .
 git commit -m "init" > /dev/null
 
-export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
+export PYTHONPATH="${PROJECT_ROOT}/scripts:${PYTHONPATH:-}"
 
 # Test Case 1: Untracked files -> git stash JIT
 touch untracked_test_file
@@ -49,5 +58,4 @@ if ! echo "$OUTPUT" | grep -q 'Engine: gemini'; then
 fi
 
 echo "✅ PR-003 Tests PASSED"
-rm -rf "$SANDBOX_DIR"
 exit 0
