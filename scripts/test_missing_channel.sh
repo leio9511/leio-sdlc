@@ -7,6 +7,14 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SANDBOX_DIR=$(mktemp -d)
 cd "$SANDBOX_DIR"
 
+# Simulate a clean runner by preventing fallback to host git config.
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+unset GIT_AUTHOR_NAME
+unset GIT_AUTHOR_EMAIL
+unset GIT_COMMITTER_NAME
+unset GIT_COMMITTER_EMAIL
+
 # Clear environment variables
 unset OPENCLAW_SESSION_KEY
 unset OPENCLAW_CHANNEL_ID
@@ -17,6 +25,8 @@ echo "dummy prd content" > docs/PRDs/dummy.md
 
 # Initialize Git to pass boundary check
 git init > /dev/null
+git config user.name "Test User"
+git config user.email "test@example.com"
 
 # Apply SDLC infrastructure
 python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
@@ -26,6 +36,11 @@ echo ".sdlc_repo.lock" >> .gitignore
 echo ".tmp" >> .gitignore
 git add docs/PRDs/dummy.md .gitignore STATE.md preflight.sh
 git commit -m "init" > /dev/null
+
+if ! git rev-parse --verify HEAD > /dev/null 2>&1; then
+    echo "❌ test_missing_channel.sh FAILED: Sandbox git bootstrap did not produce an initial commit."
+    exit 1
+fi
 
 # Run orchestrator WITHOUT the --channel parameter
 export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
