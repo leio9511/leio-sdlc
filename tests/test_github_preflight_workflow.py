@@ -5,6 +5,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
+WITNESS_CAPTURE_PATH = REPO_ROOT / "docs" / "ci" / "preflight-github-witness-capture.md"
 GATE_COMMAND = "bash preflight.sh"
 REQUIRED_STEP_IDS = [
     "checkout",
@@ -53,6 +54,14 @@ SUCCESS_FAILURE_MAPPING = (
 def load_workflow():
     with WORKFLOW_PATH.open("r", encoding="utf-8") as workflow_file:
         return yaml.safe_load(workflow_file)
+
+
+def load_witness_capture_procedure():
+    return WITNESS_CAPTURE_PATH.read_text(encoding="utf-8")
+
+
+def normalized_witness_capture_procedure():
+    return load_witness_capture_procedure().lower()
 
 
 def workflow_on(workflow):
@@ -195,3 +204,39 @@ def test_bootstrap_and_gate_step_semantics_are_inspectable():
     assert step_by_id(workflow, "node-runtime-setup").get("uses") == "actions/setup-node@v4"
     assert step_by_id(workflow, "node-runtime-setup").get("with", {}).get("node-version") == "22"
     assert step_by_name(workflow, "Run preflight").get("run") == GATE_COMMAND
+
+
+def test_github_preflight_witness_capture_procedure_exists():
+    assert WITNESS_CAPTURE_PATH.exists()
+    assert WITNESS_CAPTURE_PATH.is_file()
+    assert WITNESS_CAPTURE_PATH.suffix == ".md"
+    assert load_witness_capture_procedure().strip()
+
+
+def test_github_preflight_witness_capture_procedure_lists_required_metadata():
+    procedure = load_witness_capture_procedure()
+    normalized = procedure.lower()
+
+    assert "docs/ci/preflight-github-witness.md" in procedure
+    assert "Preflight" in procedure
+    assert ".github/workflows/preflight.yml" in procedure
+    assert "push" in normalized
+    assert "pull_request" in procedure
+    assert "head sha" in normalized
+    assert "run url" in normalized or "run database id" in normalized or "run id" in normalized
+    assert "terminal conclusion" in normalized
+    assert "success" in normalized
+    assert "failure" in normalized
+    assert "cancelled" in normalized
+    assert "capture date" in normalized or "capture timestamp" in normalized
+
+
+def test_github_preflight_witness_capture_procedure_keeps_live_github_out_of_local_loop():
+    normalized = normalized_witness_capture_procedure()
+
+    assert "low-frequency witness capture only" in normalized
+    assert "must not" in normalized
+    assert "pytest" in normalized
+    assert "bash preflight.sh" in normalized
+    assert "normal local coder/reviewer loop" in normalized
+    assert "github api" in normalized or "github ui" in normalized
