@@ -1,6 +1,80 @@
 #!/bin/bash
 
 # setup_sandbox.sh - Centralized fixture for dependency injection into hermetic sandboxes
+#
+# Canonical public entrypoints for Bash / mocked E2E tests:
+#   init_hermetic_sandbox "$sandbox/scripts"
+#   init_git_test_sandbox "$sandbox/repo" [--baseline-commit]
+#
+# init_git_test_sandbox is the shared clean-runner-safe bootstrap for temporary
+# git repos that need commit capability. It only initializes git and repo-local
+# identity (plus an optional explicit empty baseline commit); it does not run
+# doctor.py --fix or create PRDs, jobs, mocked state, or other business files.
+
+_sandbox_project_root() {
+    cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
+}
+
+_sandbox_has_git_repo() {
+    local target_dir="$1"
+    local resolved_target
+    local resolved_top
+
+    resolved_target="$(cd "$target_dir" && pwd -P)" || return 1
+    resolved_top="$(git -C "$target_dir" rev-parse --show-toplevel 2>/dev/null)" || return 1
+    [ "$resolved_target" = "$resolved_top" ]
+}
+
+_sandbox_has_commits() {
+    local target_dir="$1"
+    git -C "$target_dir" rev-parse --verify HEAD >/dev/null 2>&1
+}
+
+init_git_test_sandbox() {
+    local target_dir="$1"
+    shift || true
+
+    local create_baseline_commit=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --baseline-commit)
+                create_baseline_commit=1
+                ;;
+            *)
+                echo "Error: unknown init_git_test_sandbox option: $1"
+                return 1
+                ;;
+        esac
+        shift
+    done
+
+    if [ -z "$target_dir" ]; then
+        echo "Error: target_dir is required"
+        return 1
+    fi
+
+    mkdir -p "$target_dir"
+
+    if ! _sandbox_has_git_repo "$target_dir"; then
+        git -C "$target_dir" init >/dev/null 2>&1
+    fi
+
+    git -C "$target_dir" config --local user.name "SDLC Test Sandbox"
+    git -C "$target_dir" config --local user.email "sdlc-test-sandbox@example.invalid"
+
+    if [ "$create_baseline_commit" -eq 1 ]; then
+        if _sandbox_has_commits "$target_dir"; then
+            return 0
+        fi
+
+        if [ -n "$(git -C "$target_dir" status --porcelain --untracked-files=no)" ]; then
+            echo "Error: --baseline-commit requires a clean index in $target_dir"
+            return 1
+        fi
+
+        git -C "$target_dir" commit --allow-empty -m "init" >/dev/null 2>&1
+    fi
+}
 
 init_hermetic_sandbox() {
     local target_dir="$1"
@@ -10,7 +84,7 @@ init_hermetic_sandbox() {
     fi
 
     # Anchor to the project root relative to this script
-    PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    PROJECT_ROOT="$(_sandbox_project_root)"
 
     # Create target directory if it doesn't exist
     mkdir -p "$target_dir"
