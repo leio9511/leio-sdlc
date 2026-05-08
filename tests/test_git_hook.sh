@@ -7,14 +7,14 @@ set -e
 TEST_DIR="/tmp/test_sdlc_hook_$$"
 echo "=== SDLC Pre-Commit Hook Integration Tests ==="
 
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+
 # --- Helper: create a fresh sandbox ---
 setup_sandbox() {
     rm -rf "$TEST_DIR"
-    mkdir -p "$TEST_DIR"
+    init_git_test_sandbox "$TEST_DIR"
     cd "$TEST_DIR"
-    git init > /dev/null 2>&1
-    git config user.name "Test"
-    git config user.email "test@example.com"
     touch .sdlc_guardrail
     git add .sdlc_guardrail
     git commit -m "init" > /dev/null 2>&1
@@ -25,7 +25,6 @@ setup_sandbox() {
     git config core.hooksPath .sdlc_hooks
 }
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # =============================================
 # Test 1: Direct commit on protected branch rejected
