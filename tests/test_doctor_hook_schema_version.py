@@ -11,6 +11,8 @@ DOCTOR_SCRIPT = Path(__file__).parents[1] / "scripts" / "doctor.py"
 
 def test_doctor_check_flags_missing_managed_hook_metadata(tmp_path):
     """A hook without the managed header/schema metadata is reported non-compliant."""
+    # Intentional direct `git init`: this is hook metadata/schema setup; pre-bootstrapping
+    # with git_test_sandbox would not add clean-runner identity value here.
     subprocess.run(
         ["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True
     )
@@ -33,6 +35,8 @@ def test_doctor_check_flags_missing_managed_hook_metadata(tmp_path):
 
 def test_doctor_check_flags_outdated_hook_schema_version(tmp_path):
     """An installed managed hook with schema version lower than 2 is reported as requiring upgrade."""
+    # Intentional direct `git init`: this is hook metadata/schema setup; pre-bootstrapping
+    # with git_test_sandbox would not add clean-runner identity value here.
     subprocess.run(
         ["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True
     )
@@ -57,6 +61,8 @@ def test_doctor_check_flags_outdated_hook_schema_version(tmp_path):
 
 def test_doctor_fix_replaces_outdated_hook_with_current_managed_version(tmp_path):
     """doctor.py --fix overwrites the outdated hook, installs the current managed header, and leaves the hook executable."""
+    # Intentional direct `git init`: this is hook metadata/schema setup; pre-bootstrapping
+    # with git_test_sandbox would not add clean-runner identity value here.
     subprocess.run(
         ["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True
     )

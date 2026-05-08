@@ -3,11 +3,14 @@ import tempfile
 import subprocess
 from pathlib import Path
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.doctor import check_vcs, apply_overlay, _read_managed_hook_schema_version
 
 import pytest
+
+
 def test_doctor_apply_skill_profile():
     with tempfile.TemporaryDirectory() as tmpdir:
         overlay = Path(tmpdir) / "overlay"
@@ -18,18 +21,19 @@ def test_doctor_apply_skill_profile():
             f.write("# SKILL")
         with open(overlay / ".release_ignore.append", "w") as f:
             f.write("tests/")
-            
+
         target = Path(tmpdir) / "target"
         target.mkdir()
-        
+
         apply_overlay(target, overlay, check_only=False)
-        
+
         assert (target / "deploy.sh").exists()
         assert (target / "SKILL.md").exists()
         assert (target / ".release_ignore").exists()
-        
+
         with open(target / ".release_ignore", "r") as f:
             assert "tests/" in f.read()
+
 
 def test_doctor_enforce_git_lock():
     # Since enforce_git_lock is handled in main, we can invoke doctor as a subprocess
@@ -41,12 +45,12 @@ def test_doctor_enforce_git_lock():
         # We need to run doctor.py --fix --enforce-git-lock on this tmpdir
         target = Path(tmpdir) / "target"
         target.mkdir()
-        
+
         doctor_script = Path(__file__).parent.parent / "scripts" / "doctor.py"
-        
+
         # We need to run python script
         res = subprocess.run([sys.executable, str(doctor_script), str(target), "--fix", "--enforce-git-lock"], capture_output=True)
-        
+
         assert res.returncode == 0
         hook_path = target / ".git" / "hooks" / "pre-commit"
         assert hook_path.exists()
@@ -58,9 +62,12 @@ def test_doctor_enforce_git_lock():
         assert "# SDLC_HOOK_SCHEMA_VERSION=2" in content
 
 
+
 def test_doctor_fix_upgrades_outdated_managed_hook(tmp_path):
     target = tmp_path / "target"
     target.mkdir()
+    # Intentional direct `git init`: this is doctor behavior that upgrades an outdated
+    # managed hook, not commit-capable repo bootstrap.
     subprocess.run(["git", "init"], cwd=target, check=True, capture_output=True, text=True)
 
     hook_path = target / ".git" / "hooks" / "pre-commit"

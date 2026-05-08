@@ -1,8 +1,9 @@
 import os
-import tempfile
 import subprocess
+import tempfile
 from pathlib import Path
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.doctor import (
@@ -14,37 +15,40 @@ from scripts.doctor import (
 )
 
 import pytest
+
+
 def test_doctor_append_logic_idempotent():
     with tempfile.TemporaryDirectory() as tmpdir:
         overlay = Path(tmpdir) / "overlay"
         overlay.mkdir()
-        
+
         append_file = overlay / "test.txt.append"
         with open(append_file, "w") as f:
             f.write("line1\nline2\n")
-            
+
         target = Path(tmpdir) / "target"
         target.mkdir()
-        
+
         # First apply
         apply_overlay(target, overlay, check_only=False)
         dest_file = target / "test.txt"
         with open(dest_file, "r") as f:
             content = f.read()
         assert "line1\nline2\n" == content
-        
+
         # Second apply
         apply_overlay(target, overlay, check_only=False)
         with open(dest_file, "r") as f:
             content2 = f.read()
         assert "line1\nline2\n" == content2
 
+
 def test_doctor_check_vcs_init(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as home:
         monkeypatch.setenv("HOME", home)
         check_vcs(tmpdir)
         assert os.path.exists(os.path.join(tmpdir, ".git"))
-        
+
         # Doctor-owned VCS initialization must create the baseline commit directly.
         out = subprocess.run(["git", "log", "--oneline"], cwd=tmpdir, capture_output=True, text=True)
         assert "Baseline commit" in out.stdout
@@ -66,6 +70,7 @@ def test_doctor_check_vcs_init(monkeypatch):
         assert config_name.stdout.strip() == DOCTOR_GIT_USER_NAME
         assert config_email.stdout.strip() == DOCTOR_GIT_USER_EMAIL
 
+
 def test_doctor_apply_base_scaffold():
     with tempfile.TemporaryDirectory() as tmpdir:
         overlay = Path(tmpdir) / "overlay"
@@ -76,26 +81,27 @@ def test_doctor_apply_base_scaffold():
             f.write("echo 'ok'")
         with open(overlay / ".gitignore.append", "w") as f:
             f.write(".sdlc_runs/")
-            
+
         target = Path(tmpdir) / "target"
         target.mkdir()
-        
+
         apply_overlay(target, overlay, check_only=False)
-        
+
         assert (target / "STATE.md").exists()
         assert (target / "preflight.sh").exists()
         assert (target / ".gitignore").exists()
-        
+
         with open(target / ".gitignore", "r") as f:
             assert ".sdlc_runs/" in f.read()
+
 
 def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
     custom_root = "/tmp/custom_skills_root"
     env = os.environ.copy()
     env["SDLC_RUNTIME_DIR"] = custom_root
 
-    # TDD Test Case 4: set up a git repo with an outdated managed hook so that
-    # both the runtime-aware JIT fix path AND the outdated-hook upgrade message coexist.
+    # Intentional direct `git init`: this is doctor-owned hook-state setup,
+    # not commit-capable temp-repo bootstrap.
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
     hook_dir = tmp_path / ".git" / "hooks"
     hook_dir.mkdir(parents=True, exist_ok=True)
@@ -107,7 +113,9 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
 
     result = subprocess.run(
         ["python3", str(script), str(tmp_path), "--check"],
-        capture_output=True, text=True, env=env
+        capture_output=True,
+        text=True,
+        env=env,
     )
     assert result.returncode == 1
     # Runtime-aware JIT fix path remains correct
@@ -117,6 +125,8 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
 
 
 def test_doctor_detects_outdated_managed_hook(tmp_path):
+    # Intentional direct `git init`: this is hook-state setup for doctor behavior,
+    # not commit-capable repo bootstrap.
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
     hook_dir = tmp_path / ".git" / "hooks"
     hook_dir.mkdir(parents=True, exist_ok=True)
