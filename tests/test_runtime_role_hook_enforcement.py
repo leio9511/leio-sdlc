@@ -17,17 +17,16 @@ HOOK_SOURCE = os.path.join(
 )
 
 
-def _setup_sandbox(tmp_path):
+def _setup_sandbox(tmp_path, git_test_sandbox):
     """Create a temp git repo on master with .sdlc_guardrail and the managed hook installed."""
+    git_test_sandbox(tmp_path, baseline_commit=True)
     os.chdir(str(tmp_path))
-    subprocess.run(["git", "init"], check=True)
-    subprocess.run(["git", "config", "user.name", "Test User"], check=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "branch", "-M", "master"], check=True)
 
-    # Create guardrail file
+    # Create protected-branch scenario state after shared helper bootstrap.
     (tmp_path / ".sdlc_guardrail").write_text("")
     subprocess.run(["git", "add", ".sdlc_guardrail"], check=True)
-    subprocess.run(["git", "commit", "-m", "init"], check=True)
+    subprocess.run(["git", "commit", "-m", "init guardrail"], check=True)
 
     # Install the SDLC managed hook
     hooks_dir = tmp_path / ".sdlc_hooks"
@@ -51,9 +50,9 @@ def _setup_sandbox(tmp_path):
         ("unknown", False),
     ],
 )
-def test_runtime_role_hook_authorization(tmp_path, role, expect_pass):
+def test_runtime_role_hook_authorization(tmp_path, git_test_sandbox, role, expect_pass):
     """Verify allowlisted roles pass the hook and non-allowlisted roles are blocked."""
-    _setup_sandbox(tmp_path)
+    _setup_sandbox(tmp_path, git_test_sandbox)
 
     # Create a test file to commit
     (tmp_path / "test.txt").write_text("content")
@@ -82,9 +81,9 @@ def test_runtime_role_hook_authorization(tmp_path, role, expect_pass):
         ), f"Wrong rejection message for '{role}': {combined}"
 
 
-def test_runtime_commit_with_missing_role_is_rejected(tmp_path):
+def test_runtime_commit_with_missing_role_is_rejected(tmp_path, git_test_sandbox):
     """sdlc.runtime=1 without sdlc.role fails and emits the exact missing-role message."""
-    _setup_sandbox(tmp_path)
+    _setup_sandbox(tmp_path, git_test_sandbox)
 
     (tmp_path / "test.txt").write_text("content")
     subprocess.run(["git", "add", "test.txt"], check=True)
@@ -107,9 +106,9 @@ def test_runtime_commit_with_missing_role_is_rejected(tmp_path):
     ), f"Missing exact rejection message. Got: {combined}"
 
 
-def test_runtime_commit_with_verifier_role_is_rejected(tmp_path):
+def test_runtime_commit_with_verifier_role_is_rejected(tmp_path, git_test_sandbox):
     """Protected-branch runtime commit with sdlc.role=verifier fails with exact unauthorized message."""
-    _setup_sandbox(tmp_path)
+    _setup_sandbox(tmp_path, git_test_sandbox)
 
     (tmp_path / "test.txt").write_text("content")
     subprocess.run(["git", "add", "test.txt"], check=True)
@@ -133,13 +132,13 @@ def test_runtime_commit_with_verifier_role_is_rejected(tmp_path):
     ), f"Missing exact rejection message. Got: {combined}"
 
 
-def test_runtime_commit_with_authorized_roles_is_allowed(tmp_path):
+def test_runtime_commit_with_authorized_roles_is_allowed(tmp_path, git_test_sandbox):
     """Representative allowlisted roles (coder, merge_code, commit_state) are not blocked."""
     for role in ("coder", "merge_code", "commit_state"):
         # Create a fresh sandbox for each role to keep independent commits
         role_dir = tmp_path / role
         role_dir.mkdir()
-        _setup_sandbox(role_dir)
+        _setup_sandbox(role_dir, git_test_sandbox)
 
         (role_dir / f"{role}_test.txt").write_text(role)
         subprocess.run(["git", "add", f"{role}_test.txt"], check=True)
@@ -160,9 +159,9 @@ def test_runtime_commit_with_authorized_roles_is_allowed(tmp_path):
         )
 
 
-def test_non_runtime_direct_commit_still_blocked(tmp_path):
+def test_non_runtime_direct_commit_still_blocked(tmp_path, git_test_sandbox):
     """Direct commit on protected branch without runtime bypass is still rejected."""
-    _setup_sandbox(tmp_path)
+    _setup_sandbox(tmp_path, git_test_sandbox)
 
     (tmp_path / "test.txt").write_text("content")
     subprocess.run(["git", "add", "test.txt"], check=True)
@@ -178,9 +177,9 @@ def test_non_runtime_direct_commit_still_blocked(tmp_path):
     assert "GIT COMMIT REJECTED" in combined, f"Missing rejection banner. Got: {combined}"
 
 
-def test_non_protected_branch_commit_still_allowed(tmp_path):
+def test_non_protected_branch_commit_still_allowed(tmp_path, git_test_sandbox):
     """Commits on feature branches are not intercepted by the protected-branch logic."""
-    _setup_sandbox(tmp_path)
+    _setup_sandbox(tmp_path, git_test_sandbox)
 
     # Switch to a feature branch
     subprocess.run(["git", "checkout", "-b", "feature/test"], check=True)
@@ -199,9 +198,9 @@ def test_non_protected_branch_commit_still_allowed(tmp_path):
     )
 
 
-def test_sdlc_override_bypasses_hook(tmp_path):
+def test_sdlc_override_bypasses_hook(tmp_path, git_test_sandbox):
     """sdlc.override=true bypasses the hook entirely (glass-break path)."""
-    _setup_sandbox(tmp_path)
+    _setup_sandbox(tmp_path, git_test_sandbox)
 
     (tmp_path / "test.txt").write_text("content")
     subprocess.run(["git", "add", "test.txt"], check=True)
