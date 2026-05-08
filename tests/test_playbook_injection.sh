@@ -3,15 +3,19 @@ set -e
 
 echo "Testing spawn_reviewer.py and spawn_planner.py prompt injections..."
 
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 # Use a non-problematic directory name
 TEST_DIR="/tmp/sdlc_test_injection_$$"
 mkdir -p "$TEST_DIR"
 trap 'rm -rf "$TEST_DIR"' EXIT
 
+source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
+
 cd "$TEST_DIR"
-git init -b master
-git config user.email "test@openclaw.ai"
-git config user.name "TDD Tester"
+init_git_test_sandbox "$TEST_DIR"
+git branch -m master || true
+
 echo "init" > README.md
 git add README.md
 git commit -m "initial commit"
@@ -24,7 +28,7 @@ export SDLC_TEST_MODE=true
 
 # Test Reviewer
 echo "Running spawn_reviewer.py..."
-python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/spawn_reviewer.py --enable-exec-from-workspace \
+python3 "$PROJECT_ROOT/scripts/spawn_reviewer.py" --enable-exec-from-workspace \
     --pr-file PR.md \
     --diff-target HEAD \
     --workdir "$TEST_DIR"
@@ -45,7 +49,7 @@ fi
 
 # Test Planner
 echo "Running spawn_planner.py..."
-python3 "$(cd "$(dirname "$0")/.." && pwd)"/scripts/spawn_planner.py --enable-exec-from-workspace \
+python3 "$PROJECT_ROOT/scripts/spawn_planner.py" --enable-exec-from-workspace \
     --prd-file PRD.md \
     --workdir "$TEST_DIR"
 

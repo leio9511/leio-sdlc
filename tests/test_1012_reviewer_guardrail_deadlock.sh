@@ -6,11 +6,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 WORK_DIR="/tmp/test_1012_workspace_$$"
 mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
 
-git init
-git config user.name "Test User"
-git config user.email "test@example.com"
+source "$SCRIPT_DIR/../scripts/e2e/setup_sandbox.sh"
+
+cd "$WORK_DIR"
+init_git_test_sandbox "$WORK_DIR"
 
 echo "status: in_progress" > PR_001.md
 echo "scripts/spawn_reviewer.py" > .sdlc_guardrail

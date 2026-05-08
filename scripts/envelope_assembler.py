@@ -9,6 +9,8 @@ def _build_planner_envelope(workdir, out_dir, references, contract_params, mode)
         f"You MUST FIRST create each PR contract by calling `{contract_params.get('scaffold_command', '')}` before writing contract content.",
         f"This task is complete only when the generated PR contract files physically exist under `{out_dir}`.",
         "Before producing any artifact, you MUST use the read tool to read every reference in the REFERENCE INDEX where required=true and priority=1.",
+        "You are explicitly forbidden from manually editing the markdown file's status field.",
+        "Follow the PLANNER PLAYBOOK methodologies.",
     ]
     if mode == "uat":
         execution_contract.insert(
@@ -89,6 +91,8 @@ def _build_reviewer_envelope(workdir, references, contract_params):
         f"Output JSON Schema:\n```json\n{json.dumps(contract_params.get('output_schema'), indent=2)}\n```",
         "Mandatory Rule: You MUST read the diff, PR contract, and PRD.",
         "Mandatory Rule: Evaluate only. NEVER modify code or use write tools on the workspace files.",
+        "You are explicitly forbidden from manually editing the markdown file's status field.",
+        "Follow the REVIEWER PLAYBOOK methodologies.",
     ]
 
     reference_index = [

@@ -9,17 +9,15 @@ mkdir -p "$WORKSPACE"
 # Ensure cleanup on exit
 trap 'rm -rf "$WORKSPACE"' EXIT
 
+source "$(dirname "$0")/../scripts/e2e/setup_sandbox.sh"
+
 # Absolute path to spawn_reviewer.py and PR file
 SPAWN_SCRIPT=$(realpath "$(cd "$(dirname "$0")/.." && pwd)/scripts/spawn_reviewer.py")
 DUMMY_PR="$WORKSPACE/PR_002_dummy.md"
 touch "$DUMMY_PR"
 
 cd "$WORKSPACE"
-git init > /dev/null
-
-# Set git user
-git config user.name "Test Bot"
-git config user.email "test@example.com"
+init_git_test_sandbox "$WORKSPACE"
 
 # 2. Create and commit a base file to master with the message "Base commit on master".
 echo "base file content" > base_file.txt
@@ -46,7 +44,7 @@ git commit -m "Feature commit B: fix buggy test" > /dev/null
 # To prevent actually calling out to openclaw in tests, let's set the environment variable.
 export SDLC_TEST_MODE=true
 
-python3 "$SPAWN_SCRIPT" --pr-file "$DUMMY_PR" --diff-target master --workdir "$WORKSPACE" --global-dir "$WORKSPACE"
+python3 "$SPAWN_SCRIPT" --enable-exec-from-workspace --pr-file "$DUMMY_PR" --diff-target master --workdir "$WORKSPACE" --global-dir "$WORKSPACE"
 
 # Assertions:
 # 1. Read the generated recent_history.diff.
