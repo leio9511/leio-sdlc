@@ -2,14 +2,16 @@
 export SDLC_TEST_MODE=true
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="/tmp/test_069_workspace_$$"
 mkdir -p "$WORKSPACE"
+
+source "$SCRIPT_DIR/../scripts/e2e/setup_sandbox.sh"
+
 cd "$WORKSPACE"
 
 # Initialize dummy git workspace
-git init > /dev/null 2>&1
-git config user.email "test@example.com"
-git config user.name "Test User"
+init_git_test_sandbox "$WORKSPACE"
 echo "Dummy file" > README.md
 git add README.md
 git commit -m "Initial commit" > /dev/null 2>&1
@@ -26,7 +28,7 @@ EOF
 git add docs/PRs/PRD_069_Test/PR_001_Namespace_Fix.md
 
 # Path to original orchestrator
-ORCHESTRATOR="$(cd "$(dirname "$0")/.." && pwd)/scripts/orchestrator.py --force-replan true --channel "valid:id""
+ORCHESTRATOR="$(cd "$SCRIPT_DIR/.." && pwd)/scripts/orchestrator.py --force-replan true --channel \"valid:id\""
 
 # Create a wrapper Python script to test the logic directly since we can't easily inject into orchestrator.py --force-replan true --channel "valid:id"'s while loop without it running everything
 cat << 'EOF' > test_extraction.py
