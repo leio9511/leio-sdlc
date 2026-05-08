@@ -158,11 +158,10 @@ def test_forensic_or_cleanup_commit_paths_use_runtime_helper_with_orchestrator_r
 
 
 @pytest.fixture
-def repo_env_main(tmp_path):
+def repo_env_main(tmp_path, git_test_sandbox):
     workdir = tmp_path / "workdir_main"
-    workdir.mkdir()
+    git_test_sandbox(workdir)
     
-    run_git(["init"], cwd=workdir)
     (workdir / "file.txt").write_text("v1")
     run_git(["add", "file.txt"], cwd=workdir)
     run_git(["commit", "-m", "init"], cwd=workdir)
