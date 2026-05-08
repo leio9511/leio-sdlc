@@ -15,6 +15,7 @@ def clean_cwd():
 def test_cleanup_quarantine(clean_cwd, git_test_sandbox):
     with tempfile.TemporaryDirectory() as td:
         os.chdir(td)
+        # Bootstrap only: shared helper owns git init, repo-local identity, and baseline commit.
         git_test_sandbox(td, baseline_commit=True)
         
         # Create a branch and a dirty file

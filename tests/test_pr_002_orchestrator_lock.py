@@ -12,6 +12,7 @@ class TestOrchestratorLock:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workdir = tmpdir
+            # Bootstrap only: shared helper owns git init, repo-local identity, and baseline commit.
             git_test_sandbox(workdir, baseline_commit=True)
             subprocess.run(["python3", doctor_path, workdir, "--fix"], cwd=project_root, check=True, capture_output=True, text=True)
 

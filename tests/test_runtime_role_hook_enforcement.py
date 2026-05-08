@@ -18,7 +18,8 @@ HOOK_SOURCE = os.path.join(
 
 
 def _setup_sandbox(tmp_path, git_test_sandbox):
-    """Create a temp git repo on master with .sdlc_guardrail and the managed hook installed."""
+    """Use the canonical git sandbox, then add protected-branch hook state."""
+    # Bootstrap only: shared helper owns git init, repo-local identity, and baseline commit.
     git_test_sandbox(tmp_path, baseline_commit=True)
     os.chdir(str(tmp_path))
     subprocess.run(["git", "branch", "-M", "master"], check=True)

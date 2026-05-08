@@ -10,7 +10,8 @@ import commit_state
 
 
 def test_commit_state_validates_files(tmp_path, git_test_sandbox):
-    git_test_sandbox(tmp_path)
+    # Bootstrap only: source-code rejection requires a git repo, not a hand-rolled identity setup.
+    git_test_sandbox(tmp_path, baseline_commit=False)
     os.chdir(tmp_path)
 
     with open("main.py", "w") as f:
@@ -26,6 +27,7 @@ def test_commit_state_validates_files(tmp_path, git_test_sandbox):
 
 
 def test_orchestrator_rejects_uncommitted_state(tmp_path, git_test_sandbox):
+    # Bootstrap only: shared helper creates clean-runner-safe baseline before doctor/orchestrator behavior.
     git_test_sandbox(tmp_path, baseline_commit=True)
     os.chdir(tmp_path)
     doctor_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/doctor.py"
@@ -42,7 +44,8 @@ def test_orchestrator_rejects_uncommitted_state(tmp_path, git_test_sandbox):
 
 
 def test_commit_state_success(tmp_path, git_test_sandbox):
-    git_test_sandbox(tmp_path)
+    # Bootstrap only: commit_state behavior is exercised after canonical sandbox initialization.
+    git_test_sandbox(tmp_path, baseline_commit=False)
     os.chdir(tmp_path)
 
     os.makedirs("docs/PRDs", exist_ok=True)
@@ -65,7 +68,8 @@ def test_commit_state_success(tmp_path, git_test_sandbox):
 
 
 def test_commit_state_uses_runtime_helper_with_commit_state_role(tmp_path, git_test_sandbox):
-    git_test_sandbox(tmp_path)
+    # Bootstrap only: runtime helper assertion remains the business behavior under test.
+    git_test_sandbox(tmp_path, baseline_commit=False)
     os.chdir(tmp_path)
 
     with open("STATE.md", "w") as f:
@@ -83,7 +87,8 @@ def test_commit_state_uses_runtime_helper_with_commit_state_role(tmp_path, git_t
 
 
 def test_pre_commit_hook_output(tmp_path, git_test_sandbox):
-    git_test_sandbox(tmp_path)
+    # Bootstrap only: hook installation, guardrail commit, rejection, runtime commit, and lock checks stay scenario-specific.
+    git_test_sandbox(tmp_path, baseline_commit=False)
     os.chdir(tmp_path)
 
     with open(".sdlc_guardrail", "w") as f:
