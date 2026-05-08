@@ -12,11 +12,10 @@ def run_git(cmd, cwd):
     return subprocess.run(["git"] + cmd, cwd=cwd, capture_output=True, text=True, check=True)
 
 @pytest.fixture
-def repo_env(tmp_path):
+def repo_env(tmp_path, git_test_sandbox):
     workdir = tmp_path / "workdir"
-    workdir.mkdir()
+    git_test_sandbox(workdir)
     
-    run_git(["init"], cwd=workdir)
     (workdir / "file.txt").write_text("v1")
     run_git(["add", "file.txt"], cwd=workdir)
     run_git(["commit", "-m", "init"], cwd=workdir)
