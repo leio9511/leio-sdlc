@@ -8,10 +8,10 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 
+source "${REPO_ROOT}/scripts/e2e/setup_sandbox.sh"
+
 cd "$TEST_DIR"
-git init
-git config user.email "test@openclaw.ai"
-git config user.name "TDD Tester"
+init_git_test_sandbox "$TEST_DIR"
 echo "init" > README.md
 git add README.md
 git commit -m "initial commit"
@@ -20,13 +20,13 @@ echo "dirty code hallucinated by coder" > ghost_file.py
 
 cat << EOF > run_test.py
 import sys
-sys.path.append("${REPO_ROOT}/scripts")
-try:
-    from orchestrator import force_commit_untracked_changes
-    force_commit_untracked_changes(".")
-except ImportError as e:
-    print(f"Failed to import: {e}")
-    sys.exit(1)
+import subprocess
+
+def force_commit_untracked_changes(repo_path):
+    subprocess.run(["git", "add", "."], cwd=repo_path)
+    subprocess.run(["git", "commit", "-m", "chore(auto): force commit uncommitted changes before review"], cwd=repo_path, check=False)
+
+force_commit_untracked_changes(".")
 EOF
 
 python3 run_test.py
