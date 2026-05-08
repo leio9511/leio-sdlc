@@ -11,8 +11,9 @@ DOCTOR_SCRIPT = Path(__file__).parents[1] / "scripts" / "doctor.py"
 
 def test_doctor_check_flags_missing_managed_hook_metadata(tmp_path):
     """A hook without the managed header/schema metadata is reported non-compliant."""
-    # Intentional direct `git init`: this is hook metadata/schema setup; pre-bootstrapping
-    # with git_test_sandbox would not add clean-runner identity value here.
+    # PR-003 candidate resolution: keep direct `git init` because this test
+    # constructs bare hook metadata/schema state, not a commit-capable repo;
+    # git_test_sandbox would add identity/baseline behavior irrelevant here.
     subprocess.run(
         ["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True
     )
@@ -35,8 +36,9 @@ def test_doctor_check_flags_missing_managed_hook_metadata(tmp_path):
 
 def test_doctor_check_flags_outdated_hook_schema_version(tmp_path):
     """An installed managed hook with schema version lower than 2 is reported as requiring upgrade."""
-    # Intentional direct `git init`: this is hook metadata/schema setup; pre-bootstrapping
-    # with git_test_sandbox would not add clean-runner identity value here.
+    # PR-003 candidate resolution: keep direct `git init` because this test
+    # constructs managed hook schema state for doctor detection only; no
+    # commit-capable bootstrap or baseline commit is involved.
     subprocess.run(
         ["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True
     )
@@ -61,8 +63,9 @@ def test_doctor_check_flags_outdated_hook_schema_version(tmp_path):
 
 def test_doctor_fix_replaces_outdated_hook_with_current_managed_version(tmp_path):
     """doctor.py --fix overwrites the outdated hook, installs the current managed header, and leaves the hook executable."""
-    # Intentional direct `git init`: this is hook metadata/schema setup; pre-bootstrapping
-    # with git_test_sandbox would not add clean-runner identity value here.
+    # PR-003 candidate resolution: keep direct `git init` because the setup is
+    # the stale hook state that doctor.py --fix upgrades; adding sandbox
+    # identity/baseline commits would not exercise the behavior under test.
     subprocess.run(
         ["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True
     )

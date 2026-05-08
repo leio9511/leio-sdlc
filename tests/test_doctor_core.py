@@ -49,7 +49,9 @@ def test_doctor_check_vcs_init(monkeypatch):
         check_vcs(tmpdir)
         assert os.path.exists(os.path.join(tmpdir, ".git"))
 
-        # Doctor-owned VCS initialization must create the baseline commit directly.
+        # PR-003 candidate resolution: keep direct check_vcs() here because
+        # doctor-owned VCS initialization is the behavior under test; it must
+        # create .git plus the Baseline commit without the sandbox helper.
         out = subprocess.run(["git", "log", "--oneline"], cwd=tmpdir, capture_output=True, text=True)
         assert "Baseline commit" in out.stdout
 
@@ -100,8 +102,9 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
     env = os.environ.copy()
     env["SDLC_RUNTIME_DIR"] = custom_root
 
-    # Intentional direct `git init`: this is doctor-owned hook-state setup,
-    # not commit-capable temp-repo bootstrap.
+    # PR-003 candidate resolution: direct `git init` is retained because this
+    # test hand-installs outdated doctor hook state only; it does not need a
+    # commit-capable temp repo or host git identity.
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
     hook_dir = tmp_path / ".git" / "hooks"
     hook_dir.mkdir(parents=True, exist_ok=True)
@@ -125,8 +128,9 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
 
 
 def test_doctor_detects_outdated_managed_hook(tmp_path):
-    # Intentional direct `git init`: this is hook-state setup for doctor behavior,
-    # not commit-capable repo bootstrap.
+    # PR-003 candidate resolution: direct `git init` is retained because this
+    # test prepares hook-state input for doctor detection only; no baseline
+    # commit or clean-runner identity is required.
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
     hook_dir = tmp_path / ".git" / "hooks"
     hook_dir.mkdir(parents=True, exist_ok=True)

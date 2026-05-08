@@ -48,7 +48,9 @@ def test_doctor_enforce_git_lock():
 
         doctor_script = Path(__file__).parent.parent / "scripts" / "doctor.py"
 
-        # We need to run python script
+        # PR-003 candidate resolution: do not pre-bootstrap this repo; the
+        # behavior under test is doctor.py --fix creating .git and installing
+        # the managed pre-commit hook for enforce-git-lock.
         res = subprocess.run([sys.executable, str(doctor_script), str(target), "--fix", "--enforce-git-lock"], capture_output=True)
 
         assert res.returncode == 0
@@ -66,8 +68,9 @@ def test_doctor_enforce_git_lock():
 def test_doctor_fix_upgrades_outdated_managed_hook(tmp_path):
     target = tmp_path / "target"
     target.mkdir()
-    # Intentional direct `git init`: this is doctor behavior that upgrades an outdated
-    # managed hook, not commit-capable repo bootstrap.
+    # PR-003 candidate resolution: direct `git init` is retained because this
+    # test prepares an outdated managed hook for doctor.py --fix to upgrade;
+    # it does not require a commit-capable bootstrap repo.
     subprocess.run(["git", "init"], cwd=target, check=True, capture_output=True, text=True)
 
     hook_path = target / ".git" / "hooks" / "pre-commit"
