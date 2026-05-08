@@ -6,9 +6,9 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
 import config
 
-def test_orchestrator_dynamic_strings(tmp_path):
+def test_orchestrator_dynamic_strings(tmp_path, git_test_sandbox):
     os.chdir(tmp_path)
-    subprocess.run(["git", "init"])
+    git_test_sandbox(tmp_path, baseline_commit=False)
     
     # Make project compliant so we get past the doctor check
     doctor_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/doctor.py"
