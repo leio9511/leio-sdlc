@@ -131,12 +131,8 @@ EOF
 {"name":"pm-skill-fixture"}
 EOF
 
-    (
-        cd "$repo_dir"
-        git init -q
-        git config user.email "test@example.com"
-        git config user.name "Test User"
-    )
+    source "$REPO_ROOT/scripts/e2e/setup_sandbox.sh"
+    init_git_test_sandbox "$repo_dir"
 }
 
 seed_existing_runtime() {

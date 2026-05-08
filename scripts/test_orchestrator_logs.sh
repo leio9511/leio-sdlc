@@ -22,10 +22,9 @@ mkdir -p docs/PRDs
 echo "dummy prd content" > docs/PRDs/dummy.md
 
 # Initialize Git to pass boundary check
-git init > /dev/null
-git config --local user.name "Test User"
-git config --local user.email "test@example.com"
-if [ "$(git config --local --get user.name)" != "Test User" ] || [ "$(git config --local --get user.email)" != "test@example.com" ]; then
+source "${PROJECT_ROOT}/scripts/e2e/setup_sandbox.sh"
+init_git_test_sandbox "$(pwd)"
+if [ "$(git config --local --get user.name)" != "SDLC Test Sandbox" ] || [ "$(git config --local --get user.email)" != "sdlc-test-sandbox@example.invalid" ]; then
     echo "❌ test_orchestrator_logs.sh FAILED: Sandbox repo-local git identity was not configured correctly."
     exit 1
 fi

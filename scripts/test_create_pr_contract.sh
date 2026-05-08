@@ -9,9 +9,8 @@ mkdir -p "$WORK_DIR"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 # Initialize a git repo to test tracking
-cd "$WORK_DIR"
-git init > /dev/null 2>&1
-cd - > /dev/null 2>&1
+source "$(dirname "$0")/e2e/setup_sandbox.sh"
+init_git_test_sandbox "$WORK_DIR"
 
 TEST_DIR="$WORK_DIR/test_queue_dir"
 mkdir -p "$TEST_DIR"

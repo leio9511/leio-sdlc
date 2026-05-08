@@ -20,9 +20,8 @@ mkdir -p docs/PRDs
 echo "dummy prd content" > docs/PRDs/dummy.md
 
 # Initialize Git to pass boundary check
-git init > /dev/null
-git config user.name "Test User"
-git config user.email "test@example.com"
+source "${PROJECT_ROOT}/scripts/e2e/setup_sandbox.sh"
+init_git_test_sandbox "$(pwd)"
 git add docs/PRDs/dummy.md
 echo "test_output.log" > .gitignore
 echo ".sdlc_repo.lock" >> .gitignore

@@ -24,9 +24,8 @@ mkdir -p docs/PRDs
 echo "dummy prd content" > docs/PRDs/dummy.md
 
 # Initialize Git to pass boundary check
-git init > /dev/null
-git config user.name "Test User"
-git config user.email "test@example.com"
+source "${PROJECT_ROOT}/scripts/e2e/setup_sandbox.sh"
+init_git_test_sandbox "$(pwd)"
 
 # Apply SDLC infrastructure
 python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
