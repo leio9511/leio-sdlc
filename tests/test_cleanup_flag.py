@@ -86,19 +86,3 @@ def test_cleanup_lock_blocked(clean_cwd):
         
         assert res.returncode == 1
         assert "[FATAL_LOCK]" in res.stdout
-        
-if __name__ == "__main__":
-    # Mocking the fixture behavior for direct script execution
-    import contextlib
-    @contextlib.contextmanager
-    def mock_clean_cwd():
-        orig_cwd = os.getcwd()
-        try:
-            yield
-        finally:
-            os.chdir(orig_cwd)
-
-    with mock_clean_cwd():
-        test_cleanup_quarantine(None)
-        test_cleanup_lock_blocked(None)
-    print("Cleanup tests passed.")
