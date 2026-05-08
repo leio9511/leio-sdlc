@@ -7,11 +7,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 TEST_DIR=$(mktemp -d)
+init_git_test_sandbox "$TEST_DIR"
 cd "$TEST_DIR"
-
-git init > /dev/null 2>&1
-git config user.name "E2E Test"
-git config user.email "e2e@example.com"
 echo "init" > init.txt
 echo ".sdlc_repo.lock" > .gitignore
 echo "*.log" >> .gitignore

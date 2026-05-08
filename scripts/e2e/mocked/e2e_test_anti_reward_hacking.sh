@@ -8,10 +8,8 @@ source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 echo "Running Anti-Reward Hacking Tests..."
 
 TEST_DIR=$(mktemp -d)
+init_git_test_sandbox "$TEST_DIR"
 cd "$TEST_DIR"
-git init > /dev/null 2>&1
-git config user.email "test@test.com"
-git config user.name "Test"
 mkdir -p bin
 cat << 'INNER_EOF' > bin/openclaw
 #!/bin/bash

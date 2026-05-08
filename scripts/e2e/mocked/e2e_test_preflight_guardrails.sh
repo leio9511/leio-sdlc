@@ -12,11 +12,9 @@ echo "Sandbox created at $TEST_DIR"
 
 init_hermetic_sandbox "$TEST_DIR/scripts"
 
+init_git_test_sandbox "$TEST_DIR" --baseline-commit
+
 cd "$TEST_DIR"
-git init >/dev/null 2>&1
-git config user.email "test@example.com"
-git config user.name "Test User"
-git commit --allow-empty -m "init" >/dev/null 2>&1
 
 export SDLC_TEST_MODE=true
 

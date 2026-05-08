@@ -6,12 +6,10 @@ source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 # Setup a test git repo
 WORK_DIR=$(mktemp -d)
+init_git_test_sandbox "$WORK_DIR"
 cd "$WORK_DIR"
-git init > /dev/null 2>&1
 echo "test" > test.txt
 git add test.txt
-git config user.email "test@example.com"
-git config user.name "Test User"
 git commit -m "initial commit" > /dev/null 2>&1
 
 touch dummy_prd.md

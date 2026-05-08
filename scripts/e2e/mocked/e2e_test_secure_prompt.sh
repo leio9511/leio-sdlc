@@ -4,12 +4,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 SANDBOX_DIR=$(mktemp -d)
+init_git_test_sandbox "$SANDBOX_DIR" --baseline-commit
 
 cd "$SANDBOX_DIR"
-git init > /dev/null
-git config user.name "Test"
-git config user.email "test@example.com"
-git commit --allow-empty -m "init" > /dev/null
 mkdir -p playbooks TEMPLATES scripts docs/PRDs
 
 echo "playbook" > playbooks/planner_playbook.md

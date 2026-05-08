@@ -17,10 +17,7 @@ exit 0
 INNER_EOF
     chmod +x "bin/openclaw"
     export PATH="$(pwd)/bin:$PATH"
-    git init > /dev/null 2>&1
-    git config user.name "E2E Test"
-    git config user.email "e2e@example.com"
-    git commit --allow-empty -m "init" > /dev/null 2>&1
+    init_git_test_sandbox "$sandbox_dir" --baseline-commit
     echo "*.log" > .gitignore
     echo ".tmp/" >> .gitignore
     git add .gitignore

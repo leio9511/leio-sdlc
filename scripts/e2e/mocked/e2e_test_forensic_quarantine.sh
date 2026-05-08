@@ -10,11 +10,8 @@ source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 SANDBOX_DIR=$(mktemp -d)
 MOCK_GLOBAL_DIR=$(mktemp -d)
+init_git_test_sandbox "$SANDBOX_DIR"
 cd "$SANDBOX_DIR"
-
-git init > /dev/null 2>&1
-git config user.name "E2E Test"
-git config user.email "e2e@example.com"
 
 echo "initial" > init.txt
 git add init.txt
