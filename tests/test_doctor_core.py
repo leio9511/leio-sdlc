@@ -5,7 +5,13 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scripts.doctor import check_vcs, apply_overlay, _read_managed_hook_schema_version
+from scripts.doctor import (
+    DOCTOR_GIT_USER_EMAIL,
+    DOCTOR_GIT_USER_NAME,
+    check_vcs,
+    apply_overlay,
+    _read_managed_hook_schema_version,
+)
 
 import pytest
 def test_doctor_append_logic_idempotent():
@@ -33,14 +39,32 @@ def test_doctor_append_logic_idempotent():
             content2 = f.read()
         assert "line1\nline2\n" == content2
 
-def test_doctor_check_vcs_init():
-    with tempfile.TemporaryDirectory() as tmpdir:
+def test_doctor_check_vcs_init(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as home:
+        monkeypatch.setenv("HOME", home)
         check_vcs(tmpdir)
         assert os.path.exists(os.path.join(tmpdir, ".git"))
         
-        # Check if there is a baseline commit
+        # Doctor-owned VCS initialization must create the baseline commit directly.
         out = subprocess.run(["git", "log", "--oneline"], cwd=tmpdir, capture_output=True, text=True)
         assert "Baseline commit" in out.stdout
+
+        config_name = subprocess.run(
+            ["git", "config", "--local", "user.name"],
+            cwd=tmpdir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        config_email = subprocess.run(
+            ["git", "config", "--local", "user.email"],
+            cwd=tmpdir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert config_name.stdout.strip() == DOCTOR_GIT_USER_NAME
+        assert config_email.stdout.strip() == DOCTOR_GIT_USER_EMAIL
 
 def test_doctor_apply_base_scaffold():
     with tempfile.TemporaryDirectory() as tmpdir:

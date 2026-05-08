@@ -7,6 +7,8 @@ from pathlib import Path
 import config
 
 HOOK_SCHEMA_VERSION = "2"
+DOCTOR_GIT_USER_NAME = "SDLC Doctor"
+DOCTOR_GIT_USER_EMAIL = "sdlc-doctor@example.invalid"
 MANAGED_HOOK_HEADER = [
     "# SDLC_MANAGED_HOOK=leio-sdlc",
     f"# SDLC_HOOK_SCHEMA_VERSION={HOOK_SCHEMA_VERSION}",
@@ -16,6 +18,8 @@ def check_vcs(target_dir):
     git_dir = os.path.join(target_dir, ".git")
     if not os.path.exists(git_dir):
         subprocess.run(["git", "init"], cwd=target_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "--local", "user.name", DOCTOR_GIT_USER_NAME], cwd=target_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "--local", "user.email", DOCTOR_GIT_USER_EMAIL], cwd=target_dir, check=True, capture_output=True)
         subprocess.run(["git", "commit", "--allow-empty", "-m", "Baseline commit"], cwd=target_dir, check=True, capture_output=True)
 
 def apply_overlay(target_dir, overlay_path, check_only=False):
