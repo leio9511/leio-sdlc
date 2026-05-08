@@ -4,6 +4,8 @@ import time
 import unittest
 import tempfile
 
+from tests.conftest import init_git_test_sandbox
+
 class TestOrchestratorLock(unittest.TestCase):
     def test_concurrent_orchestrator_blocked(self):
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,10 +14,7 @@ class TestOrchestratorLock(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workdir = tmpdir
-            subprocess.run(["git", "init"], cwd=workdir, check=True, capture_output=True, text=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workdir, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=workdir, check=True)
-            subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=workdir, check=True, capture_output=True, text=True)
+            init_git_test_sandbox(workdir, baseline_commit=True)
             subprocess.run(["python3", doctor_path, workdir, "--fix"], cwd=project_root, check=True, capture_output=True, text=True)
 
             # We start a background orchestrator that sleeps

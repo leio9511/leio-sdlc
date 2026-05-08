@@ -12,13 +12,10 @@ def clean_cwd():
     yield
     os.chdir(orig_cwd)
 
-def test_cleanup_quarantine(clean_cwd):
+def test_cleanup_quarantine(clean_cwd, git_test_sandbox):
     with tempfile.TemporaryDirectory() as td:
         os.chdir(td)
-        subprocess.run(["git", "init"], check=True)
-        subprocess.run(["git", "config", "user.name", "Test"], check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], check=True)
-        subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], check=True)
+        git_test_sandbox(td, baseline_commit=True)
         
         # Create a branch and a dirty file
         subprocess.run(["git", "checkout", "-b", "feature/toxic_branch"], check=True)
