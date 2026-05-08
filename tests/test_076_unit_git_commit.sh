@@ -20,13 +20,13 @@ echo "dirty code hallucinated by coder" > ghost_file.py
 
 cat << EOF > run_test.py
 import sys
-import subprocess
-
-def force_commit_untracked_changes(repo_path):
-    subprocess.run(["git", "add", "."], cwd=repo_path)
-    subprocess.run(["git", "commit", "-m", "chore(auto): force commit uncommitted changes before review"], cwd=repo_path, check=False)
-
-force_commit_untracked_changes(".")
+sys.path.append("${REPO_ROOT}/scripts")
+try:
+    from orchestrator import force_commit_untracked_changes
+    force_commit_untracked_changes(".")
+except ImportError as e:
+    print(f"Failed to import: {e}")
+    sys.exit(1)
 EOF
 
 python3 run_test.py
