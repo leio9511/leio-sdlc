@@ -5,10 +5,9 @@ from pathlib import Path
 import os
 
 
-def test_orchestrator_fail_fast_on_non_compliant_project(tmp_path):
+def test_orchestrator_fail_fast_on_non_compliant_project(tmp_path, git_test_sandbox):
     workdir = tmp_path / "workdir"
-    workdir.mkdir()
-    os.system(f"git init {workdir}")
+    git_test_sandbox(workdir)
     # Run orchestrator, doctor should fail because no templates exist
     orch_script = Path(__file__).parent.parent / "scripts" / "orchestrator.py"
 
@@ -21,9 +20,7 @@ def test_orchestrator_fail_fast_on_non_compliant_project(tmp_path):
     # TDD Test Case 6 (fail-fast counterpart): project with scaffold templates
     # but an outdated managed hook (schema version < 2) must also be blocked.
     workdir2 = tmp_path / "workdir2"
-    workdir2.mkdir()
-    os.system(f"git init {workdir2}")
-    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=str(workdir2), capture_output=True, text=True)
+    git_test_sandbox(workdir2, baseline_commit=True)
     doctor_script = Path(__file__).parent.parent / "scripts" / "doctor.py"
     # Apply scaffold via doctor --fix so template files are present
     res_fix = subprocess.run([sys.executable, str(doctor_script), str(workdir2), "--fix"], capture_output=True, text=True)
@@ -44,13 +41,9 @@ def test_orchestrator_fail_fast_on_non_compliant_project(tmp_path):
     assert "Project is not SDLC compliant" in res2.stdout or "Project is not SDLC compliant" in res2.stderr
 
 
-def test_orchestrator_proceeds_on_compliant_project(tmp_path):
+def test_orchestrator_proceeds_on_compliant_project(tmp_path, git_test_sandbox):
     workdir = tmp_path / "workdir"
-    workdir.mkdir()
-    os.system(f"git init {workdir}")
-    
-    # Needs a baseline commit or git init will complain about branches
-    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=str(workdir))
+    git_test_sandbox(workdir, baseline_commit=True)
     
     # Need to manually create the mock template directory inside the skill, but we use the real one for orchestrator test
     # The real templates exist because of PR-001
