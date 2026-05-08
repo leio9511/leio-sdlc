@@ -30,19 +30,27 @@ INNER_EOF
 
 chmod +x "$TEST_DIR/scripts/"*.py
 
+source "$(dirname "$0")/../scripts/e2e/setup_sandbox.sh"
+
 # Initialize git repo so git show-ref works
-cd "$TEST_DIR"
-git init >/dev/null 2>&1
-git config user.email "test@example.com"
-git config user.name "Test User"
-git commit --allow-empty -m "Initial commit" >/dev/null 2>&1
-cd ..
+init_git_test_sandbox "$TEST_DIR" --baseline-commit
+python3 scripts/doctor.py --fix "$TEST_DIR" >/dev/null 2>&1
+
+cat << 'INNER_EOF' >> "$TEST_DIR/.gitignore"
+.sdlc_repo.lock
+.sdlc_run.lock
+.sdlc_lock_manifest.json
+.tmp/
+scripts/__pycache__/
+INNER_EOF
+
+(cd "$TEST_DIR" && git add . && git commit -m "add state files" >/dev/null 2>&1)
 
 export SDLC_TEST_MODE=true
 
 # Run orchestrator
 set +e
-OUTPUT=$(python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$TEST_DIR" --prd-file "dummy.md" --max-runs 1 2>&1)
+OUTPUT=$(python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --channel "valid:id" --workdir "$TEST_DIR" --prd-file "dummy.md" --max-prs-to-process 1 2>&1)
 set -e
 
 if echo "$OUTPUT" | grep -q "HIJACKED_CODER"; then
