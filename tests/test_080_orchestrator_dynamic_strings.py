@@ -8,11 +8,13 @@ import config
 
 def test_orchestrator_dynamic_strings(tmp_path, git_test_sandbox):
     os.chdir(tmp_path)
-    git_test_sandbox(tmp_path, baseline_commit=False)
+    # Use the canonical sandbox helper for the commit-capable repository setup;
+    # the PRD file is created afterwards so its uncommitted state remains the assertion.
+    git_test_sandbox(tmp_path, baseline_commit=True)
     
     # Make project compliant so we get past the doctor check
     doctor_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/doctor.py"
-    subprocess.run(["python3", doctor_script, str(tmp_path), "--fix"])
+    subprocess.run(["python3", doctor_script, str(tmp_path), "--fix"], check=True)
     
     # Create uncommitted PRD file
     with open("PRD_uncommitted.md", "w") as f:
