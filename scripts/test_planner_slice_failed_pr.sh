@@ -9,7 +9,15 @@ GLOBAL_MOCK_DIR=""
 setup_sandbox() {
     local sandbox_name="$1"
 
-    : "${GLOBAL_MOCK_DIR:?GLOBAL_MOCK_DIR must be initialized before setup_sandbox}"
+    if [[ -z "${GLOBAL_MOCK_DIR:-}" ]]; then
+        echo "Error: GLOBAL_MOCK_DIR must be initialized before setup_sandbox" >&2
+        return 1
+    fi
+
+    if [[ ! -d "$GLOBAL_MOCK_DIR" ]]; then
+        echo "Error: GLOBAL_MOCK_DIR ($GLOBAL_MOCK_DIR) is not a valid directory." >&2
+        return 1
+    fi
 
     TEST_DIR="$(mktemp -d "/tmp/${sandbox_name}.XXXXXX")"
     SANDBOX_NAME="$(basename "$TEST_DIR")"
@@ -44,6 +52,25 @@ export SDLC_TEST_MODE=true
 
 # Test Scenario 5: Bootstrap Safety Regression
 echo "Running Test Scenario 5 (Bootstrap Safety Regression)..."
+
+# Explicitly test that setup_sandbox fails if GLOBAL_MOCK_DIR is not set
+(
+    GLOBAL_MOCK_DIR=""
+    if setup_sandbox "should_fail_empty" >/dev/null 2>&1; then
+        echo "❌ Scenario 5 Failed: setup_sandbox succeeded despite empty GLOBAL_MOCK_DIR."
+        exit 1
+    fi
+)
+
+# Explicitly test that setup_sandbox fails if GLOBAL_MOCK_DIR is an invalid directory
+(
+    GLOBAL_MOCK_DIR="/tmp/definitely_not_a_valid_dir_12345"
+    if setup_sandbox "should_fail_invalid" >/dev/null 2>&1; then
+        echo "❌ Scenario 5 Failed: setup_sandbox succeeded despite invalid GLOBAL_MOCK_DIR."
+        exit 1
+    fi
+)
+
 EXPECTED_MOCK_PR_DIR="$GLOBAL_MOCK_DIR/.sdlc_runs/$SANDBOX_NAME/PRD"
 if [[ -z "$GLOBAL_MOCK_DIR" ]]; then
     echo "❌ Scenario 5 Failed: GLOBAL_MOCK_DIR was not initialized before sandbox setup."
