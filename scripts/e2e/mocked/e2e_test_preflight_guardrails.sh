@@ -215,6 +215,16 @@ if [ $PREFLIGHT_EXIT -eq 0 ]; then
     echo "$PREFLIGHT_OUTPUT"
     exit 1
 fi
+if echo "$PREFLIGHT_OUTPUT" | grep -q "If ignore_tests.json is missing or malformed, preflight must fail closed."; then
+    echo "Fail: empty ignore manifest was treated as malformed instead of valid full-audit input"
+    echo "$PREFLIGHT_OUTPUT"
+    exit 1
+fi
+if echo "$PREFLIGHT_OUTPUT" | grep -q "debt-quarantine green"; then
+    echo "Fail: empty ignore manifest incorrectly reported quarantine-green semantics"
+    echo "$PREFLIGHT_OUTPUT"
+    exit 1
+fi
 if ! echo "$PREFLIGHT_OUTPUT" | grep -q "Bash Test: scripts/test_unignored_bash.sh"; then
     echo "Fail: empty manifest did not expose full bash discovery surface"
     echo "$PREFLIGHT_OUTPUT"
