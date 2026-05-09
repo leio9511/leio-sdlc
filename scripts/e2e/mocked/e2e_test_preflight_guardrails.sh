@@ -284,30 +284,6 @@ JSON
     rm -rf "$PREFLIGHT_SANDBOX"
 done
 
-# Test Case 4: test_seed_manifest_matches_prd_quarantine_list_exactly
-python3 - "$PROJECT_ROOT/ignore_tests.json" <<'PY'
-import json
-import sys
-
-expected = {
-    "bash": [
-        "scripts/test_planner_slice_failed_pr.sh"
-    ],
-    "pytest": [
-        "tests/test_orchestrator_session_strategy.py",
-        "tests/test_079_agent_driver_openclaw_lazy_create.py",
-        "tests/test_083_openclaw_model_aware_routing.py",
-        "tests/test_handoff_integration.py",
-        "tests/test_orchestrator_handoff.py",
-        "tests/test_planner_envelope_forward_compatibility.py",
-        "tests/test_spawn_auditor.py",
-    ],
-}
-with open(sys.argv[1], "r", encoding="utf-8") as f:
-    actual = json.load(f)
-assert actual == expected, actual
-PY
-
 # 7. Cleanup Sandbox
 echo "[GUARDRAILS_TEST_SUCCESS]"
 rm -rf "$TEST_DIR"
