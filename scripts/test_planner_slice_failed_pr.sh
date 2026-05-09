@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+TEST_SANDBOX_NAME="test_planner_slice"
+export GLOBAL_MOCK_DIR="/tmp/mock_sdlc_global_$$"
+
 # Emulate setup_sandbox
 setup_sandbox() {
     TEST_DIR="/tmp/$1"
@@ -10,6 +13,10 @@ setup_sandbox() {
     cd "$TEST_DIR"
     export PYTHONPATH="$TEST_DIR"
     export WORKSPACE_DIR="$TEST_DIR"
+    if [[ -z "${GLOBAL_MOCK_DIR:-}" ]]; then
+        echo "❌ setup_sandbox Failed: GLOBAL_MOCK_DIR must be initialized before sandbox setup."
+        exit 1
+    fi
     mkdir -p docs/PRDs "$GLOBAL_MOCK_DIR/.sdlc_runs/PRD"
 }
 
@@ -21,10 +28,9 @@ echo "================================================="
 echo "Testing: Planner Micro-Slicing Logic"
 echo "================================================="
 
-setup_sandbox "test_planner_slice"
+setup_sandbox "$TEST_SANDBOX_NAME"
 export SDLC_TEST_MODE=true
-export GLOBAL_MOCK_DIR="/tmp/mock_sdlc_global_$$"
-mkdir -p "$GLOBAL_MOCK_DIR/.sdlc_runs/test_planner_slice/PRD"
+mkdir -p "$GLOBAL_MOCK_DIR/.sdlc_runs/$TEST_SANDBOX_NAME/PRD"
 
 # Create a mock PRD
 echo "# Mock PRD" > PRD.md
@@ -102,7 +108,7 @@ if ! grep -q "$FAILED_PR_002_1_ABS" tests/task_string.log; then
 fi
 echo "✅ Scenario 4 Passed."
 
-cleanup_sandbox "test_planner_slice"
+cleanup_sandbox "$TEST_SANDBOX_NAME"
 rm -rf "$GLOBAL_MOCK_DIR"
 echo "✅ test_planner_slice_failed_pr.sh passed."
 exit 0
