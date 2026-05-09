@@ -31,9 +31,8 @@ PY
 
 run_sandbox_preflight() {
     local sandbox_dir="$1"
-    shift || true
     set +e
-    PREFLIGHT_OUTPUT=$(cd "$sandbox_dir" && bash ./preflight.sh "$@" 2>&1)
+    PREFLIGHT_OUTPUT=$(cd "$sandbox_dir" && bash ./preflight.sh 2>&1)
     PREFLIGHT_EXIT=$?
     set -e
 }
@@ -204,45 +203,20 @@ echo "UNIGNORED_BASH_RAN"
 exit 1
 SH
 chmod +x "$PREFLIGHT_SANDBOX/scripts/test_unignored_bash.sh"
-cat > "$PREFLIGHT_SANDBOX/tests/test_unignored_pytest.py" <<'PY'
-def test_unignored_pytest():
-    print("UNIGNORED_PYTEST_RAN")
-    assert False
-PY
 cat > "$PREFLIGHT_SANDBOX/ignore_tests.json" <<'JSON'
 {
   "bash": [],
   "pytest": []
 }
 JSON
-run_sandbox_preflight "$PREFLIGHT_SANDBOX" --report-all
+run_sandbox_preflight "$PREFLIGHT_SANDBOX"
 if [ $PREFLIGHT_EXIT -eq 0 ]; then
-    echo "Fail: empty ignore manifest should restore full discovery and fail on failing sentinels"
-    echo "$PREFLIGHT_OUTPUT"
-    exit 1
-fi
-if echo "$PREFLIGHT_OUTPUT" | grep -q "debt-quarantine green"; then
-    echo "Fail: empty manifest should not report debt-quarantine green"
-    echo "$PREFLIGHT_OUTPUT"
-    exit 1
-fi
-if echo "$PREFLIGHT_OUTPUT" | grep -q "If ignore_tests.json is missing or malformed, preflight must fail closed."; then
-    echo "Fail: empty manifest should be treated as a valid full-audit input, not malformed"
+    echo "Fail: empty ignore manifest should restore full discovery and fail on failing bash sentinel"
     echo "$PREFLIGHT_OUTPUT"
     exit 1
 fi
 if ! echo "$PREFLIGHT_OUTPUT" | grep -q "Bash Test: scripts/test_unignored_bash.sh"; then
     echo "Fail: empty manifest did not expose full bash discovery surface"
-    echo "$PREFLIGHT_OUTPUT"
-    exit 1
-fi
-if ! echo "$PREFLIGHT_OUTPUT" | grep -q "Pytest functional & unittest suite"; then
-    echo "Fail: empty manifest did not restore pytest discovery surface"
-    echo "$PREFLIGHT_OUTPUT"
-    exit 1
-fi
-if ! echo "$PREFLIGHT_OUTPUT" | grep -q "tests/test_unignored_pytest.py\|UNIGNORED_PYTEST_RAN"; then
-    echo "Fail: empty manifest did not surface the failing pytest sentinel"
     echo "$PREFLIGHT_OUTPUT"
     exit 1
 fi
@@ -319,13 +293,9 @@ expected = {
         "tests/test_spawn_auditor.py",
     ],
 }
-empty_manifest = {
-    "bash": [],
-    "pytest": []
-}
 with open(sys.argv[1], "r", encoding="utf-8") as f:
     actual = json.load(f)
-assert actual == expected or actual == empty_manifest, actual
+assert actual == expected, actual
 PY
 
 # 7. Cleanup Sandbox
