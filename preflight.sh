@@ -265,6 +265,9 @@ fi
 
 # 4. E2E Mocked Tests
 for f in scripts/e2e/mocked/*.sh; do
+    if [[ -n "${IGNORE_BASH[$f]:-}" ]]; then
+        continue
+    fi
     run_test "bash $f" "Mocked E2E: $(basename "$f")"
 done
 

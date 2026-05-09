@@ -338,6 +338,12 @@ def main():
     parser.add_argument("--global-dir", help="Global workspace path")
     parser.add_argument("--test-sleep", action="store_true")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass # Reaper safety check: process already reaped or pgid not found the workspace path check")
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
     parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart. Use this flag if the SDLC was interrupted and you need to resume or continue from the last successful checkpoint.")
@@ -346,6 +352,8 @@ def main():
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     args = parser.parse_args()
+    from thinking_resolver import resolve_thinking
+    resolved_thinking = resolve_thinking(getattr(args, "thinking", None))
     from handoff_prompter import HandoffPrompter
     if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
@@ -738,7 +746,7 @@ def main():
             notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
             notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
             try:
-                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                 proc.wait()
                 if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
             except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found
@@ -764,7 +772,7 @@ def main():
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
         try:
-            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
             proc.wait()
             if proc.returncode != 0: raise subprocess.CalledProcessError(proc.returncode, "spawn_planner.py")
         except subprocess.CalledProcessError: pass # Reaper safety check: process already reaped or pgid not found

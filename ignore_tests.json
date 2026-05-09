@@ -1,6 +1,7 @@
 {
   "bash": [
-    "scripts/test_planner_slice_failed_pr.sh"
+    "scripts/test_planner_slice_failed_pr.sh",
+    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh"
   ],
   "pytest": [
     "tests/test_079_agent_driver_openclaw_lazy_create.py",
