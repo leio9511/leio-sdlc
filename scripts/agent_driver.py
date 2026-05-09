@@ -175,11 +175,13 @@ def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model:
         )
         sys.exit(1)
 
-def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
+def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinking: str | None = None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
     Supports dynamic path resolution and isolated E2E testing integration.
     """
+    from thinking_resolver import resolve_thinking
+    resolved_thinking = resolve_thinking(thinking)
     if not session_key:
         session_key = f"subtask-{uuid.uuid4().hex[:8]}"
 
@@ -266,9 +268,9 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None):
                 validate_openclaw_agent_model(cmd_exec, agent_id, model)
 
             if actual_id:
-                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "--thinking", "high", "-m", secure_msg]
+                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "--thinking", resolved_thinking, "-m", secure_msg]
             else:
-                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", session_key, "--thinking", "high", "-m", secure_msg]
+                cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", session_key, "--thinking", resolved_thinking, "-m", secure_msg]
             
         print(f"[{role or 'system'}] Invoking agent driver: {' '.join(cmd)}")
         

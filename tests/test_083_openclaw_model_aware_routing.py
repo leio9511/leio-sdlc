@@ -50,7 +50,17 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
 
         self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "list"])
         cmd = self.mock_run.call_args_list[2][0][0]
-        self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
+        # Semantic thinking-aware assertions
+        self.assertIn("--thinking", cmd)
+        think_idx = cmd.index("--thinking")
+        self.assertEqual(cmd[think_idx + 1], "high")
+        self.assertIn("--agent", cmd)
+        self.assertIn("sdlc-generic-openclaw-gpt", cmd)
+        self.assertIn("--session-id", cmd)
+        self.assertIn("session-123", cmd)
+        self.assertIn("-m", cmd)
+        m_idx = cmd.index("-m")
+        self.assertTrue(cmd[m_idx + 1].startswith("Read your complete task instructions"))
 
     def test_openclaw_agent_id_is_model_aware_for_full_model_name(self):
         self.assertEqual(
@@ -80,7 +90,17 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
         self.assertIn("gemini-3.1-pro-preview", create_cmd)
 
         run_cmd = self.mock_run.call_args_list[2][0][0]
-        self.assertEqual(run_cmd[3], "sdlc-generic-openclaw-gemini-3-1-pro-preview")
+        # Semantic thinking-aware assertions on run command
+        self.assertIn("--thinking", run_cmd)
+        think_idx = run_cmd.index("--thinking")
+        self.assertEqual(run_cmd[think_idx + 1], "high")
+        self.assertIn("--agent", run_cmd)
+        self.assertIn("sdlc-generic-openclaw-gemini-3-1-pro-preview", run_cmd)
+        self.assertIn("--session-id", run_cmd)
+        self.assertIn("session-123", run_cmd)
+        self.assertIn("-m", run_cmd)
+        m_idx = run_cmd.index("-m")
+        self.assertTrue(run_cmd[m_idx + 1].startswith("Read your complete task instructions"))
         self.assertTrue(self.mock_copy2.called or self.mock_copytree.called)
 
     def test_openclaw_existing_matching_agent_is_reused_without_recreate(self):
@@ -95,7 +115,17 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
         self.assertEqual(len(self.mock_run.call_args_list), 3)
         self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "list"])
         run_cmd = self.mock_run.call_args_list[2][0][0]
-        self.assertEqual(run_cmd[3], "sdlc-generic-openclaw-gpt")
+        # Semantic thinking-aware assertions
+        self.assertIn("--thinking", run_cmd)
+        think_idx = run_cmd.index("--thinking")
+        self.assertEqual(run_cmd[think_idx + 1], "high")
+        self.assertIn("--agent", run_cmd)
+        self.assertIn("sdlc-generic-openclaw-gpt", run_cmd)
+        self.assertIn("--session-id", run_cmd)
+        self.assertIn("session-123", run_cmd)
+        self.assertIn("-m", run_cmd)
+        m_idx = run_cmd.index("-m")
+        self.assertTrue(run_cmd[m_idx + 1].startswith("Read your complete task instructions"))
 
 
 if __name__ == "__main__":

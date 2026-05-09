@@ -51,8 +51,17 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
         # Second call is from validate_openclaw_agent_model
         self.assertEqual(calls[1][0][0], ["mock_openclaw", "agents", "list"])
         cmd = calls[2][0][0]
-        self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
-        self.assertTrue(cmd[7].startswith("Read your complete task instructions"))
+        # Semantic thinking-aware assertions
+        self.assertIn("--thinking", cmd)
+        think_idx = cmd.index("--thinking")
+        self.assertEqual(cmd[think_idx + 1], "high")
+        self.assertIn("--agent", cmd)
+        self.assertIn("sdlc-generic-openclaw-gpt", cmd)
+        self.assertIn("--session-id", cmd)
+        self.assertIn("session-123", cmd)
+        self.assertIn("-m", cmd)
+        m_idx = cmd.index("-m")
+        self.assertTrue(cmd[m_idx + 1].startswith("Read your complete task instructions"))
 
     def test_openclaw_multi_line_parsing_unit(self):
         sample_output = """
@@ -110,6 +119,12 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
         
         # Check copy was called
         self.assertTrue(self.mock_copy2.called or self.mock_copytree.called)
+
+        # Semantic thinking-aware assertions on run command
+        run_cmd = calls[2][0][0]
+        self.assertIn("--thinking", run_cmd)
+        think_idx = run_cmd.index("--thinking")
+        self.assertEqual(run_cmd[think_idx + 1], "high")
         
     def test_gemini_path_unchanged(self):
         with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}):
@@ -132,6 +147,7 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
             self.assertEqual(cmd[:3], ["mock_gemini", "--yolo", "-p"])
             self.assertNotIn("--agent", cmd)
             self.assertNotIn("sdlc-generic-openclaw", cmd)
+            self.assertNotIn("--thinking", cmd)
 
     def test_openclaw_agent_exists_with_annotations_integration(self):
         # Setup: agent exists with annotation
@@ -153,7 +169,71 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
         calls = self.mock_run.call_args_list
         self.assertEqual(calls[0][0][0], ["mock_openclaw", "agents", "list"])
         cmd = calls[2][0][0]
-        self.assertEqual(cmd[:7], ["mock_openclaw", "agent", "--agent", "sdlc-generic-openclaw-gpt", "--session-id", "session-123", "-m"])
+        # Semantic thinking-aware assertions
+        self.assertIn("--thinking", cmd)
+        think_idx = cmd.index("--thinking")
+        self.assertEqual(cmd[think_idx + 1], "high")
+        self.assertIn("--agent", cmd)
+        self.assertIn("sdlc-generic-openclaw-gpt", cmd)
+        self.assertIn("--session-id", cmd)
+        self.assertIn("session-123", cmd)
+        self.assertIn("-m", cmd)
+        m_idx = cmd.index("-m")
+        self.assertTrue(cmd[m_idx + 1].startswith("Read your complete task instructions"))
+
+    def test_explicit_thinking_passed_through(self):
+        # Call invoke_agent with explicit thinking="xhigh"
+        mock_result_list = MagicMock()
+        mock_result_list.stdout = "- sdlc-generic-openclaw-gpt\n  Model: gpt\n"
+        mock_result_list.returncode = 0
+
+        mock_result_run = MagicMock()
+        mock_result_run.stdout = "output"
+        mock_result_run.returncode = 0
+
+        self.mock_run.side_effect = [mock_result_list, mock_result_list, mock_result_run]
+
+        with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
+            agent_driver.invoke_agent("test task", session_key="session-123", thinking="xhigh")
+
+        cmd = self.mock_run.call_args_list[2][0][0]
+        self.assertIn("--thinking", cmd)
+        think_idx = cmd.index("--thinking")
+        self.assertEqual(cmd[think_idx + 1], "xhigh")
+        self.assertIn("--agent", cmd)
+        self.assertIn("sdlc-generic-openclaw-gpt", cmd)
+        self.assertIn("--session-id", cmd)
+        self.assertIn("session-123", cmd)
+        self.assertIn("-m", cmd)
+        m_idx = cmd.index("-m")
+        self.assertTrue(cmd[m_idx + 1].startswith("Read your complete task instructions"))
+
+    def test_default_thinking_is_high(self):
+        # Call invoke_agent without explicit thinking and verify default "high"
+        mock_result_list = MagicMock()
+        mock_result_list.stdout = "- sdlc-generic-openclaw-gpt\n  Model: gpt\n"
+        mock_result_list.returncode = 0
+
+        mock_result_run = MagicMock()
+        mock_result_run.stdout = "output"
+        mock_result_run.returncode = 0
+
+        self.mock_run.side_effect = [mock_result_list, mock_result_list, mock_result_run]
+
+        with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
+            agent_driver.invoke_agent("test task", session_key="session-123")
+
+        cmd = self.mock_run.call_args_list[2][0][0]
+        self.assertIn("--thinking", cmd)
+        think_idx = cmd.index("--thinking")
+        self.assertEqual(cmd[think_idx + 1], "high")
+        self.assertIn("--agent", cmd)
+        self.assertIn("sdlc-generic-openclaw-gpt", cmd)
+        self.assertIn("--session-id", cmd)
+        self.assertIn("session-123", cmd)
+        self.assertIn("-m", cmd)
+        m_idx = cmd.index("-m")
+        self.assertTrue(cmd[m_idx + 1].startswith("Read your complete task instructions"))
 
 if __name__ == '__main__':
     unittest.main()
