@@ -23,8 +23,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 IGNORE_MANIFEST = REPO_ROOT / "ignore_tests.json"
 SOURCE_PREFLIGHT = REPO_ROOT / "preflight.sh"
 TARGETED_PYTEST_IGNORES = {
-    "tests/test_handoff_integration.py",
-    "tests/test_orchestrator_handoff.py",
+    "tests/test_orchestrator_session_strategy.py",
+    "tests/test_planner_envelope_forward_compatibility.py",
 }
 
 

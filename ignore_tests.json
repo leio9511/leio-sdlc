@@ -5,6 +5,8 @@
   "pytest": [
     "tests/test_079_agent_driver_openclaw_lazy_create.py",
     "tests/test_083_openclaw_model_aware_routing.py",
+    "tests/test_handoff_integration.py",
+    "tests/test_orchestrator_handoff.py",
     "tests/test_spawn_auditor.py"
   ]
 }
