@@ -952,7 +952,7 @@ def main():
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     
-                    coder_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir]
+                    coder_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--thinking", resolved_thinking, "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir]
                     if current_feedback_file:
                         coder_cmd.extend(["--feedback-file", current_feedback_file])
                     if system_alert_text:

@@ -1,7 +1,10 @@
 {
   "bash": [
     "scripts/test_planner_slice_failed_pr.sh",
-    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh"
+    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
+    "scripts/test_missing_channel.sh",
+    "scripts/e2e/mocked/e2e_test_reviewer_artifact_guardrail.sh",
+    "scripts/e2e/mocked/e2e_test_secure_prompt.sh"
   ],
   "pytest": [
     "tests/test_079_agent_driver_openclaw_lazy_create.py",
