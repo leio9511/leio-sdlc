@@ -1,5 +1,11 @@
 import os
+import sys
+from pathlib import Path
 import json
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
 from scripts.planner_envelope import render_planner_prompt
 
 def test_envelope_supports_auditor():
@@ -155,7 +161,7 @@ def test_envelope_supports_coder():
 
 def test_playbook_is_methodology_only():
     # Read the planner playbook and ensure it does not contain rigid output constraints or script flags
-    playbook_path = "/root/projects/leio-sdlc/playbooks/planner_playbook.md"
+    playbook_path = REPO_ROOT / "playbooks" / "planner_playbook.md"
     with open(playbook_path, "r") as f:
         playbook_content = f.read()
 

@@ -1,33 +1,56 @@
 import os
 import sys
 import subprocess
+from pathlib import Path
+
 import pytest
-import time
 from unittest.mock import patch, MagicMock
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ORCHESTRATOR_SCRIPT = REPO_ROOT / "scripts" / "orchestrator.py"
+
 
 @pytest.fixture(autouse=True)
 def reset_cwd():
-    os.chdir("/root/projects/leio-sdlc")
+    original_cwd = Path.cwd()
+    os.chdir(REPO_ROOT)
+    try:
+        yield
+    finally:
+        os.chdir(original_cwd)
+
 
 # Assuming orchestrator is importable or we can test it using subprocess / module import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import pytest
 
 def test_invalid_strategy():
     result = subprocess.run(
-        [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--workdir", ".", "--prd-file", "dummy.md", "--coder-session-strategy", "invalid-strategy"],
-        capture_output=True, text=True
+        [
+            sys.executable,
+            str(ORCHESTRATOR_SCRIPT),
+            "--enable-exec-from-workspace",
+            "--workdir",
+            ".",
+            "--prd-file",
+            "dummy.md",
+            "--coder-session-strategy",
+            "invalid-strategy",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
     )
     assert result.returncode != 0
     assert "argument --coder-session-strategy: invalid choice: 'invalid-strategy'" in result.stderr
 
-import pytest
 
 def test_missing_workdir():
     result = subprocess.run(
-        [sys.executable, "scripts/orchestrator.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md"],
-        capture_output=True, text=True
+        [sys.executable, str(ORCHESTRATOR_SCRIPT), "--enable-exec-from-workspace", "--prd-file", "dummy.md"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
     )
     assert result.returncode != 0
     assert "the following arguments are required: --workdir" in result.stderr

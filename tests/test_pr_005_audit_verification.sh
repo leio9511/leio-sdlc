@@ -2,7 +2,9 @@
 # Test Case 1: verify_audit_report_completeness
 # Check that docs/OpenClaw_CLI_Compatibility_Audit.md contains a reference to scripts/rollback.sh
 
-AUDIT_FILE="/root/projects/leio-sdlc/docs/OpenClaw_CLI_Compatibility_Audit.md"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+AUDIT_FILE="$REPO_ROOT/docs/OpenClaw_CLI_Compatibility_Audit.md"
 ROLLBACK_SCRIPT="scripts/rollback.sh"
 
 echo "Running Test Case 1: verify_audit_report_completeness..."
@@ -17,7 +19,7 @@ fi
 # Verify that scripts/rollback.sh indeed contains the openclaw gateway restart command
 
 echo "Running Test Case 2: verify_rollback_script_call_site..."
-if grep -q "openclaw gateway restart" "/root/projects/leio-sdlc/$ROLLBACK_SCRIPT"; then
+if grep -q "openclaw gateway restart" "$REPO_ROOT/$ROLLBACK_SCRIPT"; then
     echo "✅ Test Case 2 PASSED: 'openclaw gateway restart' found in $ROLLBACK_SCRIPT"
 else
     echo "❌ Test Case 2 FAILED: 'openclaw gateway restart' NOT found in $ROLLBACK_SCRIPT"
