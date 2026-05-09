@@ -27,6 +27,11 @@ TARGETED_PYTEST_IGNORES = {
     "tests/test_planner_envelope_forward_compatibility.py",
 }
 
+HANDOFF_PYTEST_IGNORES = {
+    "tests/test_handoff_integration.py",
+    "tests/test_orchestrator_handoff.py",
+}
+
 
 def _make_executable(path: Path) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
@@ -109,6 +114,7 @@ def test_targeted_portability_pytests_are_not_quarantined():
     assert all(isinstance(item, str) for item in manifest["bash"])
     assert all(isinstance(item, str) for item in manifest["pytest"])
     assert TARGETED_PYTEST_IGNORES.isdisjoint(manifest["pytest"])
+    assert HANDOFF_PYTEST_IGNORES.isdisjoint(manifest["pytest"])
 
 
 def test_preflight_source_of_truth_still_consumes_repo_ignore_manifest(tmp_path: Path):
