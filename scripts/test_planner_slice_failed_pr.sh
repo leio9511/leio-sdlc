@@ -36,6 +36,7 @@ echo "================================================="
 echo "Testing: Planner Micro-Slicing Logic"
 echo "================================================="
 
+# Initialize GLOBAL_MOCK_DIR as a runner-safe temporary directory before sandbox setup
 GLOBAL_MOCK_DIR="$(mktemp -d "/tmp/mock_sdlc_global.XXXXXX")"
 export GLOBAL_MOCK_DIR
 setup_sandbox "$TEST_NAME"
