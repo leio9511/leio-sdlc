@@ -895,6 +895,7 @@ def main():
                                 uat_recovery_count += 1
                                 proc = dpopen([
                                     sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"),
+                                    "--thinking", resolved_thinking,
                                     "--prd-file", args.prd_file,
                                     "--replan-uat-failures", uat_out_file,
                                     "--workdir", workdir,
@@ -1060,7 +1061,7 @@ def main():
                                 break
                                 
                             sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                             proc.wait()
                                 
                     if verdict == "APPROVED":
@@ -1134,7 +1135,7 @@ def main():
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before
