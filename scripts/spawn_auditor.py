@@ -13,6 +13,7 @@ import agent_driver
 import config
 from agent_driver import invoke_agent, build_prompt
 import envelope_assembler
+from thinking_resolver import resolve_thinking
 
 def main():
     parser = argparse.ArgumentParser(description="Spawn an Auditor agent.")
@@ -22,6 +23,12 @@ def main():
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
     
     args = parser.parse_args()
     # API Key Assignment
@@ -37,6 +44,8 @@ def main():
         os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
+    
+    resolved_thinking = resolve_thinking(args.thinking)
     
     # Ignition Handshake: Centralized helper that fails fast on error
     from agent_driver import notify_channel, send_ignition_handshake
@@ -133,7 +142,7 @@ def main():
     else:
         print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
         session_id = f"prd_auditor_{int(time.time())}"
-        result = invoke_agent(task_string, session_key=session_id, role="auditor")
+        result = invoke_agent(task_string, session_key=session_id, role="auditor", thinking=resolved_thinking)
         output = result.stdout
 
     stdout_status = "UNKNOWN"

@@ -3,6 +3,7 @@ import tempfile
 import os
 import sys
 from agent_driver import invoke_agent, build_prompt, resolve_cmd
+from thinking_resolver import resolve_thinking
 import envelope_assembler
 import config
 import subprocess
@@ -62,6 +63,12 @@ def main():
     parser.add_argument("--system-alert", help="Send a system alert to the existing reviewer session", default=None)
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
@@ -78,6 +85,8 @@ def main():
         os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
+
+    resolved_thinking = resolve_thinking(args.thinking)
 
     session_file = os.path.join(args.run_dir, ".reviewer_session")
 
@@ -247,7 +256,7 @@ def main():
         with open(session_file, "w") as sf:
             sf.write(session_id)
             
-        result = invoke_agent(task_string, session_key=session_id, role="reviewer")
+        result = invoke_agent(task_string, session_key=session_id, role="reviewer", thinking=resolved_thinking)
 
     # Removed stdout overwrite as agent writes directly to file
 

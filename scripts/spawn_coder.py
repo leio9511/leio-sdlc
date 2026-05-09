@@ -11,6 +11,7 @@ from pathlib import Path
 import config
 import envelope_assembler
 from agent_driver import invoke_agent
+from thinking_resolver import resolve_thinking
 
 
 def extract_pr_id(pr_file_path):
@@ -377,12 +378,12 @@ def save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt):
     return artifact_subdir
 
 
-def send_feedback(session_key, message, workdir=".", run_dir="."):
-    result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir)
+def send_feedback(session_key, message, workdir=".", run_dir=".", thinking: str | None = None):
+    result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
     print(f"Sent feedback to session {result.session_key}")
 
 
-def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False):
+def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False, thinking: str | None = None):
     session_file = os.path.join(run_dir, ".coder_session")
     current_branch = get_current_branch(workdir)
     latest_commit_hash = get_latest_commit_hash(workdir)
@@ -440,17 +441,17 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         sys.exit(0)
 
     if mode == "revision":
-        send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir)
+        send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir, thinking=thinking)
         return True, session_key
     else:
-        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir)
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
         with open(session_file, "w") as f:
             f.write(result.session_key)
         print(f"Spawned new session {result.session_key} with feedback")
         return False, result.session_key
 
 
-def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_path, system_alert, pr_id, test_mode=False):
+def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_path, system_alert, pr_id, test_mode=False, thinking: str | None = None):
     session_file = os.path.join(run_dir, ".coder_session")
     current_branch = get_current_branch(workdir)
     latest_commit_hash = get_latest_commit_hash(workdir)
@@ -504,10 +505,10 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
         sys.exit(0)
 
     if mode == "system_alert":
-        send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir)
+        send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir, thinking=thinking)
         return True, session_key
     else:
-        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir)
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
         with open(session_file, "w") as f:
             f.write(result.session_key)
         print(f"Spawned new session {result.session_key} with system alert")
@@ -534,6 +535,12 @@ def main():
         default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL),
         help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})",
     )
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
     runtime_dir = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
@@ -554,6 +561,8 @@ def main():
         os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
+
+    resolved_thinking = resolve_thinking(args.thinking)
 
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
@@ -588,11 +597,11 @@ def main():
     session_file = os.path.join(args.run_dir, ".coder_session")
 
     if args.system_alert:
-        handle_system_alert_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.system_alert, pr_id, test_mode=test_mode)
+        handle_system_alert_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.system_alert, pr_id, test_mode=test_mode, thinking=resolved_thinking)
         return
 
     if args.feedback_file:
-        handle_feedback_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.feedback_file, pr_id, test_mode=test_mode)
+        handle_feedback_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.feedback_file, pr_id, test_mode=test_mode, thinking=resolved_thinking)
         return
 
     envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
@@ -622,7 +631,7 @@ def main():
     else:
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
 
-    result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir)
+    result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir, thinking=resolved_thinking)
     if not os.path.exists(session_file):
         with open(session_file, "w") as f:
             f.write(result.session_key)

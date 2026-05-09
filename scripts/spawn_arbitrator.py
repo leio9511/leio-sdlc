@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 from agent_driver import invoke_agent, build_prompt
+from thinking_resolver import resolve_thinking
 import subprocess
 import uuid
 
@@ -12,6 +13,12 @@ def main():
     parser.add_argument("--diff-target", required=True, help="Git diff target range (e.g., origin/master..HEAD)")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
     
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
@@ -23,6 +30,9 @@ def main():
     # API Key Assignment
     from utils_api_key import setup_spawner_api_key
     setup_spawner_api_key(args, __file__)
+    
+    resolved_thinking = resolve_thinking(args.thinking)
+    
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
 
@@ -50,7 +60,7 @@ def main():
     )
     
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-    result = invoke_agent(task_string, session_key=session_id, role='arbitrator')
+    result = invoke_agent(task_string, session_key=session_id, role='arbitrator', thinking=resolved_thinking)
 
     report_path = os.path.join(args.run_dir, "arbitration_report.txt")
     if os.path.exists(report_path):

@@ -5,6 +5,7 @@ import json
 import sys
 from agent_driver import invoke_agent, build_prompt
 from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
+from thinking_resolver import resolve_thinking
 import config
 import subprocess
 import uuid
@@ -22,6 +23,12 @@ def main():
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
     from handoff_prompter import HandoffPrompter
@@ -36,6 +43,8 @@ def main():
         os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
+
+    resolved_thinking = resolve_thinking(args.thinking)
 
     workdir = os.path.abspath(args.workdir)
     os.chdir(workdir)
@@ -194,7 +203,7 @@ def main():
         import time
         print("Calling OpenClaw real API...")
         session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-        result = invoke_agent(task_string, session_key=session_id, role="planner")
+        result = invoke_agent(task_string, session_key=session_id, role="planner", thinking=resolved_thinking)
 
 if __name__ == "__main__":
     main()

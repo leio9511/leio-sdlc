@@ -7,6 +7,7 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 from agent_driver import invoke_agent
+from thinking_resolver import resolve_thinking
 import envelope_assembler
 
 VERIFIER_OUTPUT_SCHEMA = {
@@ -27,10 +28,16 @@ def main():
     parser.add_argument("--prd-files", required=True, help="Comma-separated paths to PRDs")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--out-file", default="uat_report.json", help="Path to output JSON")
-    parser.add_argument("--thinking", choices=["low", "medium", "high", "xhigh"], default="high", help="OpenClaw thinking level")
+    parser.add_argument(
+        "--thinking",
+        choices=["low", "medium", "high", "xhigh"],
+        default=None,
+        help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
+    )
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     
     args = parser.parse_args()
+    resolved_thinking = resolve_thinking(args.thinking)
     import config
     from handoff_prompter import HandoffPrompter
     if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
@@ -84,7 +91,7 @@ def main():
         print(f"🚀 Launching Agentic UAT Verifier...")
         session_id = f"uat_verifier_{int(time.time())}"
         # The verifier agent is instructed in the prompt to use the 'write' tool to save the JSON directly.
-        result = invoke_agent(task_string, session_key=session_id, role="verifier", thinking=args.thinking)
+        result = invoke_agent(task_string, session_key=session_id, role="verifier", thinking=resolved_thinking)
         
         # Verify that the output file was actually created by the agent
         if not os.path.exists(os.path.abspath(args.out_file)):

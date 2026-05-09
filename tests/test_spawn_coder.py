@@ -28,7 +28,7 @@ class TestSpawnCoder(unittest.TestCase):
     def test_send_feedback(self, mock_call):
         mock_call.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
         spawn_coder.send_feedback("sdlc_coder_PR_001", "feedback message")
-        mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".")
+        mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".", thinking=None)
 
     @patch('spawn_coder.get_current_branch', return_value='feature/test')
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
