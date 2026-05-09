@@ -1,3 +1,15 @@
+"""Preflight ignore-manifest contract tests.
+
+This module is a regression guard for PR-002: it locks in the contract that
+the repaired portability pytest targets are no longer quarantined by
+preflight and that the checked-in ``ignore_tests.json`` remains the
+source of truth consumed by ``preflight.sh``.
+
+If either targeted test is re-added to the ignore manifest, or if the
+manifest is malformed, or if preflight stops consuming the repo-root
+manifest, these tests will fail.
+"""
+
 from __future__ import annotations
 
 import json
@@ -81,6 +93,13 @@ def _run_preflight(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_targeted_portability_pytests_are_not_quarantined():
+    """The checked-in ignore manifest must parse cleanly and must NOT
+    quarantine either of the repaired portability pytest targets.
+
+    Validates manifest shape (must be a dict with exactly ``bash`` and
+    ``pytest`` keys whose values are arrays of strings) to prevent a
+    fake fix via malformed JSON, deleted keys, or non-array values.
+    """
     manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
 
     assert isinstance(manifest, dict)
@@ -93,6 +112,11 @@ def test_targeted_portability_pytests_are_not_quarantined():
 
 
 def test_preflight_source_of_truth_still_consumes_repo_ignore_manifest(tmp_path: Path):
+    """Verify that ``preflight.sh`` reads the repo-root ``ignore_tests.json``
+    and translates each ``pytest`` entry into a ``--ignore=...`` argument so
+    that re-addition of the targeted paths would be a detectable regression
+    rather than a silent quarantine.
+    """
     preflight_script = SOURCE_PREFLIGHT.read_text(encoding="utf-8")
     assert 'IGNORE_MANIFEST="$PROJECT_DIR/ignore_tests.json"' in preflight_script
     assert 'PYTEST_IGNORE_ARGS+=("--ignore=$ignored_path")' in preflight_script
@@ -105,3 +129,7 @@ def test_preflight_source_of_truth_still_consumes_repo_ignore_manifest(tmp_path:
     assert "debt-quarantine green" in result.stdout
     assert "ignored test was executed" not in result.stdout
     assert order_log == "allowed-ran\n"
+
+    # Verify the quarantine count matches the manifest: 1 pytest entry
+    # was ignored, confirming preflight consumed it from ignore_tests.json.
+    assert "1 pytest target(s)" in result.stdout
