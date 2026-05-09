@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--prd-files", required=True, help="Comma-separated paths to PRDs")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--out-file", default="uat_report.json", help="Path to output JSON")
+    parser.add_argument("--thinking", choices=["low", "medium", "high", "xhigh"], default="high", help="OpenClaw thinking level")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     
     args = parser.parse_args()
@@ -83,7 +84,7 @@ def main():
         print(f"🚀 Launching Agentic UAT Verifier...")
         session_id = f"uat_verifier_{int(time.time())}"
         # The verifier agent is instructed in the prompt to use the 'write' tool to save the JSON directly.
-        result = invoke_agent(task_string, session_key=session_id, role="verifier")
+        result = invoke_agent(task_string, session_key=session_id, role="verifier", thinking=args.thinking)
         
         # Verify that the output file was actually created by the agent
         if not os.path.exists(os.path.abspath(args.out_file)):

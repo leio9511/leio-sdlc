@@ -840,6 +840,7 @@ def main():
                     
                     uat_cmd = [
                         sys.executable, os.path.join(RUNTIME_DIR, "spawn_verifier.py"),
+                        "--thinking", resolved_thinking,
                         "--prd-files", prd_files_str,
                         "--workdir", workdir,
                         "--out-file", uat_out_file
