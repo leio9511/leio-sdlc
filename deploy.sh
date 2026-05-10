@@ -8,12 +8,26 @@ set -e
 # Hard Copy (Physical Sync) with Atomic Renaming
 
 perform_hard_copy_deployment() {
-    local SLUG=$(basename "$PWD")
-    local HOME_DIR="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_DIR="$HOME_DIR/.openclaw"
-    local SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_DIR/skills}"
-    local RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+    local SLUG
+    SLUG=$(basename "$PWD")
+
+    local HOME_ROOT
+    if [ -n "${HOME_MOCK:-}" ]; then
+        HOME_ROOT="$HOME_MOCK"
+    else
+        HOME_ROOT="$HOME"
+    fi
+
+    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
+    local RELEASES_ROOT="$OPENCLAW_HOME/.releases"
+    local SKILLS_DIR
+    if [ -n "${HOME_MOCK:-}" ]; then
+        SKILLS_DIR="$OPENCLAW_HOME/skills"
+    else
+        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
+    fi
     local PROD_DIR="$SKILLS_DIR/$SLUG"
+    local RELEASES_DIR="$RELEASES_ROOT/$SLUG"
 
     local RUN_TESTS=false
     local DRY_RUN=false
@@ -58,12 +72,13 @@ perform_hard_copy_deployment() {
     fi
 
     mkdir -p "$SKILLS_DIR"
-    mkdir -p "$RELEASES_DIR"
 
-    local RELEASE_ID=$(date +"%Y%m%d_%H%M%S")
+    local RELEASE_ID
+    RELEASE_ID=$(date +"%Y%m%d_%H%M%S")
 
     # 1. Backup Existing
     if [ -e "$PROD_DIR" ]; then
+        mkdir -p "$RELEASES_DIR"
         echo "📦 Backing up existing installation..."
         if [ -L "$PROD_DIR" ]; then
             echo "⚠️ Target is a symlink, removing it instead of backing up."
@@ -98,6 +113,7 @@ perform_hard_copy_deployment() {
     local HOT_CONFIG=""
     if [ -f "$PROD_DIR/config/sdlc_config.json" ]; then
         echo "💾 Preserving existing config/sdlc_config.json..."
+        mkdir -p "$RELEASES_DIR"
         HOT_CONFIG="$RELEASES_DIR/sdlc_config_hot_${RELEASE_ID}.json"
         cp "$PROD_DIR/config/sdlc_config.json" "$HOT_CONFIG"
     fi
@@ -108,14 +124,14 @@ perform_hard_copy_deployment() {
         mv "$PROD_DIR" "$OLD_DIR"
     fi
     mv -T "$TMP_DIR" "$PROD_DIR"
-    
+
     # Restore Hot Config (PRD-1088)
     if [ -n "$HOT_CONFIG" ] && [ -f "$HOT_CONFIG" ]; then
         echo "💾 Restoring config/sdlc_config.json..."
         mkdir -p "$PROD_DIR/config"
         mv "$HOT_CONFIG" "$PROD_DIR/config/sdlc_config.json"
     fi
-    
+
     rm -rf "$OLD_DIR"
 
     # 4. Auto-Cleanup
@@ -126,11 +142,11 @@ perform_hard_copy_deployment() {
 
     # 5. GitHub Auto-Sync (PRD-035)
     local SYNC_SCRIPT="$SKILLS_DIR/leio-github-sync/scripts/sync.py"
-    if [ -f "$SYNC_SCRIPT" ] && [ -z "$HOME_MOCK" ]; then
+    if [ -f "$SYNC_SCRIPT" ] && [ -z "${HOME_MOCK:-}" ]; then
         echo "🌐 Synchronizing code to GitHub..."
         python3 "$SYNC_SCRIPT" --project-dir "$PWD" || echo "⚠️ GitHub sync failed but deployment succeeded."
     fi
-    
+
     # 6. Install Git Hooks
     if [ -d ".sdlc_hooks" ]; then
         echo "🎣 Installing Git hooks..."
@@ -141,7 +157,7 @@ perform_hard_copy_deployment() {
     if command -v gemini >/dev/null 2>&1; then
         echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
         # Added --consent to avoid stalling during headless deploy
-        gemini skills link "$PROD_DIR"  --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
+        gemini skills link "$PROD_DIR" --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
     fi
 }
 

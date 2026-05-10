@@ -11,6 +11,7 @@ package.json
 *.diff
 .review_count
 .sdlc/
+.sdlc_runs/
 .tmp/
 kit-deploy.sh
 deploy.sh

@@ -1,11 +1,25 @@
 #!/bin/bash
+cd "$(dirname "$0")" || exit 1
 set -e
+
 SLUG="pm-skill"
-HOME_DIR="${HOME_MOCK:-$HOME}"
-OPENCLAW_DIR="$HOME_DIR/.openclaw"
-SKILLS_DIR="$OPENCLAW_DIR/skills"
-RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+
+HOME_ROOT=""
+if [ -n "${HOME_MOCK:-}" ]; then
+    HOME_ROOT="$HOME_MOCK"
+else
+    HOME_ROOT="$HOME"
+fi
+
+OPENCLAW_HOME="$HOME_ROOT/.openclaw"
+RELEASES_ROOT="$OPENCLAW_HOME/.releases"
+if [ -n "${HOME_MOCK:-}" ]; then
+    SKILLS_DIR="$OPENCLAW_HOME/skills"
+else
+    SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
+fi
 PROD_DIR="$SKILLS_DIR/$SLUG"
+RELEASES_DIR="$RELEASES_ROOT/$SLUG"
 
 NO_RESTART=false
 for arg in "$@"; do
@@ -18,11 +32,16 @@ for arg in "$@"; do
 done
 
 echo "Deploying $SLUG..."
+
+if [ -f "scripts/build_release.sh" ]; then
+    bash "scripts/build_release.sh"
+fi
+
 mkdir -p "$SKILLS_DIR"
-mkdir -p "$RELEASES_DIR"
 RELEASE_ID=$(date +"%Y%m%d_%H%M%S")
 
 if [ -e "$PROD_DIR" ]; then
+    mkdir -p "$RELEASES_DIR"
     if [ -L "$PROD_DIR" ]; then
         rm -f "$PROD_DIR"
     else
@@ -35,13 +54,16 @@ OLD_DIR="$SKILLS_DIR/.old_$SLUG"
 rm -rf "$TMP_DIR" "$OLD_DIR"
 mkdir -p "$TMP_DIR"
 
-# Stage the skill directory
-rsync -a --exclude=.git --exclude=__pycache__ skills/$SLUG/ "$TMP_DIR/"
+if [ -d "dist" ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+    cp -a dist/. "$TMP_DIR/"
+else
+    rsync -a --exclude=.git --exclude=__pycache__ ./ "$TMP_DIR/"
+fi
 
-# Package dependencies from monorepo root
+# Package shared dependencies from monorepo root
 mkdir -p "$TMP_DIR/scripts"
-cp scripts/agent_driver.py "$TMP_DIR/scripts/"
-cp scripts/utils_notification.py "$TMP_DIR/scripts/"
+cp ../../scripts/agent_driver.py "$TMP_DIR/scripts/"
+cp ../../scripts/utils_notification.py "$TMP_DIR/scripts/"
 
 if [ -e "$PROD_DIR" ]; then
     mv "$PROD_DIR" "$OLD_DIR"
