@@ -4,6 +4,7 @@ import subprocess
 from deploy_test_support import (
     ROOT_SKILL_SLUG,
     assert_isolated_checkout,
+    canonical_openclaw_home,
     canonical_releases_dir,
     canonical_skill_dir,
     isolated_repo_env,
@@ -127,3 +128,28 @@ def test_rollback_lock_guardrails():
             assert "[FATAL_LOCK] Cannot rollback while another SDLC pipeline is active" in result.stdout
 
             os.remove(lock_path)
+
+
+def test_rollback_reports_missing_backup_tarballs_for_root_and_pm_skill():
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    with isolated_repo_env(repo_root) as isolated:
+        isolated_root = isolated["repo_root"]
+        mock_home = isolated["mock_home"]
+        env = isolated["env"]
+
+        assert_isolated_checkout(isolated_root)
+
+        openclaw_home = canonical_openclaw_home(mock_home)
+        for slug, rollback_script in (
+            (ROOT_SKILL_SLUG, os.path.join(isolated_root, "scripts", "rollback.sh")),
+            (PM_SLUG, os.path.join(isolated_root, "skills", "pm-skill", "rollback.sh")),
+        ):
+            releases_dir = canonical_releases_dir(mock_home, slug)
+            os.makedirs(releases_dir, exist_ok=True)
+
+            result = _run(["bash", rollback_script, "--no-restart"], env=env, cwd=isolated_root)
+            assert result.returncode != 0
+            assert f"No backup tarballs found in {releases_dir}" in result.stdout
+            assert result.stderr == ""
+            assert os.path.isdir(openclaw_home)

@@ -22,6 +22,17 @@ resolve_skills_dir() {
     fi
 }
 
+latest_backup_path() {
+    local releases_dir="$1"
+    local backup_candidates=("$releases_dir"/backup_*.tar.gz)
+
+    if [ ! -e "${backup_candidates[0]}" ]; then
+        return 1
+    fi
+
+    printf '%s\n' "${backup_candidates[@]}" | sort -r | head -n 1
+}
+
 perform_hard_copy_rollback() {
     local SLUG="pm-skill"
     local HOME_ROOT
@@ -51,9 +62,8 @@ perform_hard_copy_rollback() {
         exit 1
     fi
 
-    local LATEST_BACKUP
-    LATEST_BACKUP=$(ls -t "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | head -n 1)
-    if [ -z "$LATEST_BACKUP" ]; then
+    local LATEST_BACKUP=""
+    if ! LATEST_BACKUP="$(latest_backup_path "$RELEASES_DIR")"; then
         echo "❌ No backup tarballs found in $RELEASES_DIR"
         exit 1
     fi
