@@ -1,13 +1,19 @@
 import os
 import sys
 import subprocess
+import tempfile
 from pathlib import Path
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ORCHESTRATOR_SCRIPT = REPO_ROOT / "scripts" / "orchestrator.py"
+
+sys.path.insert(0, str(REPO_ROOT / "tests"))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from planner_test_support import seed_planner_success_artifacts, seeded_job_dir_glob_side_effect
 
 
 @pytest.fixture(autouse=True)
@@ -18,10 +24,6 @@ def reset_cwd():
         yield
     finally:
         os.chdir(original_cwd)
-
-
-# Assuming orchestrator is importable or we can test it using subprocess / module import
-sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 
 def test_invalid_strategy():
@@ -55,149 +57,99 @@ def test_missing_workdir():
     assert result.returncode != 0
     assert "the following arguments are required: --workdir" in result.stderr
 
-import pytest
 
-@patch('orchestrator.teardown_coder_session')
-@patch('orchestrator.subprocess.run')
-@patch('orchestrator.safe_git_checkout')
-@patch('orchestrator.glob.glob')
-@patch('orchestrator.os.path.exists')
-@patch('orchestrator.set_pr_status')
-@patch('fcntl.flock')
-@patch('shutil.rmtree')
-@patch('shutil.copytree')
-@patch('orchestrator.open')
-@patch('git_utils.check_git_boundary')
-def test_always_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
+def _mock_subprocess_run_for_strategy(spawn_coder_returncode=0):
+    def _side_effect(cmd, *args, **kwargs):
+        result = MagicMock()
+        result.stdout = ""
+        result.stderr = ""
+        result.returncode = 0
+        if isinstance(cmd, list):
+            if cmd[:3] == ["git", "rev-parse", "HEAD"]:
+                result.stdout = "deadbeef\n"
+            elif cmd[:3] == ["git", "status", "--porcelain"]:
+                result.stdout = ""
+            elif "spawn_coder.py" in cmd:
+                result.returncode = spawn_coder_returncode
+        return result
+
+    return _side_effect
+
+
+def _run_strategy_test(strategy: str, spawn_coder_returncode: int):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
     import orchestrator
-    
-    mock_exists.return_value = True
-    mock_glob.return_value = ["dummy_pr.md"]
-    import builtins
-    original_open = builtins.open
-    def mock_open_impl(file, *args, **kwargs):
-        if str(file).endswith('.md'):
-            m = MagicMock()
-            m.__enter__.return_value.read.return_value = "status: in_progress\n"
-            return m
-        return original_open(file, *args, **kwargs)
-    mock_open.side_effect = mock_open_impl
-    
-    def mock_run_impl(*args, **kwargs):
-        if "status" in args[0] and "--porcelain" in args[0]:
-            return MagicMock(stdout="", returncode=0)
-        if "rev-parse" in args[0] and "--abbrev-ref" in args[0]:
-            return MagicMock(stdout="master\n", returncode=0)
-        if "spawn_coder.py" in args[0]:
-            return MagicMock(returncode=1) # Fail once to trigger State 5 path
-        return MagicMock(returncode=0)
-    mock_run.side_effect = mock_run_impl
-    
-    with patch('sys.argv', ['orchestrator.py', '--force-replan', 'true', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'always', '--max-prs-to-process', '1']):
-        try:
-            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
-                orchestrator.main()
-        except SystemExit:
-            pass
-            
-    from unittest.mock import ANY
-    mock_teardown.assert_called_with(os.path.abspath("."), ANY)    
-import pytest
 
-@patch('orchestrator.teardown_coder_session')
-@patch('orchestrator.subprocess.run')
-@patch('orchestrator.safe_git_checkout')
-@patch('orchestrator.glob.glob')
-@patch('orchestrator.os.path.exists')
-@patch('orchestrator.set_pr_status')
-@patch('fcntl.flock')
-@patch('shutil.rmtree')
-@patch('shutil.copytree')
-@patch('orchestrator.open')
-@patch('git_utils.check_git_boundary')
-def test_per_pr_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
-    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
-    os.environ["SDLC_TEST_MODE"] = "true"
-    import orchestrator
-    
-    mock_exists.return_value = True
-    mock_glob.return_value = ["dummy_pr.md"]
-    import builtins
-    original_open = builtins.open
-    def mock_open_impl(file, *args, **kwargs):
-        if str(file).endswith('.md'):
-            m = MagicMock()
-            m.__enter__.return_value.read.return_value = "status: in_progress\n"
-            return m
-        return original_open(file, *args, **kwargs)
-    mock_open.side_effect = mock_open_impl
-    
-    def mock_run_impl(*args, **kwargs):
-        if "status" in args[0] and "--porcelain" in args[0]:
-            return MagicMock(stdout="", returncode=0)
-        if "rev-parse" in args[0] and "--abbrev-ref" in args[0]:
-            return MagicMock(stdout="master\n", returncode=0)
-        return MagicMock(returncode=0)
-    mock_run.side_effect = mock_run_impl
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workdir = temp_dir
+        global_dir = temp_dir
+        os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+        seeded = seed_planner_success_artifacts(
+            workdir,
+            global_dir,
+            prd_filename="dummy.md",
+            pr_slice_content="status: in_progress\n",
+        )
 
-    with patch('sys.argv', ['orchestrator.py', '--force-replan', 'true', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'per-pr', '--max-prs-to-process', '1']):
-        try:
-            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
-                orchestrator.main()
-        except SystemExit:
-            pass
-            
-    from unittest.mock import ANY
-    mock_teardown.assert_called_with(os.path.abspath("."), ANY)
-import pytest
+        with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+             patch("orchestrator.subprocess.run") as mock_run, \
+             patch("orchestrator.safe_git_checkout"), \
+             patch("orchestrator.glob.glob") as mock_glob, \
+             patch("orchestrator.set_pr_status"), \
+             patch("git_utils.check_git_boundary"), \
+             patch("agent_driver.send_ignition_handshake"), \
+             patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+            mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
+            mock_run.side_effect = _mock_subprocess_run_for_strategy(
+                spawn_coder_returncode=spawn_coder_returncode
+            )
 
-@patch('orchestrator.teardown_coder_session')
-@patch('orchestrator.subprocess.run')
-@patch('orchestrator.safe_git_checkout')
-@patch('orchestrator.glob.glob')
-@patch('orchestrator.os.path.exists')
-@patch('orchestrator.set_pr_status')
-@patch('fcntl.flock')
-@patch('shutil.rmtree')
-@patch('shutil.copytree')
-@patch('orchestrator.open')
-@patch('git_utils.check_git_boundary')
-def test_on_escalation_strategy(mock_check_git, mock_open, mock_copytree, mock_rmtree, mock_flock, mock_set_pr_status, mock_exists, mock_glob, mock_safe_checkout, mock_run, mock_teardown):
-    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
-    os.environ["SDLC_TEST_MODE"] = "true"
-    import orchestrator
-    
-    mock_exists.return_value = True
-    mock_glob.return_value = ["dummy_pr.md"]
-    import builtins
-    original_open = builtins.open
-    def mock_open_impl(file, *args, **kwargs):
-        if str(file).endswith('.md'):
-            m = MagicMock()
-            m.__enter__.return_value.read.return_value = "status: in_progress\n"
-            return m
-        return original_open(file, *args, **kwargs)
-    mock_open.side_effect = mock_open_impl
-    
-    def mock_run_impl(*args, **kwargs):
-        if "status" in args[0] and "--porcelain" in args[0]:
-            return MagicMock(stdout="", returncode=0)
-        if "rev-parse" in args[0] and "--abbrev-ref" in args[0]:
-            return MagicMock(stdout="master\n", returncode=0)
-        if "spawn_coder.py" in args[0]:
-            return MagicMock(returncode=1) # Fail to trigger escalation
-        return MagicMock(returncode=0)
-        
-    mock_run.side_effect = mock_run_impl
-    
-    with patch('sys.argv', ['orchestrator.py', '--force-replan', 'true', '--enable-exec-from-workspace', '--workdir', '.', '--prd-file', 'dummy.md', '--channel', 'test', '--coder-session-strategy', 'on-escalation', '--max-prs-to-process', '1']):
-        try:
-            with patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
-                orchestrator.main()
-        except SystemExit:
-            pass
-            
-    from unittest.mock import ANY
-    mock_teardown.assert_called_with(os.path.abspath("."), ANY)
+            with patch(
+                "sys.argv",
+                [
+                    "orchestrator.py",
+                    "--force-replan",
+                    "false",
+                    "--enable-exec-from-workspace",
+                    "--workdir",
+                    workdir,
+                    "--prd-file",
+                    "dummy.md",
+                    "--channel",
+                    "test",
+                    "--global-dir",
+                    global_dir,
+                    "--coder-session-strategy",
+                    strategy,
+                    "--max-prs-to-process",
+                    "1",
+                ],
+            ):
+                try:
+                    orchestrator.main()
+                except SystemExit:
+                    pass
+
+        mock_teardown.assert_called_with(workdir, ANY)
+
+
+@patch("fcntl.flock")
+@patch("shutil.rmtree")
+@patch("shutil.copytree")
+def test_always_strategy(_mock_copytree, _mock_rmtree, _mock_flock):
+    _run_strategy_test("always", spawn_coder_returncode=1)
+
+
+@patch("fcntl.flock")
+@patch("shutil.rmtree")
+@patch("shutil.copytree")
+def test_per_pr_strategy(_mock_copytree, _mock_rmtree, _mock_flock):
+    _run_strategy_test("per-pr", spawn_coder_returncode=0)
+
+
+@patch("fcntl.flock")
+@patch("shutil.rmtree")
+@patch("shutil.copytree")
+def test_on_escalation_strategy(_mock_copytree, _mock_rmtree, _mock_flock):
+    _run_strategy_test("on-escalation", spawn_coder_returncode=1)
