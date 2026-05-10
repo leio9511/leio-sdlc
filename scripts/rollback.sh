@@ -1,19 +1,35 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT" || exit 1
+
 # ==========================================
 # BOOTSTRAP: ROLLBACK SCRIPT
 # ==========================================
 # Rollback Hard Copy (Physical Sync)
 
 perform_hard_copy_rollback() {
-    local SLUG=$(basename "$PWD")
-    local HOME_DIR="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_DIR="${SDLC_SKILLS_ROOT:-${HOME_MOCK:-$HOME}/.openclaw/skills}"
-    local SKILLS_DIR="$OPENCLAW_DIR"
-    local RELEASES_DIR="$HOME_DIR/.openclaw/.releases/$SLUG"
+    local SLUG="leio-sdlc"
+    local HOME_ROOT
+    if [ -n "$HOME_MOCK" ]; then
+        HOME_ROOT="$HOME_MOCK"
+    else
+        HOME_ROOT="$HOME"
+    fi
+
+    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
+    local RELEASES_ROOT="$OPENCLAW_HOME/.releases"
+    local SKILLS_DIR
+    if [ -n "$HOME_MOCK" ]; then
+        SKILLS_DIR="$OPENCLAW_HOME/skills"
+    else
+        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
+    fi
+    local RELEASES_DIR="$RELEASES_ROOT/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
-    
+
     local NO_RESTART=false
     for arg in "$@"; do
         case $arg in
@@ -31,7 +47,8 @@ perform_hard_copy_rollback() {
         exit 1
     fi
 
-    local LATEST_BACKUP=$(ls -t "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | head -n 1)
+    local LATEST_BACKUP
+    LATEST_BACKUP=$(ls -t "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | head -n 1)
 
     if [ -z "$LATEST_BACKUP" ]; then
         echo "❌ No backup tarballs found in $RELEASES_DIR"
@@ -47,10 +64,15 @@ perform_hard_copy_rollback() {
         exit 1
     fi
 
+    mkdir -p "$SKILLS_DIR"
+
     # 1. Clear current production directory safely
     local OLD_DIR="$SKILLS_DIR/.old_$SLUG"
     rm -rf "$OLD_DIR"
-    if [ -e "$PROD_DIR" ]; then
+    if [ -L "$PROD_DIR" ]; then
+        echo "🗑️ Removing symlinked production directory before restore..."
+        rm -f "$PROD_DIR"
+    elif [ -e "$PROD_DIR" ]; then
         echo "🗑️ Moving broken directory out of the way..."
         mv "$PROD_DIR" "$OLD_DIR"
     fi

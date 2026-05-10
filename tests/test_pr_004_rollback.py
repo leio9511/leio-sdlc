@@ -1,111 +1,129 @@
 import os
 import subprocess
-import tempfile
-import pytest
+from pathlib import Path
 
-import pytest
+from deploy_test_support import isolated_repo_env
+
+
+ROOT_SLUG = "leio-sdlc"
+PM_SLUG = "pm-skill"
+MODIFIED_MARKER = "MODIFIED_MARKER"
+LOCK_FILES = (".sdlc_repo.lock", ".coder_session", ".sdlc_lock_manifest.json")
+
+
+def _canonical_skill_dir(mock_home: str, slug: str) -> str:
+    return os.path.join(mock_home, ".openclaw", "skills", slug)
+
+
+def _canonical_releases_dir(mock_home: str, slug: str) -> str:
+    return os.path.join(mock_home, ".openclaw", ".releases", slug)
+
+
+def _run(command: list[str], *, env: dict[str, str], cwd: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, env=env, cwd=cwd, capture_output=True, text=True)
 
 
 def test_independent_symmetrical_rollbacks():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    
-    with tempfile.TemporaryDirectory() as mock_home:
-        env = os.environ.copy()
-        env["HOME_MOCK"] = mock_home
-        
-        # 1. Run first deployment
-        deploy_script = os.path.join(repo_root, "kit-deploy.sh")
-        res = subprocess.run(["bash", deploy_script], env=env, cwd=repo_root, capture_output=True, text=True)
-        assert res.returncode == 0, f"First kit-deploy.sh failed: {res.stderr}"
 
-        # 2. Run second deployment to create the backup archives of the first installation
-        res = subprocess.run(["bash", deploy_script], env=env, cwd=repo_root, capture_output=True, text=True)
-        assert res.returncode == 0, f"Second kit-deploy.sh failed: {res.stderr}"
-        
-        # Modify installed files slightly to verify rollback overwrites them
-        skills_dir = os.path.join(mock_home, ".openclaw", "skills")
-        for skill in ["leio-sdlc", "pm-skill"]:
-            skill_path = os.path.join(skills_dir, skill)
-            marker = os.path.join(skill_path, "MODIFIED_MARKER")
-            with open(marker, "w") as f:
-                f.write("modified")
-                
-        # 3. Run rollbacks
-        scripts = [
-            ("leio-sdlc", os.path.join(repo_root, "scripts", "rollback.sh")),
-            ("pm-skill", os.path.join(repo_root, "skills", "pm-skill", "rollback.sh")),
-            
-        ]
-        
-        for skill_name, script_path in scripts:
-            assert os.path.exists(script_path), f"{script_path} does not exist"
-            # Ensure --no-restart is supported and runs successfully
-            res = subprocess.run(["bash", script_path, "--no-restart"], env=env, cwd=repo_root, capture_output=True, text=True)
-            assert res.returncode == 0, f"Rollback failed for {skill_name}:\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
-            
-            # Verify marker is gone (rollback replaced the directory from tarball)
-            skill_path = os.path.join(skills_dir, skill_name)
-            marker = os.path.join(skill_path, "MODIFIED_MARKER")
-            assert not os.path.exists(marker), f"Rollback did not restore {skill_name} cleanly (marker still exists)"
-            
-            # Ensure basic structure exists
-            if skill_name == "leio-sdlc":
-                assert os.path.exists(os.path.join(skill_path, "scripts", "orchestrator.py"))
-            elif skill_name == "pm-skill":
-                assert os.path.exists(os.path.join(skill_path, "scripts", "init_prd.py"))            
+    with isolated_repo_env(repo_root) as isolated:
+        isolated_root = isolated["repo_root"]
+        mock_home = isolated["mock_home"]
+        env = isolated["env"]
+
+        assert Path(isolated_root).name != ROOT_SLUG
+        assert env["HOME_MOCK"] == mock_home
+
+        deploy_script = os.path.join(isolated_root, "kit-deploy.sh")
+        root_rollback = os.path.join(isolated_root, "scripts", "rollback.sh")
+        pm_rollback = os.path.join(isolated_root, "skills", "pm-skill", "rollback.sh")
+
+        first = _run(["bash", deploy_script], env=env, cwd=isolated_root)
+        assert first.returncode == 0, f"First kit-deploy.sh failed:\nSTDOUT: {first.stdout}\nSTDERR: {first.stderr}"
+
+        second = _run(["bash", deploy_script], env=env, cwd=isolated_root)
+        assert second.returncode == 0, f"Second kit-deploy.sh failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
+
+        for slug in (ROOT_SLUG, PM_SLUG):
+            releases_dir = _canonical_releases_dir(mock_home, slug)
+            skill_dir = _canonical_skill_dir(mock_home, slug)
+            assert os.path.isdir(releases_dir), f"Releases dir missing for {slug}: {releases_dir}"
+            assert any(name.startswith("backup_") and name.endswith(".tar.gz") for name in os.listdir(releases_dir))
+            marker = os.path.join(skill_dir, MODIFIED_MARKER)
+            with open(marker, "w", encoding="utf-8") as handle:
+                handle.write("modified")
+            assert os.path.exists(marker)
+
+        root_result = _run(["bash", root_rollback, "--no-restart"], env=env, cwd=isolated_root)
+        assert root_result.returncode == 0, (
+            f"Rollback failed for {ROOT_SLUG}:\nSTDOUT: {root_result.stdout}\nSTDERR: {root_result.stderr}"
+        )
+
+        pm_result = _run(["bash", pm_rollback, "--no-restart"], env=env, cwd=isolated_root)
+        assert pm_result.returncode == 0, (
+            f"Rollback failed for {PM_SLUG}:\nSTDOUT: {pm_result.stdout}\nSTDERR: {pm_result.stderr}"
+        )
+
+        root_skill_dir = _canonical_skill_dir(mock_home, ROOT_SLUG)
+        pm_skill_dir = _canonical_skill_dir(mock_home, PM_SLUG)
+        assert not os.path.exists(os.path.join(root_skill_dir, MODIFIED_MARKER))
+        assert not os.path.exists(os.path.join(pm_skill_dir, MODIFIED_MARKER))
+        assert os.path.exists(os.path.join(root_skill_dir, "scripts", "orchestrator.py"))
+        assert os.path.exists(os.path.join(pm_skill_dir, "scripts", "init_prd.py"))
+
 
 def test_rollback_no_restart_with_mock():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    
-    with tempfile.TemporaryDirectory() as mock_home:
-        env = os.environ.copy()
-        env["HOME_MOCK"] = mock_home
-        
-        # 1. Run first deployment
-        deploy_script = os.path.join(repo_root, "kit-deploy.sh")
-        res = subprocess.run(["bash", deploy_script], env=env, cwd=repo_root, capture_output=True, text=True)
-        assert res.returncode == 0, f"kit-deploy.sh failed: {res.stderr}"
 
-        # 2. Run second deployment to create the backup
-        res = subprocess.run(["bash", deploy_script], env=env, cwd=repo_root, capture_output=True, text=True)
-        assert res.returncode == 0, f"Second kit-deploy.sh failed: {res.stderr}"
-        
-        # 3. Run rollback
-        script_path = os.path.join(repo_root, "scripts", "rollback.sh")
-        res = subprocess.run(["bash", script_path], env=env, cwd=repo_root, capture_output=True, text=True)
-        assert res.returncode == 0, f"Rollback failed: {res.stderr}"
-        
-        # Verify that it skipped restarting OpenClaw
-        assert "Skipping OpenClaw gateway restart (mock environment detected)..." in res.stdout, "Gateway restart was not skipped"
+    with isolated_repo_env(repo_root) as isolated:
+        isolated_root = isolated["repo_root"]
+        mock_home = isolated["mock_home"]
+        env = isolated["env"]
+
+        deploy_script = os.path.join(isolated_root, "kit-deploy.sh")
+        root_rollback = os.path.join(isolated_root, "scripts", "rollback.sh")
+
+        first = _run(["bash", deploy_script], env=env, cwd=isolated_root)
+        assert first.returncode == 0, f"First kit-deploy.sh failed:\nSTDOUT: {first.stdout}\nSTDERR: {first.stderr}"
+
+        second = _run(["bash", deploy_script], env=env, cwd=isolated_root)
+        assert second.returncode == 0, f"Second kit-deploy.sh failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
+
+        marker = os.path.join(_canonical_skill_dir(mock_home, ROOT_SLUG), MODIFIED_MARKER)
+        with open(marker, "w", encoding="utf-8") as handle:
+            handle.write("modified")
+
+        result = _run(["bash", root_rollback], env=env, cwd=isolated_root)
+        assert result.returncode == 0, f"Rollback failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+        assert "Skipping OpenClaw gateway restart (mock environment detected)..." in result.stdout
+        assert not os.path.exists(marker)
+
 
 def test_rollback_lock_guardrails():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    
-    with tempfile.TemporaryDirectory() as mock_home:
-        env = os.environ.copy()
-        env["HOME_MOCK"] = mock_home
-        
-        # 1. Setup mock installation
-        skills_dir = os.path.join(mock_home, ".openclaw", "skills")
-        os.makedirs(skills_dir, exist_ok=True)
-        leio_sdlc_dir = os.path.join(skills_dir, "leio-sdlc")
-        os.makedirs(leio_sdlc_dir, exist_ok=True)
-        
-        releases_dir = os.path.join(mock_home, ".openclaw", ".releases", "leio-sdlc")
-        os.makedirs(releases_dir, exist_ok=True)
-        # Create a dummy backup
-        subprocess.run(["tar", "-czf", os.path.join(releases_dir, "backup_20230101_000000.tar.gz"), "-C", skills_dir, "leio-sdlc"])
-        
-        rollback_script = os.path.join(repo_root, "scripts", "rollback.sh")
-        
-        # Test each lock file
-        for lock_file in [".sdlc_repo.lock", ".coder_session", ".sdlc_lock_manifest.json"]:
-            lock_path = os.path.join(leio_sdlc_dir, lock_file)
-            with open(lock_path, "w") as f:
-                f.write("locked")
-            
-            res = subprocess.run(["bash", rollback_script, "--no-restart"], env=env, cwd=leio_sdlc_dir, capture_output=True, text=True)
-            assert res.returncode != 0, f"Rollback should have failed due to {lock_file}"
-            assert "[FATAL_LOCK] Cannot rollback while another SDLC pipeline is active" in res.stdout
-            
+
+    with isolated_repo_env(repo_root) as isolated:
+        isolated_root = isolated["repo_root"]
+        mock_home = isolated["mock_home"]
+        env = isolated["env"]
+
+        deploy_script = os.path.join(isolated_root, "deploy.sh")
+        rollback_script = os.path.join(isolated_root, "scripts", "rollback.sh")
+
+        first = _run(["bash", deploy_script, "--no-restart"], env=env, cwd=isolated_root)
+        assert first.returncode == 0, f"First deploy failed:\nSTDOUT: {first.stdout}\nSTDERR: {first.stderr}"
+
+        second = _run(["bash", deploy_script, "--no-restart"], env=env, cwd=isolated_root)
+        assert second.returncode == 0, f"Second deploy failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
+
+        prod_dir = _canonical_skill_dir(mock_home, ROOT_SLUG)
+        for lock_file in LOCK_FILES:
+            lock_path = os.path.join(prod_dir, lock_file)
+            with open(lock_path, "w", encoding="utf-8") as handle:
+                handle.write("locked")
+
+            result = _run(["bash", rollback_script, "--no-restart"], env=env, cwd=isolated_root)
+            assert result.returncode != 0, f"Rollback should have failed due to {lock_file}"
+            assert "[FATAL_LOCK] Cannot rollback while another SDLC pipeline is active" in result.stdout
+
             os.remove(lock_path)
