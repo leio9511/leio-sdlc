@@ -11,13 +11,19 @@ Tests use unittest.mock.patch extensively to avoid real LLM calls and
 subprocess execution while still validating parameter propagation.
 """
 
+import glob as stdlib_glob
 import os
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
+REAL_GLOB = stdlib_glob.glob
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+
+from planner_test_support import seed_planner_success_artifacts
 
 
 # ============================================================================
@@ -72,8 +78,8 @@ class TestE2EThinkingPropagation(unittest.TestCase):
         for p in patches.values():
             p.stop()
 
-    def _setup_mocks_for_run(self, mocks):
-        """Configure drun, dpopen, and glob for a clean orchestrator run."""
+    def _setup_mocks_for_run(self, mocks, workdir, global_dir, prd_filename="dummy_prd.md"):
+        """Configure drun, dpopen, and planner-success artifacts for a clean run."""
         def dummy_drun(cmd, *args, **kwargs):
             res = MagicMock()
             res.stdout = "main\n" if isinstance(cmd, list) and "branch" in cmd else ""
@@ -83,9 +89,14 @@ class TestE2EThinkingPropagation(unittest.TestCase):
 
         mock_proc = MagicMock()
         mock_proc.returncode = 0
-        mocks["dpopen"].return_value = mock_proc
 
-        mocks["glob"].return_value = []
+        def dpopen_side_effect(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                seed_planner_success_artifacts(workdir, global_dir, prd_filename)
+            return mock_proc
+
+        mocks["dpopen"].side_effect = dpopen_side_effect
+        mocks["glob"].side_effect = REAL_GLOB
         mocks["extract_json"].return_value = {"overall_assessment": "EXCELLENT"}
 
     def _get_planner_calls(self, mocks):
@@ -112,10 +123,9 @@ class TestE2EThinkingPropagation(unittest.TestCase):
 
         mocks, patches = self._common_orchestrator_mocks()
         try:
-            self._setup_mocks_for_run(mocks)
-
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+                self._setup_mocks_for_run(mocks, workdir, workdir)
                 argv = self._build_orchestrator_argv(workdir, workdir, thinking="medium")
                 with patch("sys.argv", argv):
                     try:
@@ -155,10 +165,9 @@ class TestE2EThinkingPropagation(unittest.TestCase):
 
         mocks, patches = self._common_orchestrator_mocks()
         try:
-            self._setup_mocks_for_run(mocks)
-
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+                self._setup_mocks_for_run(mocks, workdir, workdir)
                 argv = self._build_orchestrator_argv(workdir, workdir, thinking=None)
                 with patch("sys.argv", argv):
                     try:
@@ -194,10 +203,9 @@ class TestE2EThinkingPropagation(unittest.TestCase):
 
         mocks, patches = self._common_orchestrator_mocks()
         try:
-            self._setup_mocks_for_run(mocks)
-
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+                self._setup_mocks_for_run(mocks, workdir, workdir)
                 argv = self._build_orchestrator_argv(workdir, workdir, thinking="xhigh")
                 with patch("sys.argv", argv):
                     try:
@@ -450,11 +458,6 @@ class TestCrossContractConvergence(unittest.TestCase):
                 return res
             mocks["drun"].side_effect = dummy_drun
 
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mocks["dpopen"].return_value = mock_proc
-
-            mocks["glob"].return_value = []
             mocks["extract_json"].return_value = {
                 "overall_assessment": "EXCELLENT",
                 "prs": [],
@@ -462,6 +465,17 @@ class TestCrossContractConvergence(unittest.TestCase):
 
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+
+                mock_proc = MagicMock()
+                mock_proc.returncode = 0
+
+                def dpopen_side_effect(cmd, *args, **kwargs):
+                    if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                        seed_planner_success_artifacts(workdir, workdir)
+                    return mock_proc
+
+                mocks["dpopen"].side_effect = dpopen_side_effect
+                mocks["glob"].side_effect = REAL_GLOB
 
                 argv = [
                     "orchestrator.py",

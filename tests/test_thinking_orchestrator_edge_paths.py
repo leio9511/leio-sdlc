@@ -6,13 +6,19 @@ Validates that the resolved thinking value persists through all three
 recovery/retry codepaths in addition to the primary paths.
 """
 
+import glob as stdlib_glob
 import os
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
+REAL_GLOB = stdlib_glob.glob
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+
+from planner_test_support import compute_orchestrator_job_dir, seed_planner_success_artifacts
 
 
 class TestThinkingOrchestratorEdgePaths(unittest.TestCase):
@@ -39,10 +45,7 @@ class TestThinkingOrchestratorEdgePaths(unittest.TestCase):
 
     def _get_job_dir(self, workdir, global_dir, prd_filename="dummy_prd.md"):
         """Compute the job_dir the orchestrator will construct internally."""
-        target_project_name = os.path.basename(os.path.abspath(workdir))
-        base_name, _ = os.path.splitext(prd_filename)
-        return os.path.abspath(os.path.join(
-            global_dir, ".sdlc_runs", target_project_name, base_name))
+        return compute_orchestrator_job_dir(workdir, global_dir, prd_filename)
 
     @staticmethod
     def _extract_thinking_value(cmd):
@@ -152,18 +155,18 @@ class TestThinkingOrchestratorEdgePaths(unittest.TestCase):
 
         return _side_effect
 
-    def _glob_return_pr_on_calls(self, pr_file, calls):
-        """Return a glob side_effect that returns [pr_file] on specific call indices."""
+    def _glob_return_pr_on_calls(self, job_dir, calls):
+        """Return a glob side_effect that reveals real seeded PR slices on specific calls."""
         glob_counter = [0]
 
         def glob_side_effect(pathname, **kwargs):
             glob_counter[0] += 1
             c = glob_counter[0]
-            if ("*.md" in pathname or "PR_*.md" in pathname
-                    or "PRD_*.md" in pathname):
+            if pathname == os.path.join(job_dir, "*.md"):
                 if c in calls:
-                    return [pr_file]
-            return []
+                    return REAL_GLOB(pathname, **kwargs)
+                return []
+            return REAL_GLOB(pathname, **kwargs)
 
         return glob_side_effect
 
@@ -178,11 +181,13 @@ class TestThinkingOrchestratorEdgePaths(unittest.TestCase):
         os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
         global_dir = workdir
         job_dir = self._get_job_dir(workdir, global_dir)
-        os.makedirs(job_dir, exist_ok=True)
-
-        pr_file = os.path.join(job_dir, f"{job_dir_base_name}.md")
-        with open(pr_file, "w") as f:
-            f.write("status: in_progress\n")
+        seeded = seed_planner_success_artifacts(
+            workdir,
+            global_dir,
+            pr_slice_name=f"{job_dir_base_name}.md",
+            pr_slice_content="status: in_progress\n",
+        )
+        pr_file = seeded["pr_file"]
 
         # UAT report path for verifier drun handler
         # orchestrator sets run_dir = job_dir (line 681)
@@ -190,7 +195,19 @@ class TestThinkingOrchestratorEdgePaths(unittest.TestCase):
 
         # Glob
         glob_calls = glob_calls_for_pr or {3, 4}
-        mocks["glob"].side_effect = self._glob_return_pr_on_calls(pr_file, glob_calls)
+        mocks["glob"].side_effect = self._glob_return_pr_on_calls(job_dir, glob_calls)
+
+        def dpopen_side_effect(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                seed_planner_success_artifacts(
+                    workdir,
+                    global_dir,
+                    pr_slice_name=f"{job_dir_base_name}.md",
+                    pr_slice_content="status: in_progress\n",
+                )
+            return mocks["dpopen"].return_value
+
+        mocks["dpopen"].side_effect = dpopen_side_effect
 
         # Drun
         drun_opts = drun_kwargs or {}

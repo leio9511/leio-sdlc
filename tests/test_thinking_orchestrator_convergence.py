@@ -6,13 +6,19 @@ This is a convergence-gate test (PR-003_1_2_3_2): it proves the full primary-flo
 thinking chain is closed and uniform, without any spawn path silently diverging.
 """
 
+import glob as stdlib_glob
 import os
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
+REAL_GLOB = stdlib_glob.glob
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+
+from planner_test_support import compute_orchestrator_job_dir, seed_planner_success_artifacts
 
 
 class TestThinkingOrchestratorConvergence(unittest.TestCase):
@@ -39,10 +45,7 @@ class TestThinkingOrchestratorConvergence(unittest.TestCase):
 
     def _get_job_dir(self, workdir, global_dir, prd_filename="dummy_prd.md"):
         """Compute the job_dir the orchestrator will construct internally."""
-        target_project_name = os.path.basename(os.path.abspath(workdir))
-        base_name, _ = os.path.splitext(prd_filename)
-        return os.path.abspath(os.path.join(
-            global_dir, ".sdlc_runs", target_project_name, base_name))
+        return compute_orchestrator_job_dir(workdir, global_dir, prd_filename)
 
     @staticmethod
     def _extract_thinking_value(cmd):
@@ -184,13 +187,13 @@ class TestThinkingOrchestratorConvergence(unittest.TestCase):
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
                 global_dir = workdir
-                job_dir = self._get_job_dir(workdir, global_dir)
-                os.makedirs(job_dir, exist_ok=True)
-
-                # PR file with status 'in_progress' so the state-machine resumes it
-                pr_file = os.path.join(job_dir, "PR_001_test.md")
-                with open(pr_file, "w") as f:
-                    f.write("status: in_progress\n")
+                seeded = seed_planner_success_artifacts(
+                    workdir,
+                    global_dir,
+                    pr_slice_content="status: in_progress\n",
+                )
+                job_dir = seeded["job_dir"]
+                pr_file = seeded["pr_file"]
 
                 # Path for the uat_report.json the verifier will try to read
                 run_dir = os.path.join(job_dir, "run")
@@ -201,21 +204,32 @@ class TestThinkingOrchestratorConvergence(unittest.TestCase):
                 # Glob call sequence (counter-based so the pipeline advances):
                 #   call 1 – blast-radius .coder_session → no match → []
                 #   call 2 – resume-path check (line ~728) → [] → planner runs
-                #   call 3 – post-planner checks (line ~757) → [pr_file] → proceed
-                #   call 4 – state-machine 1st iteration → [pr_file] → process PR
+                #   call 3 – post-planner checks (line ~757) → real job_dir scan
+                #   call 4 – state-machine 1st iteration → real job_dir scan → process PR
                 #   call 5 – state-machine 2nd iteration → [] → get_next_pr → verifier
                 glob_counter = [0]
 
                 def glob_side_effect(pathname, **kwargs):
                     glob_counter[0] += 1
                     c = glob_counter[0]
-                    if ("*.md" in pathname or "PR_*.md" in pathname
-                            or "PRD_*.md" in pathname):
+                    if pathname == os.path.join(job_dir, "*.md"):
                         if c in (3, 4):
-                            return [pr_file]
-                    return []
+                            return REAL_GLOB(pathname, **kwargs)
+                        return []
+                    return REAL_GLOB(pathname, **kwargs)
 
                 mocks["glob"].side_effect = glob_side_effect
+
+                def dpopen_side_effect(cmd, *args, **kwargs):
+                    if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                        seed_planner_success_artifacts(
+                            workdir,
+                            global_dir,
+                            pr_slice_content="status: in_progress\n",
+                        )
+                    return mocks["dpopen"].return_value
+
+                mocks["dpopen"].side_effect = dpopen_side_effect
 
                 # drun: git commands succeed, get_next_pr returns QUEUE_EMPTY
                 # on the second call (after the one PR is done), and verifier

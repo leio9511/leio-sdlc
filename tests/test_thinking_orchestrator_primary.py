@@ -7,13 +7,19 @@ Validates:
 - Both primary planner launch paths (force_replan=true and normal/resume) are covered
 """
 
+import glob as stdlib_glob
 import os
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
+REAL_GLOB = stdlib_glob.glob
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+
+from planner_test_support import seed_planner_success_artifacts
 
 
 class TestThinkingOrchestratorPrimary(unittest.TestCase):
@@ -94,19 +100,22 @@ class TestThinkingOrchestratorPrimary(unittest.TestCase):
                 return res
             mocks["drun"].side_effect = dummy_drun
 
-            # dpopen: simulate successful subprocess
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mocks["dpopen"].return_value = mock_proc
-
-            # glob: return empty — prevents PR processing loop, triggers clean SystemExit after planner
-            mocks["glob"].return_value = []
-
             # extract_and_parse_json won't be called (we exit before PR processing)
             mocks["extract_json"].return_value = {"overall_assessment": "EXCELLENT"}
 
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+
+                mock_proc = MagicMock()
+                mock_proc.returncode = 0
+
+                def dpopen_side_effect(cmd, *args, **kwargs):
+                    if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                        seed_planner_success_artifacts(workdir, workdir)
+                    return mock_proc
+
+                mocks["dpopen"].side_effect = dpopen_side_effect
+                mocks["glob"].side_effect = REAL_GLOB
                 argv = self._build_base_argv(workdir, workdir, thinking=thinking_value)
 
                 with patch("sys.argv", argv):
@@ -162,14 +171,21 @@ class TestThinkingOrchestratorPrimary(unittest.TestCase):
                 return res
             mocks_a["drun"].side_effect = dummy_drun
 
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mocks_a["dpopen"].return_value = mock_proc
-            mocks_a["glob"].return_value = []
             mocks_a["extract_json"].return_value = {"overall_assessment": "EXCELLENT"}
 
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+
+                mock_proc = MagicMock()
+                mock_proc.returncode = 0
+
+                def dpopen_side_effect(cmd, *args, **kwargs):
+                    if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                        seed_planner_success_artifacts(workdir, workdir)
+                    return mock_proc
+
+                mocks_a["dpopen"].side_effect = dpopen_side_effect
+                mocks_a["glob"].side_effect = REAL_GLOB
                 argv = self._build_base_argv(workdir, workdir, thinking=None)
                 with patch("sys.argv", argv):
                     try:
@@ -203,10 +219,6 @@ class TestThinkingOrchestratorPrimary(unittest.TestCase):
                 return res
             mocks_b["drun"].side_effect = dummy_drun
 
-            mock_proc = MagicMock()
-            mock_proc.returncode = 0
-            mocks_b["dpopen"].return_value = mock_proc
-            mocks_b["glob"].return_value = []
             mocks_b["extract_json"].return_value = {"overall_assessment": "EXCELLENT"}
 
             # Need to mock rmtree because force_replan=true tries to delete job_dir
@@ -214,6 +226,17 @@ class TestThinkingOrchestratorPrimary(unittest.TestCase):
 
             with tempfile.TemporaryDirectory() as workdir:
                 os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+
+                mock_proc = MagicMock()
+                mock_proc.returncode = 0
+
+                def dpopen_side_effect(cmd, *args, **kwargs):
+                    if isinstance(cmd, list) and "spawn_planner.py" in str(cmd):
+                        seed_planner_success_artifacts(workdir, workdir)
+                    return mock_proc
+
+                mocks_b["dpopen"].side_effect = dpopen_side_effect
+                mocks_b["glob"].side_effect = REAL_GLOB
                 argv = self._build_base_argv(workdir, workdir, thinking=None, force_replan="true")
                 with patch("sys.argv", argv):
                     try:
