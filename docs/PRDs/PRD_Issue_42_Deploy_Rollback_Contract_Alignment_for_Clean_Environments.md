@@ -18,28 +18,28 @@ Context_Workdir: /home/openclaw/projects/leio-sdlc
 - `Prod dir not created`
 - `FileNotFoundError: .../.openclaw/skills/leio-sdlc/MODIFIED_MARKER`
 
-这些失败并不指向某个孤立 assert，而是暴露了 deploy / rollback contract 在 clean environment 下没有被明确冻结，也没有在所有脚本中一致实现。当前 repo 中至少存在四类相关脚本：
+后续独立外部验证已经确认：这组问题并不是 ignore list 或 preflight 失效，而是实现仍然依赖当前工作区 basename 偶然等于 `leio-sdlc` 才能通过。例如主工作区 `/home/openclaw/projects/leio-sdlc` 会掩盖 root-skill slug 推导错误，而独立 worktree basename 一旦变化，deploy/rollback contract 就会立即暴露错误。
 
-- 根 skill 部署：`deploy.sh`
-- kit 级部署：`kit-deploy.sh`
-- sibling skill 部署：`skills/pm-skill/deploy.sh`
-- rollback：`scripts/rollback.sh` 与 `skills/pm-skill/rollback.sh`
+这说明本问题有两个紧密相关的层面：
 
-它们当前对以下关键 contract 的理解并不完全一致：
-- mock HOME 与真实 HOME 的优先级
-- skills 安装目录位置
-- releases / backup 目录位置
-- 首次部署与第二次部署后必须出现的可观察产物
-- rollback 可依赖的前置结构
+1. deploy / rollback 脚本的 authoritative contract 尚未完全正确实现；
+2. 对应测试当前没有把“basename 独立性 / clean worktree independence”内建为测试自身的 setup contract，因此主工作区环境会继续掩盖实现缺陷。
 
-本 PRD 的目标不是“边跑边调查再决定 contract”，而是：
+本 PRD 的目标不是把 clean-worktree 验证责任上推给整个 SDLC 流程，而是：
 
-> **先冻结一套 deploy / rollback authoritative contract，再让脚本与测试围绕这套 contract 收敛。**
+> **先冻结一套 deploy / rollback authoritative contract，再要求 #42 对应测试共享一个统一的隔离环境 helper，在测试内部自行创建独立 temporary worktree（或等价 clean repo copy）与 `HOME_MOCK` 环境，最后让脚本与测试围绕这套 contract 收敛。**
+
+这意味着：
+- #42 的修复边界仍然主要在 deploy/rollback 脚本与对应测试本身；
+- 不把“执行这些测试前必须从外部另开 worktree”变成整个执行流程的新隐含前置条件；
+- clean-worktree 验证必须成为测试自己的黑盒 contract，而不是外部调用者的约定俗成；
+- 三个 deploy/rollback 核心测试不得各自手写不同版本的隔离 setup，而必须共享一个统一 helper 以避免测试层再次出现 contract drift。
 
 本 PRD 不处理：
 - issue #40 的 suite contamination / `SDLC_TEST_MODE` 恢复问题；
 - issue #41 的 orchestrator mock planner side-effects 问题；
-- 任何与 deploy / rollback contract 无关的大规模发布架构重写。
+- 任何与 deploy / rollback contract 无关的大规模发布架构重写；
+- 对整个 SDLC 流程新增全局 worktree gate 的平台级重构。
 
 ## 2. Requirements & User Stories (需求定义)
 ### Functional Requirements
@@ -93,6 +93,25 @@ Context_Workdir: /home/openclaw/projects/leio-sdlc
    - `skills/pm-skill/rollback.sh` 必须和根 `scripts/rollback.sh` 共享相同 rollback 路径语义；
    - 不允许 sibling skill 使用另一套 mock HOME / skills root / releases root contract。
 
+7. **#42 对应测试必须在其内部 setup 中自行构造独立 clean worktree 环境**
+   - `tests/test_deploy_backup.py`
+   - `tests/test_deploy_excludes.py`
+   - `tests/test_pr_004_rollback.py`
+   这三个测试必须在测试内部自行创建独立 temporary worktree（或等价 clean repo copy），并在该隔离环境中运行相关脚本；
+   - 不允许这些测试继续隐式依赖“当前调用它们的人正好在主仓库根目录”；
+   - 不允许把“要先从外部另开 worktree”变成整个 SDLC / preflight 调用链的新前置条件；
+   - 测试自身必须证明：实现不依赖当前 repo basename 碰巧等于 `leio-sdlc`。
+
+8. **这三个测试必须共享一个统一的隔离环境 helper**
+   - 不允许 `tests/test_deploy_backup.py`、`tests/test_deploy_excludes.py`、`tests/test_pr_004_rollback.py` 各自手写不同版本的 worktree / `HOME_MOCK` setup；
+   - 必须抽取一个共享 helper（可为测试支持模块、fixture helper、或 context-manager helper），统一负责：
+     - 创建 isolated temporary worktree（或等价 clean repo copy）
+     - 保证 worktree basename 不等于 `leio-sdlc`
+     - 创建并注入 `HOME_MOCK`
+     - 返回可用于 `subprocess.run(..., env=...)` 的环境
+     - 在 teardown / finally 中清理 worktree 与 mock home
+   - 该 helper **不得**为 deploy/rollback 逻辑手工伪造成功产物（如 prod dir / backup tarball）；它只负责环境隔离，不负责掩盖产品逻辑问题。
+
 ### Non-Functional Requirements
 
 1. **本 PRD 可以修改脚本，但只限于 contract 对齐**
@@ -110,23 +129,28 @@ Context_Workdir: /home/openclaw/projects/leio-sdlc
      - `PROD_DIR`
      - `RELEASES_DIR`
 
-3. **clean environment 必须成为主验证标准**
+3. **clean environment 必须成为测试自身的 contract，而不是外部调用约定**
    - 不能依赖主工作区历史残留；
-   - 必须在 `HOME_MOCK` / clean worktree / GitHub clean runner 下稳定成立。
+   - 不能依赖“执行流程额外帮测试准备特殊 cwd”；
+   - 对应测试必须在其内部 setup 中自行落地 `HOME_MOCK` + clean worktree 隔离。
+
+4. **测试层也必须避免新的 contract drift**
+   - 三个 deploy/rollback 核心测试的隔离环境逻辑必须收敛到同一个 helper；
+   - 不允许各自实现略有差异的 basename、`HOME_MOCK`、cleanup 逻辑后再次制造 suite 层或测试层漂移。
 
 ### User Stories
 
 - **As a maintainer**, I want all deploy and rollback scripts to share one explicit path contract, so clean-environment tests and real installs observe the same artifact layout.
 - **As a reviewer**, I want the PRD to freeze concrete prod/release locations up front, so the coder is not forced to guess deployment semantics mid-implementation.
-- **As an engineer**, I want first deploy, second deploy, and rollback to have explicit black-box observables, so deploy/rollback tests become deterministic on clean runners.
+- **As an engineer**, I want first deploy, second deploy, and rollback tests to share one reusable isolation helper that builds their own clean worktree + `HOME_MOCK` setup, so basename-sensitive bugs cannot hide behind the main repo directory name.
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-本 PRD 采用 **contract-first alignment** 路线，而不是“先调查后决定”：
+本 PRD 采用 **contract-first alignment + test-internal isolation** 路线，而不是“先调查后决定”或“把隔离责任上推给整个流程”：
 
 - 先冻结唯一权威 contract；
 - 再让所有 deploy / rollback 脚本对齐它；
-- 最后让测试围绕同一 contract 收敛；
-- 不通过放松断言或测试手工造目录来掩盖问题。
+- 再让 #42 对应测试通过共享 helper 在自身 setup 里构造独立 clean worktree 与 `HOME_MOCK`；
+- 不通过放松断言、测试手工造目录、或外部流程专门为测试准备特殊 cwd 来掩盖问题。
 
 ### 3.1 冻结的 authoritative contract
 
@@ -159,6 +183,7 @@ backup_<YYYYMMDD_HHMMSS>.tar.gz
 #### A. `deploy.sh`
 必须改到与上述 contract 一致：
 - `HOME_MOCK` 场景下不得再让 `SDLC_RUNTIME_DIR` 抢占 `SKILLS_DIR`
+- root skill 的 slug 不能再依赖当前工作目录 basename 偶然等于 `leio-sdlc`
 - 统一命名为 `OPENCLAW_HOME` / `RELEASES_ROOT`
 - 首次 deploy 保证 `PROD_DIR` 存在
 - 第二次 deploy 保证 `RELEASES_DIR` 与 backup tarball 存在
@@ -169,10 +194,12 @@ backup_<YYYYMMDD_HHMMSS>.tar.gz
 - 采用同样的 `HOME_ROOT` / `OPENCLAW_HOME` / `SKILLS_DIR` / `RELEASES_ROOT` 逻辑
 - 保证 `pm-skill` 的 `PROD_DIR` 与 `RELEASES_DIR` 按冻结 contract 落位
 - 保留 `agent_driver.py` / `utils_notification.py` bundling，但其产物位置必须符合上述 contract
+- 在新增脚本自定位后，必须显式解析 monorepo repo-root 来获取共享文件，不得让 repo-root 解析再次依赖偶然 cwd。
 
 #### C. `scripts/rollback.sh`
 必须与 deploy 共享同一套路径语义：
 - 删除当前混乱的 `OPENCLAW_DIR = .../.openclaw/skills` 语义
+- root skill 的 slug 不能再依赖当前工作目录 basename 偶然等于 `leio-sdlc`
 - 使用：
   - `HOME_ROOT`
   - `OPENCLAW_HOME`
@@ -200,6 +227,22 @@ backup_<YYYYMMDD_HHMMSS>.tar.gz
 
 则授权修改它们，但仅限兑现本 PRD 明确写死的 exclude contract。
 
+#### G. Shared isolated-environment helper
+必须引入一个共享 helper（例如测试支持模块、fixture helper、或 context-manager helper），由 `tests/test_deploy_backup.py`、`tests/test_deploy_excludes.py`、`tests/test_pr_004_rollback.py` 共同使用。该 helper 的职责必须且仅限于：
+- 创建临时 isolated worktree（或等价 clean repo copy）
+- 保证该隔离目录 basename 不等于 `leio-sdlc`
+- 创建并注入 `HOME_MOCK`
+- 返回 repo root / worktree root / env 等供测试使用
+- 在 teardown / finally 中清理 worktree 与 mock home
+
+该 helper **不得**：
+- 手工创建 `PROD_DIR`
+- 手工创建 `RELEASES_DIR`
+- 手工创建 `backup_*.tar.gz`
+- 手工伪造 deploy 成功的任何产品产物
+
+这些仍必须由真实 deploy/rollback 脚本行为产生。
+
 ### 3.3 明确不采用的方案
 
 1. **不允许 coder 自行再决定 contract**
@@ -212,12 +255,20 @@ backup_<YYYYMMDD_HHMMSS>.tar.gz
 3. **不让测试手工补目录来假装 deploy 成功**
    - rollback tests 不能自己 mkdir 出 deploy 应生成的目录结构。
 
-4. **不扩张成发布系统大重构**
+4. **不把隔离责任上推给整个 SDLC / preflight 执行流程**
+   - 不新增“所有相关测试都必须从外部特殊 worktree 启动”的全局流程规则；
+   - clean-worktree 验证是 #42 对应测试自身的 setup contract。
+
+5. **不让三个测试各自实现不同版本的 worktree / HOME_MOCK setup**
+   - 隔离环境逻辑必须收敛到统一 helper，避免测试层再次出现 drift。
+
+6. **不扩张成发布系统大重构**
    - 目标是 contract 对齐，不是重写 deploy framework。
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
-- **Scenario 1: first deploy of `leio-sdlc` uses the frozen HOME-root contract**
-  - **Given** a clean temporary environment with `HOME_MOCK=<mock_home>`
+- **Scenario 1: first deploy of `leio-sdlc` uses the frozen HOME-root contract in a test-created isolated worktree**
+  - **Given** a test-created isolated temporary worktree whose basename is not `leio-sdlc`
+  - **And** `HOME_MOCK=<mock_home>`
   - **When** `deploy.sh --no-restart` succeeds for the first time
   - **Then** `leio-sdlc` is installed at:
 ```text
@@ -225,8 +276,8 @@ backup_<YYYYMMDD_HHMMSS>.tar.gz
 ```
   - **And** that directory contains `scripts/orchestrator.py`
 
-- **Scenario 2: second deploy of `leio-sdlc` creates the frozen backup layout**
-  - **Given** a successful first deploy under `HOME_MOCK=<mock_home>`
+- **Scenario 2: second deploy of `leio-sdlc` creates the frozen backup layout independent of repo basename**
+  - **Given** the same isolated worktree and a successful first deploy under `HOME_MOCK=<mock_home>`
   - **When** `deploy.sh --no-restart` succeeds a second time
   - **Then** the following directory exists:
 ```text
@@ -237,8 +288,9 @@ backup_<YYYYMMDD_HHMMSS>.tar.gz
 backup_*.tar.gz
 ```
 
-- **Scenario 3: `pm-skill` deploy follows the same frozen contract**
-  - **Given** a clean temporary environment with `HOME_MOCK=<mock_home>`
+- **Scenario 3: `pm-skill` deploy follows the same frozen contract from an isolated worktree**
+  - **Given** a test-created isolated temporary worktree whose basename is not `leio-sdlc`
+  - **And** `HOME_MOCK=<mock_home>`
   - **When** `skills/pm-skill/deploy.sh --no-restart` succeeds
   - **Then** `pm-skill` is installed at:
 ```text
@@ -260,8 +312,8 @@ tests/
 .sdlc_runs/
 ```
 
-- **Scenario 5: rollback consumes real deploy-generated artifacts only**
-  - **Given** `kit-deploy.sh` has completed twice successfully under `HOME_MOCK=<mock_home>`
+- **Scenario 5: rollback consumes real deploy-generated artifacts only in an isolated worktree**
+  - **Given** `kit-deploy.sh` has completed twice successfully under `HOME_MOCK=<mock_home>` from a test-created isolated temporary worktree whose basename is not `leio-sdlc`
   - **When** `scripts/rollback.sh` and `skills/pm-skill/rollback.sh` execute
   - **Then** they succeed using backup tarballs from:
 ```text
@@ -273,10 +325,12 @@ tests/
 ```
   - **And** manually inserted `MODIFIED_MARKER` files are removed after rollback
 
-- **Scenario 6: clean worktree and GitHub clean runner observe the same layout**
-  - **Given** a clean temporary worktree or GitHub Actions runner
-  - **When** deploy/rollback tests execute
-  - **Then** they pass without depending on pre-existing local machine state outside the frozen contract above
+- **Scenario 6: the tests themselves own clean-worktree verification via one shared helper**
+  - **Given** the #42 deploy/rollback tests
+  - **When** they run under normal `pytest` / `preflight` invocation
+  - **Then** they internally construct and use their own isolated clean worktree (or equivalent clean repo copy)
+  - **And** they do so through one shared isolation helper rather than three independent setup implementations
+  - **And** they do not rely on an external caller to provide a special cwd setup beforehand
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 ### Core Quality Risk
@@ -285,7 +339,9 @@ tests/
 1. 继续允许脚本和测试各自理解一套目录 contract；
 2. 在 mock HOME 场景下仍让 runtime 环境变量抢占技能安装根路径；
 3. 通过放松测试而不是修正 contract 来掩盖真实 deploy/rollback 问题；
-4. sibling skill（`pm-skill`）路径语义不对称，导致 `kit-deploy` / rollback 只有一半可信。
+4. sibling skill（`pm-skill`）路径语义不对称，导致 `kit-deploy` / rollback 只有一半可信；
+5. 把 clean-worktree 验证责任推给整个执行流程，而不是让测试自己约束自己的环境；
+6. 三个测试各自发明一套 worktree / `HOME_MOCK` / cleanup 逻辑，最终在测试层再次制造 drift。
 
 ### Verification Strategy
 
@@ -295,11 +351,11 @@ tests/
 - `pytest -q tests/test_deploy_excludes.py`
 - `pytest -q tests/test_pr_004_rollback.py`
 
-#### B. Clean-environment verification
-必须在以下环境之一重复验证：
-- 独立临时 worktree
-- 临时 `HOME_MOCK`
-- GitHub Actions clean runner
+#### B. Test-owned clean-environment verification
+以上测试必须通过共享 helper 在其内部 setup 中自行完成：
+- 独立 temporary worktree（或等价 clean repo copy）
+- `HOME_MOCK`
+- basename 不等于 `leio-sdlc`
 
 #### C. Full-suite regression check
 修复后应再次运行：
@@ -322,6 +378,7 @@ tests/
 - `tests/test_deploy_backup.py`
 - `tests/test_deploy_excludes.py`
 - `tests/test_pr_004_rollback.py`
+- 统一的 deploy/rollback test helper 文件
 - 必要的测试辅助文件
 
 本 PRD **不授权**修改以下与其它 issue 边界相关的内容：
@@ -331,6 +388,7 @@ tests/
 - `tests/test_thinking_orchestrator_primary.py`
 - `tests/test_orchestrator_session_strategy.py`
 - 与 #40 / #41 相关的测试修复逻辑
+- 整个 SDLC 流程级别的全局 worktree gate
 
 ---
 
@@ -342,6 +400,8 @@ tests/
 - **v1.1 Scope Decision**: 明确 #42 与 #40 / #41 分离；#42 只处理 deploy / rollback contract。
 - **v1.2 Strategy Decision**: 初版采用“先审并统一 runtime contract，再修测试对齐”的模糊表达，被 Auditor 拒绝。
 - **v1.3 Contract Freeze**: 明确冻结 `HOME_MOCK` / `HOME` / `SDLC_RUNTIME_DIR` 的优先级、prod dir 精确位置、release/backup 精确布局，以及 `pm-skill` 的对称 contract。
+- **v1.4 Test Boundary Clarification**: 新增要求：#42 对应测试必须在其内部 setup 中自行构造 isolated clean worktree，不把 worktree 前置条件外包给整个执行流程。
+- **v1.5 Shared Helper Clarification**: 明确要求三个 deploy/rollback 核心测试必须共享一个统一的 isolation helper，而不是各自实现隔离逻辑。
 
 ---
 
