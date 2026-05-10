@@ -13,6 +13,7 @@ if [ ! -f .release_ignore ]; then
   cat <<EOF > .release_ignore
 .git/
 .sdlc/
+.sdlc_runs/
 docs/
 tests/
 *.log

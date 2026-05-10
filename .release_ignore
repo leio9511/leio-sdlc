@@ -1,4 +1,6 @@
 tests/
+.sdlc/
+.sdlc_runs/
 docs/
 memory/
 preflight.sh
@@ -10,7 +12,6 @@ package.json
 *.log
 *.diff
 .review_count
-.sdlc/
 .tmp/
 kit-deploy.sh
 deploy.sh
