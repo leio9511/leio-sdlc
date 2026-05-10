@@ -11,6 +11,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import spawn_auditor
 
+
+@pytest.fixture(autouse=True)
+def _cleanup_sdlc_env():
+    """Restore SDLC_TEST_MODE to conftest default after each test."""
+    yield
+    os.environ["SDLC_TEST_MODE"] = "true"
+
+
 def test_spawn_auditor_missing_channel(capsys):
     # Missing required argument will cause argparse to exit with code 2
     with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", "dummy.md", "--workdir", "."]):
