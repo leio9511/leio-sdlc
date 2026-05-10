@@ -346,6 +346,14 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
     assert_file_not_exists "$main_home/.openclaw/skills/.tmp_leio-sdlc"
     assert_file_not_exists "$main_home/.openclaw/skills/.old_leio-sdlc"
 
+    # Preserve existing rollback coverage without widening the root deploy contract in this slice.
+    (
+        cd "$runtime_dir"
+        HOME="$main_home" HOME_MOCK="$main_home" PATH="$BASE_PATH" bash "$main_repo/scripts/rollback.sh" > "$case_dir/rollback.log" 2>&1
+    )
+    assert_file_content_equals "$runtime_dir/version.txt" "v0"
+    assert_file_content_equals "$runtime_dir/config/sdlc_config.json" '{"preserved":"hot-config"}'
+
     # Gemini link skip behavior under HOME_MOCK.
     local no_gemini_home="$case_dir/no_gemini_home"
     local no_gemini_repo="$case_dir/src/no-gemini-skill"
