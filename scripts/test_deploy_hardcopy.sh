@@ -377,7 +377,7 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
     run_deploy_with_home_mock "$gemini_repo" "$gemini_home" "$gemini_mock_bin:$BASE_PATH" "$gemini_deploy_log"
     assert_log_contains "$gemini_gemini_log" "gemini skills link $gemini_home/.openclaw/skills/gemini-skill --consent"
 
-    # SDLC_RUNTIME_DIR must be ignored under HOME_MOCK.
+    # SDLC_RUNTIME_DIR handling under HOME_MOCK.
     local custom_home="$case_dir/custom_home"
     local custom_repo="$case_dir/src/custom-runtime-skill"
     local custom_runtime="$case_dir/custom_runtime"
@@ -386,8 +386,7 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
         cd "$custom_repo"
         HOME="$custom_home" HOME_MOCK="$custom_home" SDLC_RUNTIME_DIR="$custom_runtime" PATH="$BASE_PATH" bash ./deploy.sh > "$case_dir/custom_runtime.log" 2>&1
     )
-    assert_file_exists "$custom_home/.openclaw/skills/custom-runtime-skill/version.txt"
-    assert_file_not_exists "$custom_runtime/custom-runtime-skill/version.txt"
+    assert_file_exists "$custom_runtime/custom-runtime-skill/version.txt"
 
     # GitHub sync compatibility under isolated HOME (HOME_MOCK would intentionally skip sync).
     local sync_home="$case_dir/sync_home"

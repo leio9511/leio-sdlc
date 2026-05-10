@@ -1,5 +1,4 @@
 #!/bin/bash
-cd "$(dirname "$0")/.." || exit 1
 set -e
 
 # ==========================================
@@ -8,25 +7,12 @@ set -e
 # Rollback Hard Copy (Physical Sync)
 
 perform_hard_copy_rollback() {
-    local SLUG
-    SLUG=$(basename "$PWD")
-    local HOME_ROOT
-    if [ -n "${HOME_MOCK:-}" ]; then
-        HOME_ROOT="$HOME_MOCK"
-    else
-        HOME_ROOT="$HOME"
-    fi
-
-    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
-    local RELEASES_ROOT="$OPENCLAW_HOME/.releases"
-    local SKILLS_DIR
-    if [ -n "${HOME_MOCK:-}" ]; then
-        SKILLS_DIR="$OPENCLAW_HOME/skills"
-    else
-        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
-    fi
+    local SLUG=$(basename "$PWD")
+    local HOME_DIR="${HOME_MOCK:-$HOME}"
+    local OPENCLAW_DIR="${SDLC_SKILLS_ROOT:-${HOME_MOCK:-$HOME}/.openclaw/skills}"
+    local SKILLS_DIR="$OPENCLAW_DIR"
+    local RELEASES_DIR="$HOME_DIR/.openclaw/.releases/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
-    local RELEASES_DIR="$RELEASES_ROOT/$SLUG"
     
     local NO_RESTART=false
     for arg in "$@"; do
@@ -39,11 +25,6 @@ perform_hard_copy_rollback() {
     done
 
     echo "[$(date '+%H:%M:%S')] Starting hard-copy rollback flow for $SLUG"
-
-    if [ ! -d "$PROD_DIR" ]; then
-        echo "❌ No production directory found at $PROD_DIR"
-        exit 1
-    fi
 
     if [ ! -d "$RELEASES_DIR" ]; then
         echo "❌ No releases directory found at $RELEASES_DIR"
@@ -69,8 +50,10 @@ perform_hard_copy_rollback() {
     # 1. Clear current production directory safely
     local OLD_DIR="$SKILLS_DIR/.old_$SLUG"
     rm -rf "$OLD_DIR"
-    echo "🗑️ Moving broken directory out of the way..."
-    mv "$PROD_DIR" "$OLD_DIR"
+    if [ -e "$PROD_DIR" ]; then
+        echo "🗑️ Moving broken directory out of the way..."
+        mv "$PROD_DIR" "$OLD_DIR"
+    fi
 
     # 2. Restore backup
     echo "♻️ Restoring backup to $PROD_DIR..."
