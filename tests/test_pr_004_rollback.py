@@ -1,22 +1,18 @@
 import os
 import subprocess
-from pathlib import Path
 
-from deploy_test_support import isolated_repo_env
+from deploy_test_support import (
+    ROOT_SKILL_SLUG,
+    assert_isolated_checkout,
+    canonical_releases_dir,
+    canonical_skill_dir,
+    isolated_repo_env,
+)
 
 
-ROOT_SLUG = "leio-sdlc"
 PM_SLUG = "pm-skill"
 MODIFIED_MARKER = "MODIFIED_MARKER"
 LOCK_FILES = (".sdlc_repo.lock", ".coder_session", ".sdlc_lock_manifest.json")
-
-
-def _canonical_skill_dir(mock_home: str, slug: str) -> str:
-    return os.path.join(mock_home, ".openclaw", "skills", slug)
-
-
-def _canonical_releases_dir(mock_home: str, slug: str) -> str:
-    return os.path.join(mock_home, ".openclaw", ".releases", slug)
 
 
 def _run(command: list[str], *, env: dict[str, str], cwd: str) -> subprocess.CompletedProcess[str]:
@@ -31,7 +27,7 @@ def test_independent_symmetrical_rollbacks():
         mock_home = isolated["mock_home"]
         env = isolated["env"]
 
-        assert Path(isolated_root).name != ROOT_SLUG
+        assert_isolated_checkout(isolated_root)
         assert env["HOME_MOCK"] == mock_home
 
         deploy_script = os.path.join(isolated_root, "kit-deploy.sh")
@@ -44,9 +40,9 @@ def test_independent_symmetrical_rollbacks():
         second = _run(["bash", deploy_script], env=env, cwd=isolated_root)
         assert second.returncode == 0, f"Second kit-deploy.sh failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
 
-        for slug in (ROOT_SLUG, PM_SLUG):
-            releases_dir = _canonical_releases_dir(mock_home, slug)
-            skill_dir = _canonical_skill_dir(mock_home, slug)
+        for slug in (ROOT_SKILL_SLUG, PM_SLUG):
+            releases_dir = canonical_releases_dir(mock_home, slug)
+            skill_dir = canonical_skill_dir(mock_home, slug)
             assert os.path.isdir(releases_dir), f"Releases dir missing for {slug}: {releases_dir}"
             assert any(name.startswith("backup_") and name.endswith(".tar.gz") for name in os.listdir(releases_dir))
             marker = os.path.join(skill_dir, MODIFIED_MARKER)
@@ -56,7 +52,7 @@ def test_independent_symmetrical_rollbacks():
 
         root_result = _run(["bash", root_rollback, "--no-restart"], env=env, cwd=isolated_root)
         assert root_result.returncode == 0, (
-            f"Rollback failed for {ROOT_SLUG}:\nSTDOUT: {root_result.stdout}\nSTDERR: {root_result.stderr}"
+            f"Rollback failed for {ROOT_SKILL_SLUG}:\nSTDOUT: {root_result.stdout}\nSTDERR: {root_result.stderr}"
         )
 
         pm_result = _run(["bash", pm_rollback, "--no-restart"], env=env, cwd=isolated_root)
@@ -64,8 +60,8 @@ def test_independent_symmetrical_rollbacks():
             f"Rollback failed for {PM_SLUG}:\nSTDOUT: {pm_result.stdout}\nSTDERR: {pm_result.stderr}"
         )
 
-        root_skill_dir = _canonical_skill_dir(mock_home, ROOT_SLUG)
-        pm_skill_dir = _canonical_skill_dir(mock_home, PM_SLUG)
+        root_skill_dir = canonical_skill_dir(mock_home, ROOT_SKILL_SLUG)
+        pm_skill_dir = canonical_skill_dir(mock_home, PM_SLUG)
         assert not os.path.exists(os.path.join(root_skill_dir, MODIFIED_MARKER))
         assert not os.path.exists(os.path.join(pm_skill_dir, MODIFIED_MARKER))
         assert os.path.exists(os.path.join(root_skill_dir, "scripts", "orchestrator.py"))
@@ -80,6 +76,8 @@ def test_rollback_no_restart_with_mock():
         mock_home = isolated["mock_home"]
         env = isolated["env"]
 
+        assert_isolated_checkout(isolated_root)
+
         deploy_script = os.path.join(isolated_root, "kit-deploy.sh")
         root_rollback = os.path.join(isolated_root, "scripts", "rollback.sh")
 
@@ -89,7 +87,7 @@ def test_rollback_no_restart_with_mock():
         second = _run(["bash", deploy_script], env=env, cwd=isolated_root)
         assert second.returncode == 0, f"Second kit-deploy.sh failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
 
-        marker = os.path.join(_canonical_skill_dir(mock_home, ROOT_SLUG), MODIFIED_MARKER)
+        marker = os.path.join(canonical_skill_dir(mock_home, ROOT_SKILL_SLUG), MODIFIED_MARKER)
         with open(marker, "w", encoding="utf-8") as handle:
             handle.write("modified")
 
@@ -107,6 +105,8 @@ def test_rollback_lock_guardrails():
         mock_home = isolated["mock_home"]
         env = isolated["env"]
 
+        assert_isolated_checkout(isolated_root)
+
         deploy_script = os.path.join(isolated_root, "deploy.sh")
         rollback_script = os.path.join(isolated_root, "scripts", "rollback.sh")
 
@@ -116,7 +116,7 @@ def test_rollback_lock_guardrails():
         second = _run(["bash", deploy_script, "--no-restart"], env=env, cwd=isolated_root)
         assert second.returncode == 0, f"Second deploy failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
 
-        prod_dir = _canonical_skill_dir(mock_home, ROOT_SLUG)
+        prod_dir = canonical_skill_dir(mock_home, ROOT_SKILL_SLUG)
         for lock_file in LOCK_FILES:
             lock_path = os.path.join(prod_dir, lock_file)
             with open(lock_path, "w", encoding="utf-8") as handle:

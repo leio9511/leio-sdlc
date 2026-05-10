@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
+ROOT_SKILL_SLUG = "leio-sdlc"
 IGNORED_REPO_STATE = (
     ".git",
     ".dist",
@@ -16,6 +17,24 @@ IGNORED_REPO_STATE = (
     ".mypy_cache",
     ".ruff_cache",
 )
+
+
+def assert_isolated_checkout(repo_root: str | os.PathLike[str]) -> None:
+    checkout_name = Path(repo_root).resolve().name
+    if checkout_name == ROOT_SKILL_SLUG:
+        raise AssertionError("Isolated checkout basename must not be leio-sdlc")
+
+
+def canonical_openclaw_home(mock_home: str | os.PathLike[str]) -> str:
+    return os.path.join(os.fspath(mock_home), ".openclaw")
+
+
+def canonical_skill_dir(mock_home: str | os.PathLike[str], slug: str) -> str:
+    return os.path.join(canonical_openclaw_home(mock_home), "skills", slug)
+
+
+def canonical_releases_dir(mock_home: str | os.PathLike[str], slug: str) -> str:
+    return os.path.join(canonical_openclaw_home(mock_home), ".releases", slug)
 
 
 @contextmanager
@@ -34,8 +53,7 @@ def isolated_repo_env(source_repo: str | os.PathLike[str]):
         )
         mock_home.mkdir(parents=True, exist_ok=True)
 
-        if repo_root.name == "leio-sdlc":
-            raise AssertionError("Isolated checkout basename must not be leio-sdlc")
+        assert_isolated_checkout(repo_root)
 
         inherited_artifacts = [name for name in (".dist", ".sdlc", ".sdlc_runs") if (repo_root / name).exists()]
         if inherited_artifacts:
