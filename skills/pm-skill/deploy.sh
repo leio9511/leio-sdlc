@@ -1,10 +1,21 @@
 #!/bin/bash
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
 SLUG="pm-skill"
-HOME_DIR="${HOME_MOCK:-$HOME}"
-OPENCLAW_DIR="$HOME_DIR/.openclaw"
-SKILLS_DIR="$OPENCLAW_DIR/skills"
-RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+HOME_ROOT="${HOME_MOCK:-$HOME}"
+OPENCLAW_HOME="$HOME_ROOT/.openclaw"
+RELEASES_ROOT="$OPENCLAW_HOME/.releases"
+if [ -n "$HOME_MOCK" ]; then
+    SKILLS_DIR="$OPENCLAW_HOME/skills"
+else
+    SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
+fi
+RELEASES_DIR="$RELEASES_ROOT/$SLUG"
 PROD_DIR="$SKILLS_DIR/$SLUG"
 
 NO_RESTART=false
@@ -36,12 +47,12 @@ rm -rf "$TMP_DIR" "$OLD_DIR"
 mkdir -p "$TMP_DIR"
 
 # Stage the skill directory
-rsync -a --exclude=.git --exclude=__pycache__ skills/$SLUG/ "$TMP_DIR/"
+rsync -a --exclude=.git --exclude=__pycache__ "$REPO_ROOT/skills/$SLUG/" "$TMP_DIR/"
 
 # Package dependencies from monorepo root
 mkdir -p "$TMP_DIR/scripts"
-cp scripts/agent_driver.py "$TMP_DIR/scripts/"
-cp scripts/utils_notification.py "$TMP_DIR/scripts/"
+cp "$REPO_ROOT/scripts/agent_driver.py" "$TMP_DIR/scripts/"
+cp "$REPO_ROOT/scripts/utils_notification.py" "$TMP_DIR/scripts/"
 
 if [ -e "$PROD_DIR" ]; then
     mv "$PROD_DIR" "$OLD_DIR"
