@@ -222,8 +222,8 @@ test_deploy_copies_dotfiles_from_dist_into_runtime() {
     run_deploy_with_home_mock "$repo_dir" "$home_mock" "$BASE_PATH" "$log_path"
 
     assert_file_exists "$repo_dir/.dist/.sdlc_hooks/pre-commit"
-    assert_file_exists "$home_mock/.openclaw/skills/dotfile-skill/.sdlc_hooks/pre-commit"
-    assert_files_equal "$repo_dir/.sdlc_hooks/pre-commit" "$home_mock/.openclaw/skills/dotfile-skill/.sdlc_hooks/pre-commit"
+    assert_file_exists "$home_mock/.openclaw/skills/leio-sdlc/.sdlc_hooks/pre-commit"
+    assert_files_equal "$repo_dir/.sdlc_hooks/pre-commit" "$home_mock/.openclaw/skills/leio-sdlc/.sdlc_hooks/pre-commit"
     echo "✅ Passed: dotfiles are copied from .dist into runtime."
 }
 
@@ -264,7 +264,7 @@ test_kit_deploy_sh_does_not_invoke_gateway_restart() {
     run_kit_deploy_with_isolated_home "$repo_dir" "$home_dir" "$mock_bin:$BASE_PATH" "$deploy_log"
 
     assert_no_gateway_restart "$openclaw_log"
-    assert_file_exists "$home_dir/.openclaw/skills/kit-skill/version.txt"
+    assert_file_exists "$home_dir/.openclaw/skills/leio-sdlc/version.txt"
     assert_file_exists "$home_dir/.openclaw/skills/pm-skill/SKILL.md"
     echo "✅ Passed: kit-deploy.sh does not invoke gateway restart."
 }
@@ -318,7 +318,7 @@ test_deploy_sh_accepts_no_restart_as_compatibility_no_op() {
 
     assert_no_gateway_restart "$default_openclaw_log"
     assert_no_gateway_restart "$compat_openclaw_log"
-    assert_tree_equal "$default_home/.openclaw/skills/default-skill" "$compat_home/.openclaw/skills/compat-skill"
+    assert_tree_equal "$default_home/.openclaw/skills/leio-sdlc" "$compat_home/.openclaw/skills/leio-sdlc"
     echo "✅ Passed: --no-restart remains an accepted compatibility no-op."
 }
 
@@ -333,18 +333,18 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
     local main_repo="$case_dir/src/nonreg-skill"
     local main_log="$case_dir/main_deploy.log"
     create_mock_repo "$main_repo"
-    seed_existing_runtime "$main_home" "nonreg-skill"
+    seed_existing_runtime "$main_home" "leio-sdlc"
 
     run_deploy_with_home_mock "$main_repo" "$main_home" "$BASE_PATH" "$main_log"
 
-    local releases_dir="$main_home/.openclaw/.releases/nonreg-skill"
-    local runtime_dir="$main_home/.openclaw/skills/nonreg-skill"
+    local releases_dir="$main_home/.openclaw/.releases/leio-sdlc"
+    local runtime_dir="$main_home/.openclaw/skills/leio-sdlc"
     assert_file_exists "$releases_dir"
     find "$releases_dir" -maxdepth 1 -name 'backup_*.tar.gz' | grep . >/dev/null || fail "Expected deploy backup tarball to be created"
     assert_file_content_equals "$runtime_dir/version.txt" "v1"
     assert_file_content_equals "$runtime_dir/config/sdlc_config.json" '{"preserved":"hot-config"}'
-    assert_file_not_exists "$main_home/.openclaw/skills/.tmp_nonreg-skill"
-    assert_file_not_exists "$main_home/.openclaw/skills/.old_nonreg-skill"
+    assert_file_not_exists "$main_home/.openclaw/skills/.tmp_leio-sdlc"
+    assert_file_not_exists "$main_home/.openclaw/skills/.old_leio-sdlc"
 
     (
         cd "$main_repo"
@@ -375,9 +375,9 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
     create_mock_repo "$gemini_repo"
     setup_mock_bin "$gemini_mock_bin" "$gemini_openclaw_log" "$gemini_gemini_log" true
     run_deploy_with_home_mock "$gemini_repo" "$gemini_home" "$gemini_mock_bin:$BASE_PATH" "$gemini_deploy_log"
-    assert_log_contains "$gemini_gemini_log" "gemini skills link $gemini_home/.openclaw/skills/gemini-skill --consent"
+    assert_log_contains "$gemini_gemini_log" "gemini skills link $gemini_home/.openclaw/skills/leio-sdlc --consent"
 
-    # SDLC_RUNTIME_DIR handling under HOME_MOCK.
+    # SDLC_RUNTIME_DIR must be ignored under HOME_MOCK.
     local custom_home="$case_dir/custom_home"
     local custom_repo="$case_dir/src/custom-runtime-skill"
     local custom_runtime="$case_dir/custom_runtime"
@@ -386,7 +386,8 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
         cd "$custom_repo"
         HOME="$custom_home" HOME_MOCK="$custom_home" SDLC_RUNTIME_DIR="$custom_runtime" PATH="$BASE_PATH" bash ./deploy.sh > "$case_dir/custom_runtime.log" 2>&1
     )
-    assert_file_exists "$custom_runtime/custom-runtime-skill/version.txt"
+    assert_file_exists "$custom_home/.openclaw/skills/leio-sdlc/version.txt"
+    assert_file_not_exists "$custom_runtime/leio-sdlc/version.txt"
 
     # GitHub sync compatibility under isolated HOME (HOME_MOCK would intentionally skip sync).
     local sync_home="$case_dir/sync_home"

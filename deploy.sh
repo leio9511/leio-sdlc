@@ -1,5 +1,6 @@
 #!/bin/bash
-cd "$(dirname "$0")" || exit 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
 set -e
 
 # ==========================================
@@ -8,11 +9,23 @@ set -e
 # Hard Copy (Physical Sync) with Atomic Renaming
 
 perform_hard_copy_deployment() {
-    local SLUG=$(basename "$PWD")
-    local HOME_DIR="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_DIR="$HOME_DIR/.openclaw"
-    local SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_DIR/skills}"
-    local RELEASES_DIR="$OPENCLAW_DIR/.releases/$SLUG"
+    local SLUG="leio-sdlc"
+    local HOME_ROOT
+    if [ -n "$HOME_MOCK" ]; then
+        HOME_ROOT="$HOME_MOCK"
+    else
+        HOME_ROOT="$HOME"
+    fi
+
+    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
+    local RELEASES_ROOT="$OPENCLAW_HOME/.releases"
+    local SKILLS_DIR
+    if [ -n "$HOME_MOCK" ]; then
+        SKILLS_DIR="$OPENCLAW_HOME/skills"
+    else
+        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
+    fi
+    local RELEASES_DIR="$RELEASES_ROOT/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
 
     local RUN_TESTS=false
@@ -133,8 +146,12 @@ perform_hard_copy_deployment() {
     
     # 6. Install Git Hooks
     if [ -d ".sdlc_hooks" ]; then
-        echo "🎣 Installing Git hooks..."
-        git config core.hooksPath .sdlc_hooks
+        if git rev-parse --git-dir >/dev/null 2>&1; then
+            echo "🎣 Installing Git hooks..."
+            git config core.hooksPath .sdlc_hooks
+        else
+            echo "ℹ️ Skipping Git hook installation outside a Git worktree."
+        fi
     fi
 
     # 7. Gemini CLI Dual-Compatibility Link
