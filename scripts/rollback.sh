@@ -7,23 +7,11 @@ set -e
 # Rollback Hard Copy (Physical Sync)
 
 perform_hard_copy_rollback() {
-    local SLUG="leio-sdlc"
-    local HOME_ROOT
-    if [ -n "$HOME_MOCK" ]; then
-        HOME_ROOT="$HOME_MOCK"
-    else
-        HOME_ROOT="$HOME"
-    fi
-
-    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
-    local RELEASES_ROOT="$OPENCLAW_HOME/.releases"
-    local SKILLS_DIR
-    if [ -n "$HOME_MOCK" ]; then
-        SKILLS_DIR="$OPENCLAW_HOME/skills"
-    else
-        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
-    fi
-    local RELEASES_DIR="$RELEASES_ROOT/$SLUG"
+    local SLUG=$(basename "$PWD")
+    local HOME_DIR="${HOME_MOCK:-$HOME}"
+    local OPENCLAW_DIR="${SDLC_SKILLS_ROOT:-${HOME_MOCK:-$HOME}/.openclaw/skills}"
+    local SKILLS_DIR="$OPENCLAW_DIR"
+    local RELEASES_DIR="$HOME_DIR/.openclaw/.releases/$SLUG"
     local PROD_DIR="$SKILLS_DIR/$SLUG"
     
     local NO_RESTART=false

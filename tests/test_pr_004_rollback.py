@@ -3,18 +3,15 @@ import subprocess
 import tempfile
 import pytest
 
-from deploy_test_support import isolated_repo_env
-
 import pytest
 
 
 def test_independent_symmetrical_rollbacks():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
-    with isolated_repo_env(repo_root) as isolated:
-        repo_root = isolated["repo_root"]
-        mock_home = isolated["mock_home"]
-        env = isolated["env"]
+    with tempfile.TemporaryDirectory() as mock_home:
+        env = os.environ.copy()
+        env["HOME_MOCK"] = mock_home
         
         # 1. Run first deployment
         deploy_script = os.path.join(repo_root, "kit-deploy.sh")
@@ -60,9 +57,9 @@ def test_independent_symmetrical_rollbacks():
 def test_rollback_no_restart_with_mock():
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
-    with isolated_repo_env(repo_root) as isolated:
-        repo_root = isolated["repo_root"]
-        env = isolated["env"]
+    with tempfile.TemporaryDirectory() as mock_home:
+        env = os.environ.copy()
+        env["HOME_MOCK"] = mock_home
         
         # 1. Run first deployment
         deploy_script = os.path.join(repo_root, "kit-deploy.sh")

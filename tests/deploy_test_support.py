@@ -5,6 +5,19 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
+IGNORED_REPO_STATE = (
+    ".git",
+    ".dist",
+    ".sdlc",
+    ".sdlc_runs",
+    ".tmp_home_mock",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+)
+
+
 @contextmanager
 def isolated_repo_env(source_repo: str | os.PathLike[str]):
     source_root = Path(source_repo).resolve()
@@ -17,16 +30,18 @@ def isolated_repo_env(source_repo: str | os.PathLike[str]):
             source_root,
             repo_root,
             dirs_exist_ok=False,
-            ignore=shutil.ignore_patterns(
-                ".git",
-                "__pycache__",
-                ".pytest_cache",
-                ".mypy_cache",
-                ".ruff_cache",
-                ".dist",
-            ),
+            ignore=shutil.ignore_patterns(*IGNORED_REPO_STATE, "*.pyc"),
         )
         mock_home.mkdir(parents=True, exist_ok=True)
+
+        if repo_root.name == "leio-sdlc":
+            raise AssertionError("Isolated checkout basename must not be leio-sdlc")
+
+        inherited_artifacts = [name for name in (".dist", ".sdlc", ".sdlc_runs") if (repo_root / name).exists()]
+        if inherited_artifacts:
+            raise AssertionError(
+                f"Isolated checkout inherited generated repo state: {', '.join(sorted(inherited_artifacts))}"
+            )
 
         env = os.environ.copy()
         env["HOME_MOCK"] = str(mock_home)

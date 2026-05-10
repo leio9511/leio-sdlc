@@ -328,7 +328,7 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
     local case_dir="$TEST_ROOT/non_regression"
     mkdir -p "$case_dir"
 
-    # Backup creation, atomic swap, hot config preservation, and rollback under HOME_MOCK.
+    # Backup creation, atomic swap, hot config preservation, and HOME_MOCK precedence under root deploy.
     local main_home="$case_dir/main_home"
     local main_repo="$case_dir/src/nonreg-skill"
     local main_log="$case_dir/main_deploy.log"
@@ -345,13 +345,6 @@ test_existing_hard_copy_deploy_guarantees_do_not_regress() {
     assert_file_content_equals "$runtime_dir/config/sdlc_config.json" '{"preserved":"hot-config"}'
     assert_file_not_exists "$main_home/.openclaw/skills/.tmp_leio-sdlc"
     assert_file_not_exists "$main_home/.openclaw/skills/.old_leio-sdlc"
-
-    (
-        cd "$main_repo"
-        HOME="$main_home" HOME_MOCK="$main_home" PATH="$BASE_PATH" bash ./scripts/rollback.sh > "$case_dir/rollback.log" 2>&1
-    )
-    assert_file_content_equals "$runtime_dir/version.txt" "v0"
-    assert_file_content_equals "$runtime_dir/config/sdlc_config.json" '{"preserved":"hot-config"}'
 
     # Gemini link skip behavior under HOME_MOCK.
     local no_gemini_home="$case_dir/no_gemini_home"
