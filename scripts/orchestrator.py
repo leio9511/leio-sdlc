@@ -27,39 +27,9 @@ MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
 import json
 import config
+from config import load_or_merge_config
+from utils_path import resolve_global_dir, get_canonical_job_dir
 
-def load_or_merge_config(sdlc_root):
-    template_path = os.path.join(sdlc_root, "config", "sdlc_config.json.template")
-    config_path = os.path.join(sdlc_root, "config", "sdlc_config.json")
-    
-    config_template = {}
-    if os.path.exists(template_path):
-        with open(template_path, "r") as f:
-            config_template = json.load(f)
-            
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            try:
-                local_config = json.load(f)
-            except json.JSONDecodeError:
-                local_config = {}
-        changed = False
-        for k, v in config_template.items():
-            if k not in local_config:
-                local_config[k] = v
-                changed = True
-        if changed and os.environ.get("SDLC_TEST_MODE") != "true":
-            # PR-002: Prevent physical config write if in test mode
-            with open(config_path, "w") as fw:
-                json.dump(local_config, fw, indent=4)
-        return local_config
-    else:
-        if os.environ.get("SDLC_TEST_MODE") != "true":
-            # PR-002: Prevent physical config write if in test mode
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            with open(config_path, "w") as f:
-                json.dump(config_template, f, indent=4)
-        return config_template
 
 RETRY_RECOVERY_CONFIG_KEYS = (
     "YELLOW_RETRY_LIMIT",
@@ -377,9 +347,9 @@ def main():
     
     resolved_global_dir = None
     if args.global_dir:
-        resolved_global_dir = os.path.abspath(args.global_dir)
+        resolved_global_dir = resolve_global_dir(args.global_dir)
     elif app_config.get("GLOBAL_RUN_DIR"):
-        resolved_global_dir = os.path.abspath(app_config.get("GLOBAL_RUN_DIR"))
+        resolved_global_dir = resolve_global_dir(app_config.get("GLOBAL_RUN_DIR"))
         
     global_dir = resolved_global_dir if resolved_global_dir else os.path.abspath(args.workdir)
     retry_recovery_config = resolve_retry_recovery_config(sdlc_root, global_dir)
@@ -456,7 +426,7 @@ def main():
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
         target_project_name = os.path.basename(os.path.abspath(args.workdir))
-        job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+        job_dir = get_canonical_job_dir(global_dir, args.workdir, args.prd_file)
         
         withdrawn_dir = f"{job_dir}.withdrawn"
         if os.path.exists(withdrawn_dir) and not os.path.exists(job_dir):
@@ -587,7 +557,7 @@ def main():
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
         target_project_name = os.path.basename(os.path.abspath(workdir))
-        resume_job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+        resume_job_dir = get_canonical_job_dir(global_dir, workdir, args.prd_file)
         
         if os.path.exists(resume_job_dir):
             for pr_file in glob.glob(os.path.join(resume_job_dir, "PR_*.md")):
@@ -677,7 +647,7 @@ def main():
     prd_filename = os.path.basename(args.prd_file)
     base_name, _ = os.path.splitext(prd_filename)
     target_project_name = os.path.basename(os.path.abspath(workdir))
-    job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+    job_dir = get_canonical_job_dir(global_dir, workdir, args.prd_file)
     run_dir = job_dir
 
     def ensure_run_anchors():

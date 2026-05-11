@@ -9,8 +9,8 @@ import time
 current_dir = os.path.dirname(os.path.abspath(__file__))
 import sys
 sys.path.insert(0, current_dir)
-import agent_driver
 import config
+import agent_driver
 from agent_driver import invoke_agent, build_prompt
 import envelope_assembler
 from thinking_resolver import resolve_thinking
@@ -95,7 +95,14 @@ def main():
         sys.exit(0)
 
     SDLC_ROOT = os.path.dirname(current_dir)
-    run_dir = os.environ.get("SDLC_RUN_DIR", ".")
+    run_dir = os.environ.get("SDLC_RUN_DIR")
+    if not run_dir:
+        from utils_path import resolve_global_dir, get_canonical_job_dir
+        app_config = config.load_or_merge_config(SDLC_ROOT)
+        resolved_global_dir = resolve_global_dir(app_config.get("GLOBAL_RUN_DIR"))
+        global_dir = resolved_global_dir if resolved_global_dir else os.path.abspath(workdir)
+        run_dir = get_canonical_job_dir(global_dir, workdir, prd_file_abs)
+    os.makedirs(run_dir, exist_ok=True)
     playbook_path = os.path.join(SDLC_ROOT, "playbooks", "auditor_playbook.md")
     
     references = {
@@ -133,7 +140,6 @@ def main():
 
     test_mode = os.environ.get("SDLC_TEST_MODE", "").lower() == "true"
     if test_mode:
-        run_dir = os.environ.get("SDLC_RUN_DIR", ".")
         if "REJECT" in os.environ.get("MOCK_AUDIT_RESULT", ""):
             output = '{"status": "REJECTED", "comments": "Mock rejected"}'
         else:

@@ -90,6 +90,7 @@ init_hermetic_sandbox() {
     mkdir -p "$target_dir"
 
     # Copy required scripts from the root scripts directory into the target directory
+    cp "$PROJECT_ROOT/scripts/utils_path.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/orchestrator.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/runtime_git_identity.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/utils_json.py" "$target_dir/" 2>/dev/null || true
