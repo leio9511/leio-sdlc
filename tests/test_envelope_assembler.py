@@ -20,6 +20,11 @@ class TestEnvelopeAssembler(unittest.TestCase):
         "Do not trigger approval-requiring commands.",
         "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
     ]
+    VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES = [
+        "Do not run repository tests.",
+        "Do not trigger approval-requiring commands.",
+        "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
+    ]
 
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -203,6 +208,29 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertIn("status", execution_contract)
         self.assertIn("executive_summary", execution_contract)
         self.assertIn("verification_details", execution_contract)
+
+    def test_verifier_envelope_includes_evidence_only_boundary_rules(self):
+        envelope = build_startup_envelope(
+            role="verifier",
+            workdir="/tmp/workdir",
+            out_dir="/tmp/run_dir",
+            references={
+                "prd_files": "/tmp/PRD_A.md",
+                "playbook_path": "/tmp/verifier_playbook.md",
+            },
+            contract_params={
+                "output_file": "/tmp/uat_report.json",
+                "output_schema": {"status": "string"},
+            },
+        )
+
+        execution_contract = envelope["execution_contract"]
+        for rule in self.VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, execution_contract)
+
+        prompt = render_envelope_to_prompt(envelope)
+        for rule in self.VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, prompt)
 
     def test_render_envelope_to_prompt(self):
         envelope = {

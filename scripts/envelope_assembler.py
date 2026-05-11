@@ -2,6 +2,13 @@ import json
 import os
 
 
+EVALUATION_ROLE_BOUNDARY_RULES = [
+    "Do not run repository tests.",
+    "Do not trigger approval-requiring commands.",
+    "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
+]
+
+
 def _build_planner_envelope(workdir, out_dir, references, contract_params, mode):
     execution_contract = [
         f"The only valid output location for PR contract artifacts in this run is `{out_dir}`.",
@@ -197,6 +204,7 @@ def _build_verifier_envelope(workdir, references, contract_params):
         f"Output File: `{output_file}`",
         "Read-Only Constraint: You are an evaluation agent. Do NOT modify, create, or delete any workspace files except writing the final UAT JSON output artifact to the exact Output File path.",
         "Before verification, you MUST use the read tool to read every reference in the REFERENCE INDEX where required=true and priority=1.",
+        *EVALUATION_ROLE_BOUNDARY_RULES,
         f"Output JSON Schema:\n```json\n{json.dumps(output_schema, indent=2)}\n```",
     ]
 

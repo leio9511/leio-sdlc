@@ -11,6 +11,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 
 class TestSpawnVerifier(unittest.TestCase):
+    VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES = [
+        "Do not run repository tests.",
+        "Do not trigger approval-requiring commands.",
+        "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
+    ]
+
     def setUp(self):
         self.original_cwd = os.getcwd()
         self.temp_dir = tempfile.mkdtemp()
@@ -144,6 +150,28 @@ class TestSpawnVerifier(unittest.TestCase):
         self.assertIn("Required Reference-Read Rule", playbook)
         self.assertIn("Read-Only (EMPHASIZED)", playbook)
         self.assertIn("Output Contract", playbook)
+
+    def test_spawn_verifier_rendered_prompt_includes_evidence_only_boundary_rules(self):
+        _, mock_invoke_agent, _ = self._invoke_spawn_verifier()
+
+        rendered_prompt = mock_invoke_agent.call_args.args[0]
+        for rule in self.VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, rendered_prompt)
+
+        rendered_prompt_path = os.path.join(self.run_dir, "uat_debug", "initial", "rendered_prompt.txt")
+        with open(rendered_prompt_path, "r") as f:
+            saved_prompt = f.read()
+        for rule in self.VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, saved_prompt)
+
+    def test_verifier_playbook_contains_evidence_only_boundary_rules(self):
+        playbook_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "playbooks", "verifier_playbook.md"))
+        with open(playbook_path, "r") as f:
+            playbook = f.read()
+
+        self.assertIn("## Verification Boundary", playbook)
+        for rule in self.VERIFIER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, playbook)
 
     def test_verifier_aligned_to_file_based_result(self):
         from agent_driver import AgentResult
