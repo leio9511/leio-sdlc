@@ -7,8 +7,6 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
 
-from runtime_launch_guard import is_authorized_runtime_launch
-
 
 VALID_AUDITOR_PRD_CONTENT = (
     "1. Context & Problem\n"
@@ -21,38 +19,36 @@ VALID_AUDITOR_PRD_CONTENT = (
 )
 
 
+class _StartupAllowed(BaseException):
+    pass
+
+
 def _load_module(module_name):
     module = importlib.import_module(module_name)
     return importlib.reload(module)
 
 
+def _runtime_overlay(allowed_roots):
+    return {
+        "ALLOWED_RUNTIME_ROOTS": [str(root) for root in allowed_roots],
+        "GLOBAL_RUN_DIR": "",
+    }
 
-def test_spawn_entrypoints_accept_allowlisted_runtime_root_without_workspace_override(monkeypatch, tmp_path):
-    import config
 
-    allowed_root = tmp_path / "runtime-root" / "skills"
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("SDLC_TEST_MODE", "true")
-    monkeypatch.setenv("MOCK_AUDIT_RESULT", "APPROVE")
-    monkeypatch.setattr(config, "DEFAULT_ALLOWED_RUNTIME_ROOTS", [str(allowed_root)])
-
+def _spawn_auditor_startup_outcome(script_path, tmp_path, allowed_roots):
+    spawn_auditor = _load_module("spawn_auditor")
     prd_file = tmp_path / "valid_prd.md"
     prd_file.write_text(VALID_AUDITOR_PRD_CONTENT)
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
 
-    spawn_auditor = _load_module("spawn_auditor")
-    spawn_planner = _load_module("spawn_planner")
-
-    with patch("runtime_launch_guard.resolve_allowed_runtime_roots", return_value=[str(allowed_root)]), \
+    with patch("runtime_launch_guard.config.load_or_merge_config", return_value=_runtime_overlay(allowed_roots)), \
          patch("utils_api_key.setup_spawner_api_key"), \
-         patch("agent_driver.send_ignition_handshake"), \
-         patch("agent_driver.notify_channel"), \
+         patch("agent_driver.send_ignition_handshake", side_effect=_StartupAllowed), \
+         patch("handoff_prompter.HandoffPrompter.get_prompt", return_value="startup blocked"), \
          patch.object(
              sys,
              "argv",
              [
-                 str(allowed_root / "leio-sdlc" / "scripts" / "spawn_auditor.py"),
+                 str(script_path),
                  "--prd-file",
                  str(prd_file),
                  "--workdir",
@@ -61,17 +57,33 @@ def test_spawn_entrypoints_accept_allowlisted_runtime_root_without_workspace_ove
                  "stdout",
              ],
          ):
-        with pytest.raises(SystemExit) as auditor_exit:
+        try:
             spawn_auditor.main()
-        assert auditor_exit.value.code == 0
+        except _StartupAllowed:
+            return "allowed"
+        except SystemExit as exc:
+            assert exc.code == 1
+            return "blocked"
 
-    with patch("runtime_launch_guard.resolve_allowed_runtime_roots", return_value=[str(allowed_root)]), \
+    raise AssertionError("spawn_auditor.main() returned without a startup outcome")
+
+
+def _spawn_planner_startup_outcome(script_path, tmp_path, allowed_roots):
+    spawn_planner = _load_module("spawn_planner")
+    prd_file = tmp_path / "valid_prd.md"
+    prd_file.write_text(VALID_AUDITOR_PRD_CONTENT)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(exist_ok=True)
+
+    with patch("runtime_launch_guard.config.load_or_merge_config", return_value=_runtime_overlay(allowed_roots)), \
          patch("utils_api_key.setup_spawner_api_key"), \
+         patch("spawn_planner.os.chdir", side_effect=_StartupAllowed), \
+         patch("handoff_prompter.HandoffPrompter.get_prompt", return_value="startup blocked"), \
          patch.object(
              sys,
              "argv",
              [
-                 str(allowed_root / "leio-sdlc" / "scripts" / "spawn_planner.py"),
+                 str(script_path),
                  "--prd-file",
                  str(prd_file),
                  "--workdir",
@@ -80,41 +92,70 @@ def test_spawn_entrypoints_accept_allowlisted_runtime_root_without_workspace_ove
                  str(run_dir),
              ],
          ):
-        with pytest.raises(SystemExit) as planner_exit:
+        try:
             spawn_planner.main()
-        assert planner_exit.value.code == 0
+        except _StartupAllowed:
+            return "allowed"
+        except SystemExit as exc:
+            assert exc.code == 1
+            return "blocked"
 
+    raise AssertionError("spawn_planner.main() returned without a startup outcome")
+
+
+def _orchestrator_startup_outcome(script_path, tmp_path, allowed_roots):
+    orchestrator = _load_module("orchestrator")
+
+    with patch("runtime_launch_guard.config.load_or_merge_config", return_value=_runtime_overlay(allowed_roots)), \
+         patch("orchestrator.load_or_merge_config", side_effect=_StartupAllowed), \
+         patch("handoff_prompter.HandoffPrompter.get_prompt", return_value="startup blocked"), \
+         patch.object(
+             sys,
+             "argv",
+             [
+                 str(script_path),
+                 "--workdir",
+                 str(tmp_path),
+                 "--prd-file",
+                 str(tmp_path / "dummy.md"),
+                 "--force-replan",
+                 "true",
+             ],
+         ):
+        try:
+            orchestrator.main()
+        except _StartupAllowed:
+            return "allowed"
+        except SystemExit as exc:
+            assert exc.code == 1
+            return "blocked"
+
+    raise AssertionError("orchestrator.main() returned without a startup outcome")
+
+
+def test_spawn_entrypoints_accept_allowlisted_runtime_root_without_workspace_override(tmp_path):
+    allowed_root = tmp_path / "runtime-root" / "skills"
+    authorized_script_path = allowed_root / "leio-sdlc" / "scripts" / "entrypoint.py"
+
+    assert _spawn_auditor_startup_outcome(authorized_script_path, tmp_path, [allowed_root]) == "allowed"
+    assert _spawn_planner_startup_outcome(authorized_script_path, tmp_path, [allowed_root]) == "allowed"
 
 
 def test_explicit_allowed_runtime_roots_override_rejects_built_in_default_root_when_not_listed(monkeypatch, tmp_path):
-    import config
-
     monkeypatch.setenv("HOME", str(tmp_path))
     explicit_root = tmp_path / "explicit-runtime" / "skills"
-    legacy_default_root = tmp_path / ".openclaw" / "skills"
-    monkeypatch.setattr(config, "DEFAULT_ALLOWED_RUNTIME_ROOTS", [str(legacy_default_root)])
+    built_in_default_script_path = tmp_path / ".openclaw" / "skills" / "leio-sdlc" / "scripts" / "spawn_auditor.py"
 
-    script_under_old_default = legacy_default_root / "leio-sdlc" / "scripts" / "spawn_auditor.py"
-
-    assert not is_authorized_runtime_launch(
-        str(script_under_old_default),
-        app_config={config.ALLOWED_RUNTIME_ROOTS_CONFIG_KEY: [str(explicit_root)]},
-    )
+    assert _spawn_auditor_startup_outcome(built_in_default_script_path, tmp_path, [explicit_root]) == "blocked"
 
 
-
-def test_orchestrator_and_spawn_auditor_share_identical_authorization_outcomes(monkeypatch, tmp_path):
-    import config
-    import orchestrator
-
-    monkeypatch.setenv("HOME", str(tmp_path))
+def test_orchestrator_and_spawn_auditor_share_identical_authorization_outcomes(tmp_path):
     allowed_root = tmp_path / ".gemini" / "skills"
-    monkeypatch.setattr(config, "DEFAULT_ALLOWED_RUNTIME_ROOTS", [str(allowed_root)])
+    authorized_script_path = allowed_root / "leio-sdlc" / "scripts" / "entrypoint.py"
+    unauthorized_workspace_script_path = tmp_path / "workspace" / "leio-sdlc" / "scripts" / "entrypoint.py"
 
-    authorized_path = str(allowed_root / "leio-sdlc" / "scripts" / "orchestrator.py")
-    unauthorized_workspace_path = str(tmp_path / "workspace" / "scripts" / "spawn_auditor.py")
+    assert _orchestrator_startup_outcome(authorized_script_path, tmp_path, [allowed_root]) == "allowed"
+    assert _spawn_auditor_startup_outcome(authorized_script_path, tmp_path, [allowed_root]) == "allowed"
 
-    assert orchestrator.is_authorized_runtime_launch(authorized_path)
-    assert is_authorized_runtime_launch(authorized_path)
-    assert not orchestrator.is_authorized_runtime_launch(unauthorized_workspace_path)
-    assert not is_authorized_runtime_launch(unauthorized_workspace_path)
+    assert _orchestrator_startup_outcome(unauthorized_workspace_script_path, tmp_path, [allowed_root]) == "blocked"
+    assert _spawn_auditor_startup_outcome(unauthorized_workspace_script_path, tmp_path, [allowed_root]) == "blocked"
