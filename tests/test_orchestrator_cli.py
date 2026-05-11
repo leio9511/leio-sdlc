@@ -194,32 +194,40 @@ class TestOrchestratorCLI(unittest.TestCase):
             # Check for the red retry default which is effectively the escalation limit in the current implementation
             self.assertEqual(resolved["RED_RETRY_LIMIT"], 2)
 
-    @patch("orchestrator.is_authorized_runtime_launch", return_value=False)
-    def test_startup_validation_blocks_workspace_launch_without_override(self, mock_is_authorized_runtime_launch):
+    def test_startup_validation_blocks_workspace_launch_without_override(self):
         import orchestrator
+        import tempfile
 
-        with patch(
-            "sys.argv",
-            [
-                "/workspace/leio-sdlc/scripts/orchestrator.py",
-                "--workdir",
-                ".",
-                "--prd-file",
-                "dummy.md",
-                "--channel",
-                "test",
-                "--force-replan",
-                "false",
-            ],
-        ):
-            with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
-                with self.assertRaises(SystemExit) as cm:
-                    orchestrator.main()
+        with tempfile.TemporaryDirectory() as td:
+            fake_home = os.path.join(td, "home")
+            workspace_script = os.path.join(
+                fake_home,
+                "workspace",
+                "leio-sdlc",
+                "scripts",
+                "orchestrator.py",
+            )
+
+            with patch.dict(os.environ, {"HOME": fake_home, "SDLC_TEST_MODE": "false"}, clear=False):
+                with patch(
+                    "sys.argv",
+                    [
+                        workspace_script,
+                        "--workdir",
+                        ".",
+                        "--prd-file",
+                        "dummy.md",
+                        "--channel",
+                        "test",
+                        "--force-replan",
+                        "false",
+                    ],
+                ):
+                    with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+                        with self.assertRaises(SystemExit) as cm:
+                            orchestrator.main()
 
         self.assertEqual(cm.exception.code, 1)
-        mock_is_authorized_runtime_launch.assert_called_once_with(
-            "/workspace/leio-sdlc/scripts/orchestrator.py"
-        )
         output = "".join(call.args[0] for call in mock_stdout.write.call_args_list)
         self.assertIn("Startup validation failed", output)
 
@@ -236,13 +244,29 @@ class TestOrchestratorCLI(unittest.TestCase):
 
         td = tempfile.mkdtemp()
         try:
+            fake_home = os.path.join(td, "home")
+            allowed_script = os.path.join(
+                fake_home,
+                ".gemini",
+                "skills",
+                "leio-sdlc",
+                "scripts",
+                "orchestrator.py",
+            )
             os.makedirs(os.path.join(td, ".git"), exist_ok=True)
 
-            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+            with patch.dict(
+                os.environ,
+                {
+                    "HOME": fake_home,
+                    "SDLC_TEST_MODE": "false",
+                },
+                clear=False,
+            ):
                 with patch(
                     "sys.argv",
                     [
-                        "/allowed/runtime/leio-sdlc/scripts/orchestrator.py",
+                        allowed_script,
                         "--workdir",
                         td,
                         "--prd-file",
@@ -261,16 +285,12 @@ class TestOrchestratorCLI(unittest.TestCase):
                             with patch("orchestrator.time.sleep"):
                                 with patch("orchestrator.validate_prd_is_committed"):
                                     with patch("orchestrator.parse_affected_projects", return_value=[]):
-                                        with patch("orchestrator.is_authorized_runtime_launch", return_value=True) as mock_is_authorized_runtime_launch:
-                                            with patch("git_utils.check_git_boundary"):
-                                                with patch("orchestrator.drun", return_value=DummyRet()):
-                                                    with self.assertRaises(SystemExit) as cm:
-                                                        orchestrator.main()
+                                        with patch("git_utils.check_git_boundary"):
+                                            with patch("orchestrator.drun", return_value=DummyRet()):
+                                                with self.assertRaises(SystemExit) as cm:
+                                                    orchestrator.main()
 
             self.assertEqual(cm.exception.code, 0)
-            mock_is_authorized_runtime_launch.assert_called_once_with(
-                "/allowed/runtime/leio-sdlc/scripts/orchestrator.py"
-            )
         finally:
             shutil.rmtree(td)
 
