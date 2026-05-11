@@ -2,6 +2,7 @@
 .sdlc/
 docs/
 tests/
+dist/
 *.log
 *.diff
 .review_count

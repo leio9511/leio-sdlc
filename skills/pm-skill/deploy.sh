@@ -46,8 +46,15 @@ OLD_DIR="$SKILLS_DIR/.old_$SLUG"
 rm -rf "$TMP_DIR" "$OLD_DIR"
 mkdir -p "$TMP_DIR"
 
-# Stage the skill directory
-rsync -a --exclude=.git --exclude=__pycache__ "$REPO_ROOT/skills/$SLUG/" "$TMP_DIR/"
+# Stage the skill directory without carrying nested build artifacts into prod.
+rsync -a \
+    --exclude=.git \
+    --exclude=__pycache__ \
+    --exclude=dist \
+    --exclude=.pytest_cache \
+    --exclude=.mypy_cache \
+    --exclude=.ruff_cache \
+    "$REPO_ROOT/skills/$SLUG/" "$TMP_DIR/"
 
 # Package dependencies from monorepo root
 mkdir -p "$TMP_DIR/scripts"
