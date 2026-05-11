@@ -74,7 +74,8 @@ def main():
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
     from handoff_prompter import HandoffPrompter
-    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+    from runtime_launch_guard import is_authorized_runtime_launch
+    if not getattr(args, "enable_exec_from_workspace", False) and not is_authorized_runtime_launch(sys.argv[0]):
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
     # API Key Assignment

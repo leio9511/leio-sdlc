@@ -36,7 +36,8 @@ def main():
     setup_spawner_api_key(args, __file__)
     
     from handoff_prompter import HandoffPrompter
-    if not args.enable_exec_from_workspace and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+    from runtime_launch_guard import is_authorized_runtime_launch
+    if not args.enable_exec_from_workspace and not is_authorized_runtime_launch(sys.argv[0]):
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
     

@@ -186,10 +186,18 @@ def test_spawn_auditor_fails_fast_on_handshake_failure():
 
 
 @patch("spawn_auditor.config")
+@patch("runtime_launch_guard.config")
 @patch("sys.argv", ["/custom_runtime_dir/spawn_auditor.py", "--prd-file", "dummy", "--workdir", "dummy", "--channel", "dummy"])
-def test_spawn_auditor_startup_validation_uses_runtime_dir(mock_config):
-    mock_config.SDLC_RUNTIME_DIR = "/custom_runtime_dir"
-    mock_config.DEFAULT_LLM_ENGINE = "gemini"
+def test_spawn_auditor_startup_validation_uses_allowed_runtime_roots(mock_runtime_guard_config, mock_config):
+    for cfg in (mock_config, mock_runtime_guard_config):
+        cfg.ALLOWED_RUNTIME_ROOTS_CONFIG_KEY = "ALLOWED_RUNTIME_ROOTS"
+        cfg.DEFAULT_ALLOWED_RUNTIME_ROOTS = ["/custom_runtime_dir"]
+        cfg.DEFAULT_LLM_ENGINE = "gemini"
+        cfg.DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
+        cfg.load_or_merge_config.return_value = {
+            "ALLOWED_RUNTIME_ROOTS": ["/custom_runtime_dir"],
+        }
+        cfg.get_allowed_runtime_roots.return_value = ["/custom_runtime_dir"]
 
     try:
         with patch("spawn_auditor.invoke_agent"), \
@@ -207,10 +215,18 @@ def test_spawn_auditor_startup_validation_uses_runtime_dir(mock_config):
 
 
 @patch("spawn_auditor.config")
+@patch("runtime_launch_guard.config")
 @patch("sys.argv", ["/invalid_dir/spawn_auditor.py", "--prd-file", "dummy", "--workdir", "dummy", "--channel", "dummy"])
-def test_spawn_auditor_startup_validation_rejects_invalid_dir(mock_config):
-    mock_config.SDLC_RUNTIME_DIR = "/custom_runtime_dir"
-    mock_config.DEFAULT_LLM_ENGINE = "gemini"
+def test_spawn_auditor_startup_validation_rejects_path_outside_allowed_runtime_roots(mock_runtime_guard_config, mock_config):
+    for cfg in (mock_config, mock_runtime_guard_config):
+        cfg.ALLOWED_RUNTIME_ROOTS_CONFIG_KEY = "ALLOWED_RUNTIME_ROOTS"
+        cfg.DEFAULT_ALLOWED_RUNTIME_ROOTS = ["/custom_runtime_dir"]
+        cfg.DEFAULT_LLM_ENGINE = "gemini"
+        cfg.DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
+        cfg.load_or_merge_config.return_value = {
+            "ALLOWED_RUNTIME_ROOTS": ["/custom_runtime_dir"],
+        }
+        cfg.get_allowed_runtime_roots.return_value = ["/custom_runtime_dir"]
     with patch("handoff_prompter.HandoffPrompter.get_prompt", return_value="failed"), \
          patch("utils_api_key.setup_spawner_api_key"):
         with pytest.raises(SystemExit) as e:
