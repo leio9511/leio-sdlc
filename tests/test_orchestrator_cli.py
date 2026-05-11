@@ -194,5 +194,85 @@ class TestOrchestratorCLI(unittest.TestCase):
             # Check for the red retry default which is effectively the escalation limit in the current implementation
             self.assertEqual(resolved["RED_RETRY_LIMIT"], 2)
 
+    @patch("orchestrator.is_authorized_runtime_launch", return_value=False)
+    def test_startup_validation_blocks_workspace_launch_without_override(self, mock_is_authorized_runtime_launch):
+        import orchestrator
+
+        with patch(
+            "sys.argv",
+            [
+                "/workspace/leio-sdlc/scripts/orchestrator.py",
+                "--workdir",
+                ".",
+                "--prd-file",
+                "dummy.md",
+                "--channel",
+                "test",
+                "--force-replan",
+                "false",
+            ],
+        ):
+            with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
+                with self.assertRaises(SystemExit) as cm:
+                    orchestrator.main()
+
+        self.assertEqual(cm.exception.code, 1)
+        mock_is_authorized_runtime_launch.assert_called_once_with(
+            "/workspace/leio-sdlc/scripts/orchestrator.py"
+        )
+        output = "".join(call.args[0] for call in mock_stdout.write.call_args_list)
+        self.assertIn("Startup validation failed", output)
+
+    def test_startup_validation_accepts_allowlisted_runtime_launch(self):
+        import orchestrator
+        import tempfile
+        import shutil
+
+        class DummyRet:
+            def __init__(self, stdout="", returncode=0):
+                self.stdout = stdout
+                self.returncode = returncode
+                self.stderr = ""
+
+        td = tempfile.mkdtemp()
+        try:
+            os.makedirs(os.path.join(td, ".git"), exist_ok=True)
+
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch(
+                    "sys.argv",
+                    [
+                        "/allowed/runtime/leio-sdlc/scripts/orchestrator.py",
+                        "--workdir",
+                        td,
+                        "--prd-file",
+                        "dummy.md",
+                        "--channel",
+                        "test",
+                        "--test-sleep",
+                        "--force-replan",
+                        "false",
+                        "--global-dir",
+                        td,
+                    ],
+                ):
+                    with patch("orchestrator.os.open", return_value=999):
+                        with patch("orchestrator.fcntl.flock"):
+                            with patch("orchestrator.time.sleep"):
+                                with patch("orchestrator.validate_prd_is_committed"):
+                                    with patch("orchestrator.parse_affected_projects", return_value=[]):
+                                        with patch("orchestrator.is_authorized_runtime_launch", return_value=True) as mock_is_authorized_runtime_launch:
+                                            with patch("git_utils.check_git_boundary"):
+                                                with patch("orchestrator.drun", return_value=DummyRet()):
+                                                    with self.assertRaises(SystemExit) as cm:
+                                                        orchestrator.main()
+
+            self.assertEqual(cm.exception.code, 0)
+            mock_is_authorized_runtime_launch.assert_called_once_with(
+                "/allowed/runtime/leio-sdlc/scripts/orchestrator.py"
+            )
+        finally:
+            shutil.rmtree(td)
+
 if __name__ == "__main__":
     unittest.main()

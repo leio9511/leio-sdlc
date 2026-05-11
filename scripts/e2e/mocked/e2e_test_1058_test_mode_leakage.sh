@@ -20,6 +20,18 @@ init_hermetic_sandbox "$WORK_DIR/scripts"
 # We must ensure setup_logging is there too if needed
 cp "$PROJECT_ROOT/scripts/setup_logging.py" "$WORK_DIR/scripts/" 2>/dev/null || true
 cp "$PROJECT_ROOT/config/prompts.json" "$WORK_DIR/config/" 2>/dev/null || true
+cat > "$WORK_DIR/config/sdlc_config.json" <<INNER_EOF
+{
+    "YELLOW_RETRY_LIMIT": 3,
+    "RED_RETRY_LIMIT": 2,
+    "GLOBAL_RUN_DIR": "",
+    "ENFORCE_GIT_LOCK": true,
+    "max_uat_recovery_attempts": 5,
+    "ALLOWED_RUNTIME_ROOTS": [
+        "$WORK_DIR/scripts"
+    ]
+}
+INNER_EOF
 
 # Script path
 ORCHESTRATOR="$WORK_DIR/scripts/orchestrator.py"

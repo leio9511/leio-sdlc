@@ -93,6 +93,7 @@ init_hermetic_sandbox() {
     cp "$PROJECT_ROOT/scripts/utils_path.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/orchestrator.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/runtime_git_identity.py" "$target_dir/" 2>/dev/null || true
+    cp "$PROJECT_ROOT/scripts/runtime_launch_guard.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/utils_json.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/git_utils.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/llm_utils.py" "$target_dir/" 2>/dev/null || true

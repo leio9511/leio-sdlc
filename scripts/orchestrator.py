@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from git_utils import safe_git_checkout, GitCheckoutError, get_mainline_branch
 from notification_formatter import format_notification
 from handoff_prompter import HandoffPrompter
+from runtime_launch_guard import is_authorized_runtime_launch
 from utils_json import extract_and_parse_json
 
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
@@ -325,7 +326,7 @@ def main():
     from thinking_resolver import resolve_thinking
     resolved_thinking = resolve_thinking(getattr(args, "thinking", None))
     from handoff_prompter import HandoffPrompter
-    if not getattr(args, "enable_exec_from_workspace", False) and not sys.argv[0].startswith(getattr(config, "SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))):
+    if not getattr(args, "enable_exec_from_workspace", False) and not is_authorized_runtime_launch(sys.argv[0]):
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
     
