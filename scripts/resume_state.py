@@ -38,3 +38,15 @@ def get_baseline_commit(run_dir):
             return f.read().strip()
     except Exception:
         return ""
+
+
+def read_resume_state(run_dir):
+    state_file = os.path.join(run_dir, "resume_state.json")
+    if not os.path.exists(state_file):
+        return None
+    try:
+        import json
+        with open(state_file, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None

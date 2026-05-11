@@ -16,7 +16,8 @@ class TestOrchestratorResume(unittest.TestCase):
     @patch("orchestrator.validate_prd_is_committed")
     @patch("orchestrator.parse_affected_projects", return_value=[])
     @patch("git_utils.check_git_boundary")
-    def test_resume_resets_in_progress_pr(self, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_glob, mock_get_status, mock_update_status, mock_drun):
+    @patch("orchestrator.read_resume_state", return_value={"currentPrPath": "/dummy/job/PR_001.md", "state": "CODER_ACTIVE", "splitAllowed": False})
+    def test_resume_resets_in_progress_pr(self, mock_read_resume_state, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_glob, mock_get_status, mock_update_status, mock_drun):
         import orchestrator
         import tempfile
         
@@ -50,7 +51,8 @@ class TestOrchestratorResume(unittest.TestCase):
     @patch("orchestrator.validate_prd_is_committed")
     @patch("orchestrator.parse_affected_projects", return_value=[])
     @patch("git_utils.check_git_boundary")
-    def test_resume_workspace_purification_master(self, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun):
+    @patch("orchestrator.read_resume_state", return_value={"currentPrPath": None, "state": "PLANNER_ACTIVE", "splitAllowed": False})
+    def test_resume_workspace_purification_master(self, mock_read_resume_state, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun):
         import orchestrator
         import tempfile
         
@@ -104,7 +106,8 @@ class TestOrchestratorResume(unittest.TestCase):
     @patch("orchestrator.validate_prd_is_committed")
     @patch("orchestrator.parse_affected_projects", return_value=[])
     @patch("git_utils.check_git_boundary")
-    def test_resume_workspace_purification_feature(self, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun, mock_run_runtime_git):
+    @patch("orchestrator.read_resume_state", return_value={"currentPrPath": None, "state": "PLANNER_ACTIVE", "splitAllowed": False})
+    def test_resume_workspace_purification_feature(self, mock_read_resume_state, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun, mock_run_runtime_git):
         import orchestrator
         import tempfile
         
@@ -156,7 +159,8 @@ class TestOrchestratorResume(unittest.TestCase):
     @patch("orchestrator.validate_prd_is_committed")
     @patch("orchestrator.parse_affected_projects", return_value=[])
     @patch("git_utils.check_git_boundary")
-    def test_resume_clean_workspace(self, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun):
+    @patch("orchestrator.read_resume_state", return_value={"currentPrPath": None, "state": "PLANNER_ACTIVE", "splitAllowed": False})
+    def test_resume_clean_workspace(self, mock_read_resume_state, mock_check_git, mock_parse, mock_validate, mock_exists, mock_flock, mock_os_open, mock_drun):
         import orchestrator
         import tempfile
         

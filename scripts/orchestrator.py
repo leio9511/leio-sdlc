@@ -27,7 +27,7 @@ from utils_json import extract_and_parse_json
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
 import json
-from resume_state import write_resume_state, get_baseline_commit
+from resume_state import read_resume_state, write_resume_state, get_baseline_commit
 import config
 from config import load_or_merge_config
 from utils_path import resolve_global_dir, get_canonical_job_dir
@@ -555,22 +555,30 @@ def main():
 
     os.chdir(workdir)
 
-    if getattr(args, "resume", False):
+    if getattr(args, "resume", False) or getattr(args, "split", False):
         from structured_state_parser import get_status, update_status
         
         prd_filename = os.path.basename(args.prd_file)
         base_name, _ = os.path.splitext(prd_filename)
         target_project_name = os.path.basename(os.path.abspath(workdir))
         resume_job_dir = get_canonical_job_dir(global_dir, workdir, args.prd_file)
-        
-        if os.path.exists(resume_job_dir):
-            for pr_file in glob.glob(os.path.join(resume_job_dir, "PR_*.md")):
-                try:
-                    if get_status(pr_file) == "in_progress":
-                        update_status(pr_file, "open")
-                except ValueError:
-                    pass
-                    
+
+        state_data = read_resume_state(resume_job_dir)
+        if not state_data:
+            print("[FATAL] Missing or corrupt resume_state.json. Cannot resume safely.")
+            sys.exit(1)
+
+        manifest_path = os.path.join(resume_job_dir, "run_manifest.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest_data = json.load(f)
+                    if manifest_data.get("baseline_commit") and manifest_data.get("baseline_commit") != state_data.get("baselineCommit"):
+                        print("[FATAL] Conflict: resume_state.json baselineCommit does not match run_manifest.json.")
+                        sys.exit(1)
+            except Exception:
+                pass
+                
         status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
         if status_output.strip():
             branch_output = drun(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
@@ -582,7 +590,50 @@ def main():
                 timestamp = int(time.time())
                 drun(["git", "branch", "-m", f"{branch_output}_crashed_{timestamp}"], check=False)
                 drun(["git", "checkout", get_mainline_branch(workdir)], check=False)
-                
+
+        if getattr(args, "split", False):
+            if not state_data.get("currentPrPath") or not state_data.get("splitAllowed"):
+                print("[FATAL] Current state does not permit split or no authoritative active PR found.")
+                sys.exit(1)
+            
+            current_pr = state_data.get("currentPrPath")
+            slice_depth = get_pr_slice_depth(current_pr)
+            if slice_depth < 2:
+                pr_files_before = set(glob.glob(os.path.join(resume_job_dir, "PR_*.md")))
+                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", resume_job_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                proc.wait()
+                pr_files_after = set(glob.glob(os.path.join(resume_job_dir, "PR_*.md")))
+                new_files = pr_files_after - pr_files_before
+                if len(new_files) >= 2:
+                    set_pr_status(current_pr, "superseded")
+                    write_resume_state(resume_job_dir, "PLANNER_ACTIVE", get_baseline_commit(resume_job_dir), recovery_mode="split", split_allowed=False)
+                else:
+                    print("[FATAL] Split failed: Planner did not generate at least 2 slices.")
+                    sys.exit(1)
+            else:
+                print("[FATAL] Split failed: Maximum slice depth reached.")
+                sys.exit(1)
+        else:
+            current_pr = state_data.get("currentPrPath")
+            if current_pr and os.path.exists(current_pr):
+                current_status = get_status(current_pr)
+                if current_status != "closed":
+                    update_status(current_pr, "open")
+            
+            if state_data.get("state") == "UAT_RECOVERY_ACTIVE" and state_data.get("recoveryMode") == "uat_recovery":
+                uat_out_file = os.path.abspath(os.path.join(resume_job_dir, "uat_report.json"))
+                logger.info("STATE_UAT_RECOVERY")
+                proc = dpopen([
+                    sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"),
+                    "--thinking", resolved_thinking,
+                    "--prd-file", args.prd_file,
+                    "--replan-uat-failures", uat_out_file,
+                    "--workdir", workdir,
+                    "--global-dir", global_dir,
+                    "--run-dir", resume_job_dir
+                ], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
+                proc.wait()
+        
         args.force_replan = "false"
 
     validate_prd_is_committed(args.prd_file, workdir)
