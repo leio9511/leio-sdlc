@@ -27,6 +27,7 @@ from utils_json import extract_and_parse_json
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
 
 import json
+from resume_state import write_resume_state, get_baseline_commit
 import config
 from config import load_or_merge_config
 from utils_path import resolve_global_dir, get_canonical_job_dir
@@ -318,6 +319,7 @@ def main():
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
     parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart. Use this flag if the SDLC was interrupted and you need to resume or continue from the last successful checkpoint.")
+    parser.add_argument("--split", action="store_true", help="Split the current blocked PR into smaller tasks.")
     parser.add_argument("--withdraw", action="store_true", help="Atomic State Restoration and Withdrawal. Use this flag if the user's intent is to 'withdraw', 'rollback', or 'cancel' the entire PRD execution.")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
@@ -476,6 +478,7 @@ def main():
         teardown_coder_session(args.workdir, run_dir=job_dir)
         
         if os.path.exists(job_dir):
+            write_resume_state(job_dir, "WITHDRAWN", get_baseline_commit(job_dir))
             import shutil
             # Ensure withdrawn_dir is removed if it exists to avoid nested move
             if os.path.exists(withdrawn_dir):
@@ -716,6 +719,7 @@ def main():
             dlog(f"Transitioning to State 0 for PRD {prd_filename} (auto-slicing)")
             notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
             notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
+            write_resume_state(run_dir, "PLANNER_ACTIVE", get_baseline_commit(run_dir))
             try:
                 proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                 proc.wait()
@@ -742,6 +746,7 @@ def main():
         dlog(f"Transitioning to State 0 for PRD {prd_filename} (auto-slicing)")
         notify_channel(effective_channel, "Ignition: Starting new SDLC pipeline...", "sdlc_start", {"prd_id": prd_filename, "command": full_cmd})
         notify_channel(effective_channel, "State 0: Auto-slicing PRD...", "slicing_start", {"prd_id": prd_filename})
+        write_resume_state(run_dir, "PLANNER_ACTIVE", get_baseline_commit(run_dir))
         try:
             proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--workdir", workdir, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
             proc.wait()
@@ -797,6 +802,7 @@ def main():
                 logger.debug(f"get_next_pr.py exit_code={result.returncode}, output='{output}'")
                 if "[QUEUE_EMPTY]" in output or not output:
                     logger.info("State 6: UAT Verification")
+                    write_resume_state(run_dir, "VERIFIER_ACTIVE", get_baseline_commit(run_dir))
                     prd_files_set = {os.path.abspath(args.prd_file)}
                     for f in glob.glob(os.path.join(job_dir, "PRD_*.md")):
                         prd_files_set.add(os.path.abspath(f))
@@ -846,14 +852,16 @@ def main():
                                 pass
                     if uat_retry_count >= 3 and uat_status not in ["PASS", "NEEDS_FIX"]:
                         print("[ACTION REQUIRED FOR MANAGER] UAT Failed. uat_report.json is missing or invalid JSON.")
-                        notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT Agent 发生系统级错误（如返回格式非法/超时）。现场 已冻结，请人工介入排查。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
+                        notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT Agent 发生系统级错误（如返回格式非法/超时）。现场 已冻结，请人工介入排 查。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
                         with open(os.path.join(workdir, "STATE.md"), "w") as f: f.write("UAT_ERROR\n")
+                        write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                         sys.exit(1)
                         
                     msg = f"UAT Verification completed. Status: {uat_status}. Manager is reviewing..."
                     notify_channel(effective_channel, msg, "uat_complete", {"prd_id": prd_filename, "status": uat_status})
                     
                     if uat_status == "PASS":
+                        write_resume_state(run_dir, "COMPLETED_PASS", get_baseline_commit(run_dir))
                         print("[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py.")
                         sys.exit(0)
                     elif uat_status == "NEEDS_FIX":
@@ -863,6 +871,7 @@ def main():
                         if actionable_items:
                             if uat_recovery_count < max_uat_recovery_attempts:
                                 logger.info("STATE_UAT_RECOVERY")
+                                write_resume_state(run_dir, "UAT_RECOVERY_ACTIVE", get_baseline_commit(run_dir), recovery_mode="uat_recovery")
                                 uat_recovery_count += 1
                                 proc = dpopen([
                                     sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py"),
@@ -879,12 +888,14 @@ def main():
                                 continue
                             else:
                                 print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Retries exceeded.")
-                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
+                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理 。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
                                 with open(os.path.join(workdir, "STATE.md"), "w") as f: f.write("UAT_BLOCKED\n")
                                 logger.info("STATE_UAT_BLOCKED")
+                                write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                                 sys.exit(1)
                         else:
                             print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo.")
+                            write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                             sys.exit(1)
 
                 current_pr = output.split('\n')[-1].strip()
@@ -922,6 +933,7 @@ def main():
                 while True:
                     if args.coder_session_strategy == "always": teardown_coder_session(workdir, run_dir)
                     logger.info(f"State 3: Spawning Coder for {current_pr}")
+                    write_resume_state(run_dir, "CODER_ACTIVE", get_baseline_commit(run_dir), current_pr_path=current_pr, current_branch=branch_name, split_allowed=True)
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
                     notify_channel(effective_channel, f"Calling Coder for {base_filename}...", "coder_spawned", {"pr_id": base_filename})
                     
@@ -1000,6 +1012,7 @@ def main():
                     review_report_path = os.path.join(workdir, review_artifact)
                     if os.path.exists(review_report_path): os.remove(review_report_path)
                     logger.info(f"State 4: Spawning Reviewer for {current_pr}")
+                    write_resume_state(run_dir, "REVIEWER_ACTIVE", get_baseline_commit(run_dir), current_pr_path=current_pr, current_branch=branch_name, split_allowed=True)
                     dlog(f"Transitioning to State 4: Spawning Reviewer for {current_pr}")
                     notify_channel(effective_channel, f"Coder submitted changes for {base_filename} ".strip() + f". Reviewer is now auditing...", "reviewer_spawned", {"pr_id": base_filename})
                     proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
@@ -1112,6 +1125,7 @@ def main():
                             new_files = pr_files_after - pr_files_before
                             if len(new_files) >= 2:
                                 set_pr_status(current_pr, "superseded")
+                                write_resume_state(run_dir, "PLANNER_ACTIVE", get_baseline_commit(run_dir), recovery_mode="split", split_allowed=False)
                                 pr_done = True
                                 break
                             else:
