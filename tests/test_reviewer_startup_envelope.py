@@ -4,6 +4,13 @@ import tempfile
 import json
 import pytest
 
+EVIDENCE_ONLY_BOUNDARY_RULES = [
+    "Do not run repository tests.",
+    "Do not trigger approval-requiring commands.",
+    "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
+]
+
+
 def test_reviewer_envelope_does_not_inline_playbook():
     with tempfile.TemporaryDirectory() as tmpdir:
         pr_file = os.path.join(tmpdir, "PR_001.md")
@@ -111,4 +118,67 @@ def test_reviewer_artifacts_are_saved():
         assert "execution_contract" in data
         assert "reference_index" in data
         assert "final_checklist" in data
+
+
+def test_reviewer_rendered_prompt_includes_evidence_only_boundary_rules():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pr_file = os.path.join(tmpdir, "PR_001.md")
+        with open(pr_file, "w") as f:
+            f.write("mock pr")
+
+        prd_file = os.path.join(tmpdir, "PRD.md")
+        with open(prd_file, "w") as f:
+            f.write("mock prd")
+
+        diff_file = os.path.join(tmpdir, "diff.txt")
+        with open(diff_file, "w") as f:
+            f.write("mock diff")
+
+        env = os.environ.copy()
+        env["SDLC_TEST_MODE"] = "true"
+        env["LLM_DRIVER"] = "gemini"
+
+        cmd = [
+            "python3", "scripts/spawn_reviewer.py",
+            "--workdir", tmpdir,
+            "--pr-file", pr_file,
+            "--prd-file", prd_file,
+            "--diff-target", "HEAD",
+            "--override-diff-file", diff_file,
+            "--run-dir", tmpdir,
+            "--out-file", "report.json",
+            "--enable-exec-from-workspace"
+        ]
+
+        result = subprocess.run(
+            cmd,
+            env=env,
+            cwd=os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"Reviewer failed: {result.stderr}\n{result.stdout}"
+
+        prompt_file = os.path.join(tmpdir, "reviewer_debug", "rendered_prompt.txt")
+        assert os.path.exists(prompt_file)
+
+        with open(prompt_file, "r") as f:
+            prompt_content = f.read()
+
+        assert prompt_content.strip().startswith("# EXECUTION CONTRACT")
+        for rule in EVIDENCE_ONLY_BOUNDARY_RULES:
+            assert rule in prompt_content
+
+
+def test_reviewer_playbook_contains_evidence_only_boundary_rules():
+    playbook_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "playbooks", "reviewer_playbook.md")
+    )
+
+    with open(playbook_path, "r") as f:
+        playbook_content = f.read()
+
+    assert "## Reviewer Boundary" in playbook_content
+    for rule in EVIDENCE_ONLY_BOUNDARY_RULES:
+        assert rule in playbook_content
 

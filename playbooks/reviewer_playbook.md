@@ -3,6 +3,11 @@
 
 **CAPABILITY:** `perform_code_review(prd, contract, diff, output)`
 
+## Reviewer Boundary
+- Do not run repository tests.
+- Do not trigger approval-requiring commands.
+- If evidence is insufficient, report insufficient evidence instead of executing tests yourself.
+
 - **Step 1 (Analysis):** Use the `read` tool to read and analyze the files at `prd`, `contract`, and `diff`. Compare implementation against requirements.
 - **Step 2 (Evidence):** For EVERY item in the PR Contract's "Implementation Scope" and "TDD Blueprint", you MUST find explicit evidence in the diff.
 - **Step 3 (Evaluate):** Evaluate the code based on the Key Focus Areas checklist below.

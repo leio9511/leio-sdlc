@@ -91,6 +91,9 @@ def _build_reviewer_envelope(workdir, references, contract_params):
         f"Output JSON Schema:\n```json\n{json.dumps(contract_params.get('output_schema'), indent=2)}\n```",
         "Mandatory Rule: You MUST read the diff, PR contract, and PRD.",
         "Mandatory Rule: Evaluate only. NEVER modify code or use write tools on the workspace files.",
+        "Do not run repository tests.",
+        "Do not trigger approval-requiring commands.",
+        "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
         "You are explicitly forbidden from manually editing the markdown file's status field.",
         "Follow the REVIEWER PLAYBOOK methodologies.",
     ]

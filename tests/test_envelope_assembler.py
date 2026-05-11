@@ -15,6 +15,12 @@ from envelope_assembler import (
 
 
 class TestEnvelopeAssembler(unittest.TestCase):
+    REVIEWER_EVIDENCE_ONLY_BOUNDARY_RULES = [
+        "Do not run repository tests.",
+        "Do not trigger approval-requiring commands.",
+        "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
+    ]
+
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
 
@@ -41,6 +47,32 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertIn("execution_contract", envelope)
         self.assertIn("reference_index", envelope)
         self.assertIn("final_checklist", envelope)
+
+    def test_reviewer_envelope_includes_evidence_only_boundary_rules(self):
+        envelope = build_startup_envelope(
+            role="reviewer",
+            workdir="/test/workdir",
+            out_dir="/test/out_dir",
+            references={
+                "prd_file": "/test/prd.md",
+                "pr_contract_file": "/test/pr.md",
+                "diff_file": "/test/diff.diff",
+                "playbook_path": "/test/playbook.md",
+            },
+            contract_params={
+                "output_file": "/test/out.json",
+                "output_schema": {"status": "string"},
+            },
+        )
+
+        execution_contract = envelope["execution_contract"]
+        for rule in self.REVIEWER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, execution_contract)
+
+        prompt = render_envelope_to_prompt(envelope)
+        self.assertTrue(prompt.startswith("# EXECUTION CONTRACT"))
+        for rule in self.REVIEWER_EVIDENCE_ONLY_BOUNDARY_RULES:
+            self.assertIn(rule, prompt)
 
     def test_build_coder_initial_startup_envelope(self):
         envelope = build_startup_envelope(
