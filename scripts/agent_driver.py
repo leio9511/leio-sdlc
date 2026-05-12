@@ -279,10 +279,53 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
             run_env = os.environ.copy()
             if os.environ.get("GEMINI_API_KEY"):
                 run_env["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY")
-                
-            result = subprocess.run(cmd, capture_output=True, text=True, env=run_env)
-            if result.returncode == 0:
-                print(result.stdout)
+
+            stdout_fd = None
+            stderr_fd = None
+            stdout_path = None
+            stderr_path = None
+            stdout = ""
+            stderr = ""
+
+            try:
+                stdout_fd, stdout_path = tempfile.mkstemp(prefix=f"sdlc_stdout_{session_key}_", dir=temp_dir, text=True)
+                stderr_fd, stderr_path = tempfile.mkstemp(prefix=f"sdlc_stderr_{session_key}_", dir=temp_dir, text=True)
+
+                os.close(stdout_fd)
+                stdout_fd = None
+                os.close(stderr_fd)
+                stderr_fd = None
+
+                with open(stdout_path, "w") as stdout_file, open(stderr_path, "w") as stderr_file:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=stdout_file,
+                        stderr=stderr_file,
+                        start_new_session=True,
+                        env=run_env,
+                    )
+                    return_code = process.wait()
+
+                with open(stdout_path, "r") as stdout_file:
+                    stdout = stdout_file.read()
+                with open(stderr_path, "r") as stderr_file:
+                    stderr = stderr_file.read()
+            finally:
+                if stdout_fd is not None:
+                    os.close(stdout_fd)
+                if stderr_fd is not None:
+                    os.close(stderr_fd)
+                for capture_path in (stdout_path, stderr_path):
+                    if capture_path:
+                        try:
+                            os.remove(capture_path)
+                        except FileNotFoundError:
+                            pass
+                        except OSError:
+                            pass
+
+            if return_code == 0:
+                print(stdout)
                 
                 # Session Mapping anti-race capture
                 if llm_driver == "gemini" and not actual_id:
@@ -302,14 +345,14 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
                     with open(session_map_file, "w") as f:
                         json.dump({"actual_id": session_key}, f)
 
-                return AgentResult(session_key=session_key, stdout=result.stdout, stderr=result.stderr, return_code=result.returncode)
+                return AgentResult(session_key=session_key, stdout=stdout, stderr=stderr, return_code=return_code)
             else:
                 if attempt < 2:
                     time.sleep(3 * (2 ** attempt))
                 else:
-                    print(f"Error: subprocess returned non-zero exit status {result.returncode}", file=sys.stderr)
-                    if result.stderr:
-                        print(f"Stderr: {result.stderr}", file=sys.stderr)
+                    print(f"Error: subprocess returned non-zero exit status {return_code}", file=sys.stderr)
+                    if stderr:
+                        print(f"Stderr: {stderr}", file=sys.stderr)
                     sys.exit(1)
     finally:
         if os.path.exists(path):

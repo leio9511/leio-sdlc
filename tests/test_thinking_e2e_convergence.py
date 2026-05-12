@@ -317,6 +317,8 @@ class TestAgentDriverCommandIntegration(unittest.TestCase):
     def setUp(self):
         self.patcher_run = patch("agent_driver.subprocess.run")
         self.mock_run = self.patcher_run.start()
+        self.patcher_popen = patch("agent_driver.subprocess.Popen")
+        self.mock_popen = self.patcher_popen.start()
         self.patcher_resolve = patch("agent_driver.resolve_cmd")
         self.mock_resolve = self.patcher_resolve.start()
         self.mock_resolve.return_value = "mock_openclaw"
@@ -328,24 +330,34 @@ class TestAgentDriverCommandIntegration(unittest.TestCase):
     def tearDown(self):
         patch.stopall()
 
+    def _setup_popen(self, stdout_text="output", stderr_text="", return_code=0):
+        def side_effect(cmd, stdout=None, stderr=None, start_new_session=None, env=None, **kwargs):
+            if stdout is not None:
+                stdout.write(stdout_text)
+                stdout.flush()
+            if stderr is not None:
+                stderr.write(stderr_text)
+                stderr.flush()
+            proc = MagicMock()
+            proc.wait.return_value = return_code
+            return proc
+
+        self.mock_popen.side_effect = side_effect
+
     def _setup_openclaw_mocks(self, agent_exists=True, model="gpt"):
         """Setup subprocess.run side_effect for OpenClaw path.
 
         Call chain:
           1. agents list (to check if agent exists)
           2. agents list (inside validate_openclaw_agent_model)
-          3. actual agent invocation
         """
         agent_line = f"- sdlc-generic-openclaw-{model}\n  Model: {model}\n" if agent_exists else ""
         mock_list = MagicMock()
         mock_list.stdout = agent_line
         mock_list.returncode = 0
 
-        mock_run = MagicMock()
-        mock_run.stdout = "output"
-        mock_run.returncode = 0
-
-        self.mock_run.side_effect = [mock_list, mock_list, mock_run]
+        self.mock_run.side_effect = [mock_list, mock_list]
+        self._setup_popen(stdout_text="output")
 
     def test_invoke_agent_default_thinking_is_high(self):
         """invoke_agent without thinking → OpenClaw command contains --thinking high."""
@@ -356,8 +368,8 @@ class TestAgentDriverCommandIntegration(unittest.TestCase):
         with patch.dict(os.environ, {"LLM_DRIVER": "openclaw", "SDLC_MODEL": "gpt"}):
             agent_driver.invoke_agent("test task", session_key="session-abc")
 
-        # The third call is the actual agent invocation
-        cmd = self.mock_run.call_args_list[2][0][0]
+        # The Popen call is the actual agent invocation
+        cmd = self.mock_popen.call_args_list[0][0][0]
         self.assertIn("--thinking", cmd, "Command must include --thinking flag")
         think_idx = cmd.index("--thinking")
         self.assertEqual(cmd[think_idx + 1], "high",
@@ -376,7 +388,7 @@ class TestAgentDriverCommandIntegration(unittest.TestCase):
         with patch.dict(os.environ, {"LLM_DRIVER": "openclaw", "SDLC_MODEL": "gpt"}):
             agent_driver.invoke_agent("test task", session_key="session-xyz", thinking="xhigh")
 
-        cmd = self.mock_run.call_args_list[2][0][0]
+        cmd = self.mock_popen.call_args_list[0][0][0]
         self.assertIn("--thinking", cmd)
         think_idx = cmd.index("--thinking")
         self.assertEqual(cmd[think_idx + 1], "xhigh",
@@ -390,22 +402,18 @@ class TestAgentDriverCommandIntegration(unittest.TestCase):
         """Gemini engine path → --thinking does NOT appear in the command."""
         import agent_driver
 
-        mock_run_result = MagicMock()
-        mock_run_result.stdout = "gemini output"
-        mock_run_result.returncode = 0
-
         mock_session_list = MagicMock()
         mock_session_list.stdout = "[]"
         mock_session_list.returncode = 0
 
-        # Gemini path: 1) agent invocation, 2) session list query
-        self.mock_run.side_effect = [mock_run_result, mock_session_list]
+        self.mock_run.side_effect = [mock_session_list]
+        self._setup_popen(stdout_text="gemini output")
 
         with patch.dict(os.environ, {"LLM_DRIVER": "gemini", "SDLC_MODEL": "gemini-pro"}):
             agent_driver.invoke_agent("test task", session_key="session-gem")
 
-        # The first call is the actual gemini agent invocation
-        cmd = self.mock_run.call_args_list[0][0][0]
+        # The Popen call is the actual gemini agent invocation
+        cmd = self.mock_popen.call_args_list[0][0][0]
         self.assertNotIn("--thinking", cmd,
                          f"Gemini command must NOT include --thinking: {cmd}")
         self.assertIn("--yolo", cmd)

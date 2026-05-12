@@ -20,6 +20,8 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
         self.env.start()
         self.run = patch("agent_driver.subprocess.run")
         self.mock_run = self.run.start()
+        self.popen = patch("agent_driver.subprocess.Popen")
+        self.mock_popen = self.popen.start()
         self.resolve = patch("agent_driver.resolve_cmd", return_value="mock_openclaw")
         self.resolve.start()
         self.copytree = patch("shutil.copytree")
@@ -29,6 +31,20 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
 
     def tearDown(self):
         patch.stopall()
+
+    def _setup_popen(self, stdout_text="ok", stderr_text="", return_code=0):
+        def side_effect(cmd, stdout=None, stderr=None, start_new_session=None, env=None, **kwargs):
+            if stdout is not None:
+                stdout.write(stdout_text)
+                stdout.flush()
+            if stderr is not None:
+                stderr.write(stderr_text)
+                stderr.flush()
+            proc = MagicMock()
+            proc.wait.return_value = return_code
+            return proc
+
+        self.mock_popen.side_effect = side_effect
 
     def test_model_specific_agent_ids_match_smoke_contract_examples(self):
         self.assertEqual(agent_driver.get_openclaw_agent_id("gpt"), "sdlc-generic-openclaw-gpt")
@@ -41,15 +57,15 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
         self.assertEqual(agent_driver.get_openclaw_agent_id("gpt"), "sdlc-generic-openclaw-gpt")
 
         list_res = MagicMock(stdout="- sdlc-generic-openclaw-gpt\n  Model: gpt\n", returncode=0)
-        run_res = MagicMock(stdout="ok", returncode=0)
-        # 1. exists check, 2. validate model check, 3. run
-        self.mock_run.side_effect = [list_res, list_res, run_res]
+        # 1. exists check, 2. validate model check
+        self.mock_run.side_effect = [list_res, list_res]
+        self._setup_popen(stdout_text="ok")
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}, clear=False):
             agent_driver.invoke_agent("task", session_key="session-123")
 
         self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "list"])
-        cmd = self.mock_run.call_args_list[2][0][0]
+        cmd = self.mock_popen.call_args_list[0][0][0]
         # Semantic thinking-aware assertions
         self.assertIn("--thinking", cmd)
         think_idx = cmd.index("--thinking")
@@ -71,8 +87,8 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
     def test_openclaw_lazy_create_uses_requested_model_and_model_specific_agent(self):
         list_res = MagicMock(stdout="other-agent\n", returncode=0)
         create_res = MagicMock(stdout="created", returncode=0)
-        run_res = MagicMock(stdout="ok", returncode=0)
-        self.mock_run.side_effect = [list_res, create_res, run_res]
+        self.mock_run.side_effect = [list_res, create_res]
+        self._setup_popen(stdout_text="ok")
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gemini-3.1-pro-preview"}, clear=False):
             with patch("os.listdir", return_value=["AGENTS.md"]):
@@ -89,7 +105,7 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
         self.assertIn("--model", create_cmd)
         self.assertIn("gemini-3.1-pro-preview", create_cmd)
 
-        run_cmd = self.mock_run.call_args_list[2][0][0]
+        run_cmd = self.mock_popen.call_args_list[0][0][0]
         # Semantic thinking-aware assertions on run command
         self.assertIn("--thinking", run_cmd)
         think_idx = run_cmd.index("--thinking")
@@ -105,16 +121,16 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
 
     def test_openclaw_existing_matching_agent_is_reused_without_recreate(self):
         list_res = MagicMock(stdout="- sdlc-generic-openclaw-gpt\n  Model: gpt\n", returncode=0)
-        run_res = MagicMock(stdout="ok", returncode=0)
-        # 1. exists check, 2. validate model check, 3. run
-        self.mock_run.side_effect = [list_res, list_res, run_res]
+        # 1. exists check, 2. validate model check
+        self.mock_run.side_effect = [list_res, list_res]
+        self._setup_popen(stdout_text="ok")
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}, clear=False):
             agent_driver.invoke_agent("task", session_key="session-123")
 
-        self.assertEqual(len(self.mock_run.call_args_list), 3)
+        self.assertEqual(len(self.mock_run.call_args_list), 2)
         self.assertEqual(self.mock_run.call_args_list[1][0][0], ["mock_openclaw", "agents", "list"])
-        run_cmd = self.mock_run.call_args_list[2][0][0]
+        run_cmd = self.mock_popen.call_args_list[0][0][0]
         # Semantic thinking-aware assertions
         self.assertIn("--thinking", run_cmd)
         think_idx = run_cmd.index("--thinking")
