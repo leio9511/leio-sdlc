@@ -93,7 +93,7 @@ class TestSpawnCoder(unittest.TestCase):
 
             self.assertTrue(mock_invoke.called)
             task_string = mock_invoke.call_args[0][0]
-            self.assertTrue(task_string.startswith("# EXECUTION CONTRACT"))
+            self.assertTrue(task_string.startswith("## IDENTITY & PRIMARY GOAL"))
             self.assertIn(os.path.abspath(pr_file), task_string)
             self.assertIn(os.path.abspath(prd_file), task_string)
             self.assertIn(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "playbooks", "coder_playbook.md")), task_string)

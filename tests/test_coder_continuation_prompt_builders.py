@@ -95,7 +95,7 @@ class TestCoderContinuationPromptBuilders(unittest.TestCase):
         self.assertIn("def5678", prompt)
         self.assertIn("corrective action", prompt.lower())
         self.assertNotIn("# REFERENCE INDEX", prompt)
-        self.assertNotIn("# EXECUTION CONTRACT", prompt)
+        self.assertNotIn("## EXECUTION CONTRACT", prompt)
 
 
 if __name__ == '__main__':

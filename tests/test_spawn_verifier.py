@@ -73,7 +73,7 @@ class TestSpawnVerifier(unittest.TestCase):
         self.assertTrue(mock_invoke_agent.called, "invoke_agent was not called for verifier")
         args, kwargs = mock_invoke_agent.call_args
         rendered_prompt = args[0]
-        self.assertTrue(rendered_prompt.startswith("# EXECUTION CONTRACT"))
+        self.assertTrue(rendered_prompt.startswith("## IDENTITY & PRIMARY GOAL"))
         self.assertEqual(kwargs.get("role"), "verifier")
         mock_setup_key.assert_called()
 
@@ -124,7 +124,7 @@ class TestSpawnVerifier(unittest.TestCase):
         task_log_path = os.path.join(self.run_dir, "tests", "verifier_task_string.log")
         with open(task_log_path, "r") as f:
             task_log = f.read()
-        self.assertTrue(task_log.startswith("# EXECUTION CONTRACT"))
+        self.assertTrue(task_log.startswith("## IDENTITY & PRIMARY GOAL"))
 
         debug_dir = os.path.join(self.run_dir, "uat_debug", "initial")
         self.assertTrue(os.path.exists(os.path.join(debug_dir, "startup_packet.json")))

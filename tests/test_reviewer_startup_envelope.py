@@ -57,15 +57,15 @@ def test_reviewer_envelope_does_not_inline_playbook():
             
         # 1. The rendered prompt MUST NOT contain the full text of the Reviewer playbook
         # We can check a significant chunk of it, or just a known string that shouldn't be there
-        assert "Code Audit Logic" in playbook_content
+        assert "perform_code_review" in playbook_content
         # Let's just check if it's identical or contains a big chunk.
         # Playbook might have specific text. Let's ensure it's not fully inlined.
         # The prompt should be relatively short compared to the playbook.
-        assert "Code Audit Logic" not in prompt_content
+        assert "perform_code_review" not in prompt_content
         assert len(prompt_content) < len(playbook_content)
         
-        # 2. First section of the prompt must be the execution contract
-        assert prompt_content.strip().startswith("# EXECUTION CONTRACT")
+        # 2. First section of the prompt must be the identity header
+        assert prompt_content.strip().startswith("## IDENTITY & PRIMARY GOAL")
         
         # 3. Must reference it in the index
         assert "REFERENCE INDEX" in prompt_content
@@ -165,7 +165,7 @@ def test_reviewer_rendered_prompt_includes_evidence_only_boundary_rules():
         with open(prompt_file, "r") as f:
             prompt_content = f.read()
 
-        assert prompt_content.strip().startswith("# EXECUTION CONTRACT")
+        assert prompt_content.strip().startswith("## IDENTITY & PRIMARY GOAL")
         for rule in EVIDENCE_ONLY_BOUNDARY_RULES:
             assert rule in prompt_content
 

@@ -52,7 +52,7 @@ class TestAgentDriverTriad(unittest.TestCase):
 
         self.assertTrue(mock_agent_call.called, "invoke_agent was not called")
         args, kwargs = mock_agent_call.call_args
-        self.assertTrue(args[0].startswith("# EXECUTION CONTRACT"))
+        self.assertTrue(args[0].startswith("## IDENTITY & PRIMARY GOAL"))
         self.assertIn(os.path.abspath(pr_file), args[0])
         self.assertIn(os.path.abspath(prd_file), args[0])
         self.assertIn("coder_playbook", args[0])

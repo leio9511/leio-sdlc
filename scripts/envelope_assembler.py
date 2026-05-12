@@ -8,6 +8,46 @@ EVALUATION_ROLE_BOUNDARY_RULES = [
     "If evidence is insufficient, report insufficient evidence instead of executing tests yourself.",
 ]
 
+ROLE_PROLOGUES = {
+    "planner": (
+        "You are an Agile Planner. "
+        "Your job is to break down large PRDs into granular, sequential PR Contracts "
+        "based ONLY on business logic and functional steps."
+    ),
+    "coder": (
+        "You are an autonomous, highly skilled \"Fat Coder\". "
+        "You implement features and fix bugs based on the functional requirements "
+        "provided in the PR Contract."
+    ),
+    "reviewer": (
+        "You are a Code Audit Logic. "
+        "Your mission is to generate a high-fidelity code review report in JSON format."
+    ),
+    "verifier": (
+        "You are an independent, read-only QA Engine (User Acceptance Testing Verifier). "
+        "Your sole purpose is to independently verify that every requirement specified in the "
+        "provided PRD(s) has been implemented correctly in the final codebase. "
+        "You do not write or modify code. You only read, inspect, and report."
+    ),
+    "auditor": (
+        "你是本系统的首席架构师 (Principal Architect)，拥有极高的代码审美和架构洁癖。"
+        "你的唯一使命是：\"绝不让一个定义不清、会引入技术债、违背最佳设计模式的 PRD，"
+        "污染我们的代码库。\""
+    ),
+    "forensic": (
+        "You are a site reliability engineer focused on agent fault resolution. "
+        "Your job is to analyze failed sessions."
+    ),
+}
+
+START_WORK_CTA = "As the {role_upper}, begin your task now. Read the reference files first, then proceed."
+
+CODER_OPERATING_CONSTRAINTS = [
+    "DO NOT git push.",
+    "DO NOT change git branches.",
+    "DO NOT merge into master.",
+]
+
 
 def _build_planner_envelope(workdir, out_dir, references, contract_params, mode):
     execution_contract = [
@@ -244,8 +284,7 @@ def _build_verifier_envelope(workdir, references, contract_params):
 def _build_coder_envelope(workdir, references, contract_params, mode):
     execution_contract = [
         f"Locked Working Directory: `{workdir}`",
-        "Branch isolation rule: Stay on the current feature branch. NEVER switch branches and NEVER work on `master` or `main`.",
-        "Push rule: DO NOT `git push`.",
+        *CODER_OPERATING_CONSTRAINTS,
         "Git hygiene rule: Use explicit `git add <file>` for only the files you changed. NEVER use `git add .`.",
         "Before coding, you MUST use the read tool to read every reference in the REFERENCE INDEX where required=true and priority=1.",
         "Validation rule: Run the relevant tests and `./preflight.sh` if it exists until everything is green.",
@@ -254,9 +293,9 @@ def _build_coder_envelope(workdir, references, contract_params, mode):
     ]
 
     if mode in {"revision", "revision_bootstrap"}:
-        execution_contract.insert(5, "Revision work is execution work, not acknowledgment work.")
+        execution_contract.insert(6, "Revision work is execution work, not acknowledgment work.")
     if mode == "revision_bootstrap":
-        execution_contract.insert(6, "Bootstrap rule: Treat this as a fresh coder session that still must fully execute the reviewer feedback.")
+        execution_contract.insert(7, "Bootstrap rule: Treat this as a fresh coder session that still must fully execute the reviewer feedback.")
 
     reference_index = [
         {
@@ -344,19 +383,74 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
 
 
 def render_envelope_to_prompt(envelope):
-    prompt_lines = ["# EXECUTION CONTRACT"]
+    role = envelope.get("role", "agent")
+    
+    prompt_lines = []
+    
+    # 1. IDENTITY & PRIMARY GOAL
+    prompt_lines.append("## IDENTITY & PRIMARY GOAL")
+    prologue = ROLE_PROLOGUES.get(role, f"You are an autonomous {role} agent.")
+    prompt_lines.append(prologue)
+    prompt_lines.append("")
+    
+    # Extract constraints
+    constraints = []
+    contract_clauses = []
+    
     for clause in envelope.get("execution_contract", []):
+        is_constraint = False
+        
+        # Check if it's an evaluation role boundary rule
+        if role in {"reviewer", "verifier"} and clause in EVALUATION_ROLE_BOUNDARY_RULES:
+            is_constraint = True
+            
+        # Check if it's a coder constraint
+        if role == "coder" and clause in CODER_OPERATING_CONSTRAINTS:
+            is_constraint = True
+            
+        # Check for read reference mandate or other mandatory rules
+        if "use the read tool to read every reference in the REFERENCE INDEX" in clause:
+            is_constraint = True
+        elif clause.startswith("Mandatory Rule:"):
+            is_constraint = True
+            
+        if is_constraint:
+            constraints.append(clause)
+        else:
+            contract_clauses.append(clause)
+            
+    # 2. OPERATING CONSTRAINTS
+    prompt_lines.append("## OPERATING CONSTRAINTS")
+    for constraint in constraints:
+        prompt_lines.append(f"- {constraint}")
+    if not constraints:
+        prompt_lines.append("- No specific operating constraints for this role.")
+    prompt_lines.append("")
+        
+    # 3. EXECUTION CONTRACT
+    prompt_lines.append("## EXECUTION CONTRACT")
+    for clause in contract_clauses:
         prompt_lines.append(f"- {clause}")
-
+        
     prompt_lines.append("")
-    prompt_lines.append("# REFERENCE INDEX")
+    
+    # 4. REFERENCE INDEX
+    prompt_lines.append("## REFERENCE INDEX")
     prompt_lines.append(json.dumps(envelope.get("reference_index", []), indent=2))
-
+    
     prompt_lines.append("")
-    prompt_lines.append("# FINAL CHECKLIST")
+    
+    # 5. FINAL CHECKLIST
+    prompt_lines.append("## FINAL CHECKLIST")
     for item in envelope.get("final_checklist", []):
         prompt_lines.append(f"- {item}")
-
+        
+    prompt_lines.append("")
+    
+    # 6. START WORK
+    prompt_lines.append("## START WORK")
+    prompt_lines.append(START_WORK_CTA.format(role_upper=role.upper()))
+    
     return "\n".join(prompt_lines)
 
 

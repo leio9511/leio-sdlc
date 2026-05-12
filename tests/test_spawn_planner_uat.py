@@ -37,7 +37,7 @@ def test_spawn_planner_uat_uses_envelope(tmp_path, monkeypatch):
     
     task_string = task_string_log.read_text()
     
-    assert "# EXECUTION CONTRACT" in task_string
+    assert "## EXECUTION CONTRACT" in task_string
     assert "without replanning already-satisfied functionality" in task_string
     assert "uat_report" in task_string
     

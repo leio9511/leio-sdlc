@@ -40,11 +40,11 @@ def test_envelope_supports_auditor():
     
     prompt = render_planner_prompt(envelope)
     
-    assert "# EXECUTION CONTRACT" in prompt
+    assert "## EXECUTION CONTRACT" in prompt
     assert "Read-only behavior required." in prompt
-    assert "# REFERENCE INDEX" in prompt
+    assert "## REFERENCE INDEX" in prompt
     assert "auditor_playbook" in prompt
-    assert "# FINAL CHECKLIST" in prompt
+    assert "## FINAL CHECKLIST" in prompt
     assert "Validate PRD completeness." in prompt
 
 
@@ -80,12 +80,12 @@ def test_envelope_supports_reviewer():
     
     prompt = render_planner_prompt(envelope)
     
-    assert "# EXECUTION CONTRACT" in prompt
+    assert "## EXECUTION CONTRACT" in prompt
     assert "Review the provided PR diff." in prompt
-    assert "# REFERENCE INDEX" in prompt
+    assert "## REFERENCE INDEX" in prompt
     assert "pr_diff" in prompt
     assert "diff" in prompt
-    assert "# FINAL CHECKLIST" in prompt
+    assert "## FINAL CHECKLIST" in prompt
     assert "Verify all tests pass." in prompt
 
 
@@ -111,11 +111,11 @@ def test_envelope_supports_verifier():
     
     prompt = render_planner_prompt(envelope)
     
-    assert "# EXECUTION CONTRACT" in prompt
+    assert "## EXECUTION CONTRACT" in prompt
     assert "Verify the codebase state matches" in prompt
-    assert "# REFERENCE INDEX" in prompt
+    assert "## REFERENCE INDEX" in prompt
     assert "codebase_snapshot" in prompt
-    assert "# FINAL CHECKLIST" in prompt
+    assert "## FINAL CHECKLIST" in prompt
     assert "Ensure actual behavior matches" in prompt
 
 
@@ -151,11 +151,11 @@ def test_envelope_supports_coder():
     
     prompt = render_planner_prompt(envelope)
     
-    assert "# EXECUTION CONTRACT" in prompt
+    assert "## EXECUTION CONTRACT" in prompt
     assert "Implement feature described" in prompt
-    assert "# REFERENCE INDEX" in prompt
+    assert "## REFERENCE INDEX" in prompt
     assert "coder_playbook" in prompt
-    assert "# FINAL CHECKLIST" in prompt
+    assert "## FINAL CHECKLIST" in prompt
     assert "Tests are written and passing." in prompt
 
 

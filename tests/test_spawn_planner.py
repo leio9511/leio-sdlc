@@ -48,7 +48,7 @@ def test_spawn_planner_uses_envelope():
         with open(task_string_file, "r") as f:
             content = f.read()
             
-        assert "# EXECUTION CONTRACT" in content
+        assert "## EXECUTION CONTRACT" in content
         assert "Massive PRD content" not in content
 
 def test_spawn_planner_slice_uses_envelope():
@@ -85,7 +85,7 @@ def test_spawn_planner_slice_uses_envelope():
         with open(task_string_file, "r") as f:
             content = f.read()
             
-        assert "# EXECUTION CONTRACT" in content
+        assert "## EXECUTION CONTRACT" in content
         assert "You MUST use the exact same `--insert-after 002` value" in content
         assert "failed_pr_contract" in content
         assert os.path.abspath(failed_pr_file) in content

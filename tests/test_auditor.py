@@ -52,9 +52,9 @@ def test_auditor_uses_envelope_assembler(run_dir, valid_prd):
     with open(log_file, "r") as f:
         task_string = f.read()
         
-    assert "# EXECUTION CONTRACT" in task_string
-    assert "# REFERENCE INDEX" in task_string
-    assert "# FINAL CHECKLIST" in task_string
+    assert "## EXECUTION CONTRACT" in task_string
+    assert "## REFERENCE INDEX" in task_string
+    assert "## FINAL CHECKLIST" in task_string
 
 def test_auditor_artifacts_are_saved(run_dir, valid_prd):
     env = os.environ.copy()

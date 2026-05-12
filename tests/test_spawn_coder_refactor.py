@@ -63,7 +63,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
             mock_invoke.assert_called_once()
             prompt_sent = mock_invoke.call_args[0][0]
             invoke_kwargs = mock_invoke.call_args[1]
-            self.assertTrue(prompt_sent.startswith("# EXECUTION CONTRACT"))
+            self.assertTrue(prompt_sent.startswith("## IDENTITY & PRIMARY GOAL"))
             self.assertIn(os.path.abspath(pr_file), prompt_sent)
             self.assertIn(os.path.abspath(prd_file), prompt_sent)
             self.assertIn("coder_playbook", prompt_sent)

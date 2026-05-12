@@ -132,9 +132,9 @@ def test_rendered_prompt_sections():
     )
     prompt = render_planner_prompt(envelope)
     
-    assert "# EXECUTION CONTRACT" in prompt
-    assert "# REFERENCE INDEX" in prompt
-    assert "# FINAL CHECKLIST" in prompt
+    assert "## EXECUTION CONTRACT" in prompt
+    assert "## REFERENCE INDEX" in prompt
+    assert "## FINAL CHECKLIST" in prompt
 
 def test_rendered_prompt_no_inlining():
     # We want to ensure that the actual text body of the PRD is NOT inlined.
@@ -161,4 +161,4 @@ def test_rendered_prompt_no_inlining():
     # The prompt shouldn't contain large arbitrary markdown text from those files
     # because the `render_planner_prompt` only renders the envelope JSON/dict.
     assert "authoritative_requirements" in prompt
-    assert prompt.count("#") == 3 # only our section headers should be present (no PRD headers)
+    assert prompt.count("#") == 12 # 6 sections, 2 hashes each

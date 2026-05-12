@@ -41,8 +41,8 @@ class TestReviewerContextIsolation(unittest.TestCase):
             prompt_content = f.read()
             
         # Verify the headers exist and are separated
-        self.assertIn("# EXECUTION CONTRACT", prompt_content)
-        self.assertIn("# REFERENCE INDEX", prompt_content)
+        self.assertIn("## EXECUTION CONTRACT", prompt_content)
+        self.assertIn("## REFERENCE INDEX", prompt_content)
         self.assertIn("prd", prompt_content)
         self.assertIn("pr_contract", prompt_content)
         self.assertIn("diff", prompt_content)
