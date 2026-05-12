@@ -319,7 +319,7 @@ def main():
 
     parser.add_argument("--cleanup", action="store_true", help="Lock-aware forensic quarantine of crashed orchestrator state")
     parser.add_argument("--resume", action="store_true", help="Checkpoint-based Task Restart. Use this flag if the SDLC was interrupted and you need to resume or continue from the last successful checkpoint.")
-    parser.add_argument("--split", action="store_true", help="Split the current blocked PR into smaller tasks.")
+    parser.add_argument("--split", action="store_true", help="Split the current blocked PR into smaller tasks as defined by the active PR state.")
     parser.add_argument("--withdraw", action="store_true", help="Atomic State Restoration and Withdrawal. Use this flag if the user's intent is to 'withdraw', 'rollback', or 'cancel' the entire PRD execution.")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
     parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
@@ -592,20 +592,25 @@ def main():
                 drun(["git", "checkout", get_mainline_branch(workdir)], check=False)
 
         if getattr(args, "split", False):
+            # Strict validation: can ONLY be executed if resume_state.json explicitly identifies a current active PR, AND splitAllowed == true
             if not state_data.get("currentPrPath") or not state_data.get("splitAllowed"):
-                print("[FATAL] Current state does not permit split or no authoritative active PR found.")
+                print("[FATAL] --split validation failed: Current state does not permit split or no authoritative active PR found.")
                 sys.exit(1)
             
+            # Split Execution Workflow
             current_pr = state_data.get("currentPrPath")
             slice_depth = get_pr_slice_depth(current_pr)
             if slice_depth < 2:
+                # Leverage existing planner slicing capabilities
                 pr_files_before = set(glob.glob(os.path.join(resume_job_dir, "PR_*.md")))
                 proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", resume_job_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                 proc.wait()
                 pr_files_after = set(glob.glob(os.path.join(resume_job_dir, "PR_*.md")))
                 new_files = pr_files_after - pr_files_before
                 if len(new_files) >= 2:
+                    # Mark original active PR as superseded
                     set_pr_status(current_pr, "superseded")
+                    # Update resume_state.json to reflect new planner continuation path
                     write_resume_state(resume_job_dir, "PLANNER_ACTIVE", get_baseline_commit(resume_job_dir), recovery_mode="split", split_allowed=False)
                 else:
                     print("[FATAL] Split failed: Planner did not generate at least 2 slices.")

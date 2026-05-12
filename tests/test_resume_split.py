@@ -76,7 +76,7 @@ def test_resume_split_fails_when_not_allowed(clean_cwd, git_test_sandbox):
         
         res = run_orchestrator(td, prd_path, env, "--split")
         assert res.returncode == 1
-        assert "[FATAL] Current state does not permit split or no authoritative active PR found" in res.stdout
+        assert "[FATAL] --split validation failed: Current state does not permit split or no authoritative active PR found." in res.stdout
 
 def test_resume_split_supersedes_pr_and_updates_state(clean_cwd, git_test_sandbox):
     with tempfile.TemporaryDirectory() as td:
