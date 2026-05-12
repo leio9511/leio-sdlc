@@ -431,15 +431,13 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(debug_dir, "scaffold_contract.txt")))
         self.assertTrue(os.path.exists(os.path.join(debug_dir, "startup_packet.json")))
 
+    def test_auditor_prologue_exact_match(self):
+        expected = (
+            "你是本系统的首席架构师 (Principal Architect)，拥有极高的代码审美和架构洁癖。"
+            "你的唯一使命是：\"绝不让一个定义不清、会引入技术债、违背最佳设计模式的 PRD，"
+            "污染我们的代码库。\""
+        )
+        self.assertEqual(ROLE_PROLOGUES.get("auditor"), expected)
 
 if __name__ == '__main__':
     unittest.main()
-
-def test_auditor_prologue_exact_match():
-    from envelope_assembler import ROLE_PROLOGUES
-    expected = (
-        "你是本系统的首席架构师 (Principal Architect)，拥有极高的代码审美和架构洁癖。"
-        "你的唯一使命是：\"绝不让一个定义不清、会引入技术债、违背最佳设计模式的 PRD，"
-        "污染我们的代码库。\""
-    )
-    assert ROLE_PROLOGUES.get("auditor") == expected

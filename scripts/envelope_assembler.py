@@ -30,9 +30,9 @@ ROLE_PROLOGUES = {
         "You do not write or modify code. You only read, inspect, and report."
     ),
     "auditor": (
-        "你是本系统的首席架构师 (Principal Architect)，拥有极高的代码审美和架构洁癖。"
-        "你的唯一使命是：\"绝不让一个定义不清、会引入技术债、违背最佳设计模式的 PRD，"
-        "污染我们的代码库。\""
+        '你是本系统的首席架构师 (Principal Architect)，拥有极高的代码审美和架构洁癖。'
+        '你的唯一使命是："绝不让一个定义不清、会引入技术债、违背最佳设计模式的 PRD，'
+        '污染我们的代码库。"'
     ),
     "forensic": (
         "You are a site reliability engineer focused on agent fault resolution. "
