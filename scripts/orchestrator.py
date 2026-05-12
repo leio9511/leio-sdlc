@@ -508,7 +508,7 @@ def main():
 
         sys.exit(0)
 
-    if not args.test_sleep and getattr(args, "force_replan", None) is None and not getattr(args, "resume", False) and not getattr(args, "withdraw", False):
+    if not args.test_sleep and getattr(args, "force_replan", None) is None and not getattr(args, "resume", False) and not getattr(args, "withdraw", False) and not getattr(args, "split", False):
         print("[FATAL] Missing required parameter: --force-replan must be either 'true' or 'false'.")
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
