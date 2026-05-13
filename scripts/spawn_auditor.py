@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, current_dir)
 import config
 import agent_driver
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent, invoke_agent_gated, build_prompt
 import envelope_assembler
 from thinking_resolver import resolve_thinking
 
@@ -149,7 +149,7 @@ def main():
     else:
         print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
         session_id = f"prd_auditor_{int(time.time())}"
-        result = invoke_agent(task_string, session_key=session_id, role="auditor", thinking=resolved_thinking)
+        result = invoke_agent_gated(task_string, session_key=session_id, role="auditor", thinking=resolved_thinking)
         output = result.stdout
 
     stdout_status = "UNKNOWN"

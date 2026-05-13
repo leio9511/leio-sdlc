@@ -3,7 +3,7 @@ import tempfile
 import os
 import json
 import sys
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent, invoke_agent_gated, build_prompt
 from envelope_assembler import build_startup_envelope, render_envelope_to_prompt, save_envelope_artifacts
 from thinking_resolver import resolve_thinking
 import config
@@ -204,7 +204,7 @@ def main():
         import time
         print("Calling OpenClaw real API...")
         session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-        result = invoke_agent(task_string, session_key=session_id, role="planner", thinking=resolved_thinking)
+        result = invoke_agent_gated(task_string, session_key=session_id, role="planner", thinking=resolved_thinking)
 
 if __name__ == "__main__":
     main()

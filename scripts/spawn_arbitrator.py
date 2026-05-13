@@ -2,7 +2,7 @@
 import argparse
 import os
 import sys
-from agent_driver import invoke_agent, build_prompt
+from agent_driver import invoke_agent, invoke_agent_gated, build_prompt
 from thinking_resolver import resolve_thinking
 import subprocess
 import uuid
@@ -61,7 +61,7 @@ def main():
     )
     
     session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-    result = invoke_agent(task_string, session_key=session_id, role='arbitrator', thinking=resolved_thinking)
+    result = invoke_agent_gated(task_string, session_key=session_id, role='arbitrator', thinking=resolved_thinking)
 
     report_path = os.path.join(args.run_dir, "arbitration_report.txt")
     if os.path.exists(report_path):

@@ -114,12 +114,15 @@ def invoke_agent_gated(
       - Any other engine: return ``AgentResult`` with ``return_code=1`` and
         the exact support-rule message in stderr
     """
-    import uuid as _uuid
-
     if not engine:
         engine = os.environ.get("LLM_DRIVER", "openclaw").lower()
 
     # ── legacy mode: unchanged behavior ─────────────────────────────
+    # The explicit `engine` arg is intentionally NOT forwarded to
+    # invoke_agent() in legacy mode: invoke_agent() already resolves
+    # the engine from LLM_DRIVER at call time, mirroring legacy behavior
+    # exactly.  Passing engine explicitly would be a non-backward-
+    # compatible change.
     if not is_case1_strict_mode():
         return invoke_agent(
             task_string,
@@ -152,7 +155,7 @@ def invoke_agent_gated(
 
     # ── Not a case-1 engine: fail-closed rejection ──────────────────
     return AgentResult(
-        session_key=session_key or f"subtask-{_uuid.uuid4().hex[:8]}",
+        session_key=session_key or f"subtask-{uuid.uuid4().hex[:8]}",
         stdout="",
         stderr="Only case-1 engines are in scope for strong continuity support.",
         return_code=1,

@@ -24,7 +24,7 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertEqual(spawn_coder.extract_pr_id("PR_003_1_2_Something.md"), "PR_003_1_2")
         self.assertEqual(spawn_coder.extract_pr_id("NoPrefix.md"), "NoPrefix")
 
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     def test_send_feedback(self, mock_call):
         mock_call.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
         spawn_coder.send_feedback("sdlc_coder_PR_001", "feedback message")
@@ -34,7 +34,7 @@ class TestSpawnCoder(unittest.TestCase):
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
     @patch('spawn_coder.os.path.exists')
     @patch('envelope_assembler.os.makedirs')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('spawn_coder.build_coder_startup_packet_and_prompt')
     def test_handle_feedback_routing_with_stored_key(self, mock_build, mock_invoke, mock_makedirs, mock_exists, mock_commit, mock_branch):
         mock_exists.return_value = True
@@ -62,7 +62,7 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertNotIn("# REFERENCE INDEX", called_msg)
 
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_initial_mode_uses_envelope_prompt(self, mock_setup_key, mock_invoke, mock_check_output):
         mock_check_output.return_value = "feature/test"
@@ -107,7 +107,7 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertTrue(os.path.exists(prompt_file))
 
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('os.path.exists')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_mocked_revision_flow_prompt_injection(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):
@@ -148,7 +148,7 @@ class TestSpawnCoder(unittest.TestCase):
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('os.path.exists')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_mocked_revision_flow_prompt_injection_existing_session(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):
@@ -191,7 +191,7 @@ class TestSpawnCoder(unittest.TestCase):
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('os.path.exists')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_mocked_system_alert_prompt_injection(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):

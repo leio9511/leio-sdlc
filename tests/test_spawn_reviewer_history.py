@@ -41,7 +41,7 @@ def test_spawn_reviewer_uses_baseline_if_present():
         with patch("sys.argv", test_args), \
              patch("subprocess.run") as mock_run, \
              patch("spawn_reviewer.check_guardrails", return_value=None), \
-             patch("spawn_reviewer.invoke_agent", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
+             patch("spawn_reviewer.invoke_agent_gated", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
              patch("sys.exit", side_effect=fake_exit):
             
             try:
@@ -88,7 +88,7 @@ def test_spawn_reviewer_uses_fallback_if_missing():
         with patch("sys.argv", test_args), \
              patch("subprocess.run") as mock_run, \
              patch("spawn_reviewer.check_guardrails", return_value=None), \
-             patch("spawn_reviewer.invoke_agent", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
+             patch("spawn_reviewer.invoke_agent_gated", return_value=AgentResult(session_key='...', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
              patch("sys.exit", side_effect=fake_exit):
             
             try:
@@ -135,7 +135,7 @@ def test_spawn_reviewer_creates_session_file():
         with patch("sys.argv", test_args), \
              patch("subprocess.run"), \
              patch("spawn_reviewer.check_guardrails", return_value=None), \
-             patch("spawn_reviewer.invoke_agent", return_value=AgentResult(session_key='subtask-123', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
+             patch("spawn_reviewer.invoke_agent_gated", return_value=AgentResult(session_key='subtask-123', stdout='{"status":"APPROVED"}', stderr='', return_code=0)), \
              patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}), \
              patch("sys.exit", side_effect=fake_exit):
             

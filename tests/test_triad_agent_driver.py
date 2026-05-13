@@ -31,7 +31,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         else:
             del os.environ["SDLC_TEST_MODE"]
 
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('subprocess.check_output')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_coder_payload_injection(self, mock_setup_key, mock_check_output, mock_agent_call):
@@ -60,7 +60,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertNotIn("mock_prd_content", args[0])
         mock_setup_key.assert_called()
 
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('subprocess.check_output')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_coder_feedback_injection(self, mock_setup_key, mock_check_output, mock_agent_call):
@@ -109,7 +109,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertEqual(build_prompt("coder_system_alert"), "__DEPRECATED__ use envelope_assembler.py — see spawn_coder.py")
 
 
-    @patch('spawn_planner.invoke_agent')
+    @patch('spawn_planner.invoke_agent_gated')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_planner_payload_injection(self, mock_setup_key, mock_invoke_agent):
         import spawn_planner
@@ -130,7 +130,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertTrue(kwargs.get("session_key", "").startswith("subtask-"))
         mock_setup_key.assert_called()
 
-    @patch('spawn_reviewer.invoke_agent')
+    @patch('spawn_reviewer.invoke_agent_gated')
     @patch('subprocess.run')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_reviewer_payload_injection(self, mock_setup_key, mock_run, mock_invoke_agent):
@@ -164,7 +164,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         mock_setup_key.assert_called()
 
 
-    @patch('spawn_arbitrator.invoke_agent')
+    @patch('spawn_arbitrator.invoke_agent_gated')
     @patch('subprocess.run')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_arbitrator_payload_injection(self, mock_setup_key, mock_run, mock_invoke_agent):
@@ -196,7 +196,7 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertEqual(kwargs.get("role"), "arbitrator")
         mock_setup_key.assert_called()
 
-    @patch('spawn_manager.invoke_agent')
+    @patch('spawn_manager.invoke_agent_gated')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_manager_payload_injection(self, mock_setup_key, mock_invoke_agent):
         import spawn_manager

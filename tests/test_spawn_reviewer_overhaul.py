@@ -111,7 +111,7 @@ class TestSpawnReviewerOverhaul(unittest.TestCase):
 
 
 class TestSpawnReviewerAligned(unittest.TestCase):
-    @patch('spawn_reviewer.invoke_agent')
+    @patch('spawn_reviewer.invoke_agent_gated')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_reviewer_aligned_to_file_based_result(self, mock_setup_key, mock_invoke_agent):
         import spawn_reviewer

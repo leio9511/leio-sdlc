@@ -6,7 +6,7 @@ import time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
-from agent_driver import invoke_agent
+from agent_driver import invoke_agent, invoke_agent_gated
 from thinking_resolver import resolve_thinking
 import envelope_assembler
 
@@ -91,7 +91,7 @@ def main():
         print(f"🚀 Launching Agentic UAT Verifier...")
         session_id = f"uat_verifier_{int(time.time())}"
         # The verifier agent is instructed in the prompt to use the 'write' tool to save the JSON directly.
-        result = invoke_agent(task_string, session_key=session_id, role="verifier", thinking=resolved_thinking)
+        result = invoke_agent_gated(task_string, session_key=session_id, role="verifier", thinking=resolved_thinking)
         
         # Verify that the output file was actually created by the agent
         if not os.path.exists(os.path.abspath(args.out_file)):

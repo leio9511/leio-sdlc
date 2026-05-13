@@ -14,7 +14,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
         self.original_exists = os.path.exists
 
     @patch('spawn_coder.uuid.uuid4')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('spawn_coder.os.chdir')
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.os.path.exists')
@@ -91,7 +91,7 @@ class TestSpawnCoderRefactor(unittest.TestCase):
             self.assertEqual(spawn_coder.resolve_coder_artifact_subdir(tmp_dir, "system_alert"), "system_alert_002")
             self.assertEqual(spawn_coder.resolve_coder_artifact_subdir(tmp_dir, "revision_bootstrap"), "revision_bootstrap_001")
         
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     @patch('spawn_coder.os.chdir')
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.os.path.exists')

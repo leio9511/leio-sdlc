@@ -39,7 +39,7 @@ def test_auditor_artifacts_placed_in_run_dir(tmp_path, monkeypatch):
     mock_invoke = MagicMock(side_effect=side_effect_invoke)
 
     
-    monkeypatch.setattr(spawn_auditor, "invoke_agent", mock_invoke)
+    monkeypatch.setattr(spawn_auditor, "invoke_agent_gated", mock_invoke)
     try:
         monkeypatch.setattr(spawn_auditor.agent_driver, "send_ignition_handshake", MagicMock())
     except AttributeError:

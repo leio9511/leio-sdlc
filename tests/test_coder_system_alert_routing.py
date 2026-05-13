@@ -50,7 +50,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
 
     @patch('spawn_coder.get_current_branch', return_value='feature/system-alert-routing')
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     def test_system_alert_with_existing_session_sends_operational_delta_prompt(self, mock_invoke, mock_commit, mock_branch):
         mock_invoke.return_value = AgentResult(session_key="existing-session", stdout="")
 
@@ -76,7 +76,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
 
     @patch('spawn_coder.get_current_branch', return_value='feature/system-alert-bootstrap')
     @patch('spawn_coder.get_latest_commit_hash', return_value='def456')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     def test_system_alert_without_session_spawns_recovery_prompt(self, mock_invoke, mock_commit, mock_branch):
         mock_invoke.return_value = AgentResult(session_key="new-session", stdout="")
 
@@ -102,7 +102,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
 
     @patch('spawn_coder.get_current_branch', return_value='feature/system-alert-routing')
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     def test_system_alert_debug_artifacts_are_mode_scoped_and_non_overwriting(self, mock_invoke, mock_commit, mock_branch):
         mock_invoke.return_value = AgentResult(session_key="existing-session", stdout="")
 
@@ -126,7 +126,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
 
     @patch('spawn_coder.get_current_branch', return_value='feature/system-alert-routing')
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
-    @patch('spawn_coder.invoke_agent')
+    @patch('spawn_coder.invoke_agent_gated')
     def test_null_output_system_alert_prompt_preserves_exact_contract_text(self, mock_invoke, mock_commit, mock_branch):
         mock_invoke.return_value = AgentResult(session_key="existing-session", stdout="")
 
