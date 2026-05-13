@@ -17,6 +17,12 @@ from datetime import datetime, timezone
 
 # ── Authoritative vs. heuristic classification ──────────────────────────
 # Copied verbatim from PRD sections 3.4 and 7.
+#
+# Extending the authoritative-source allowlist requires an architecture
+# review per the authoritative-source rule in PRD section 3.4:
+# only CLI/runtime machine-readable metadata, provider-documented and
+# live-verified direct resume handles, and runtime-captured structured
+# bootstrap results may be classified as authoritative.
 
 _AUTHORITATIVE_SOURCE_LABELS = frozenset(
     ("cli_runtime", "provider_handle")
@@ -49,7 +55,7 @@ def get_bootstrap_dir(run_dir: str) -> str:
 
     Exact path rule: ``<run_dir>/bootstrap/``
     """
-    return os.path.join(run_dir, "bootstrap")
+    return os.path.join(run_dir, "bootstrap", "")
 
 
 def get_bootstrap_artifact_path(run_dir: str, invocation_id: str) -> str:
@@ -68,12 +74,36 @@ def get_bootstrap_index_path(run_dir: str) -> str:
     return os.path.join(run_dir, "bootstrap_index.json")
 
 
-# ── Artifact write helpers ──────────────────────────────────────────────
+# ── Artifact I/O helpers ───────────────────────────────────────────────
+
+
+def _read_json(path: str) -> dict:
+    """Read and parse a JSON file at *path*."""
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
 
 
 def _write_json(path: str, payload: dict) -> str:
-    """Atomically write *payload* as JSON to *path* (creates parent dirs)."""
+    """Atomically write *payload* as JSON to *path*.
+
+    Creates parent directories when the parent is a subdirectory of the
+    expected artifact root.  For paths whose parent must already exist
+    (e.g. bootstrap_index.json at the run-dir root), use ``_write_json_root``
+    instead.
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+    return path
+
+
+def _write_json_root(path: str, payload: dict) -> str:
+    """Write *payload* as JSON to *path* — parent must already exist."""
+    parent = os.path.dirname(path)
+    if not os.path.isdir(parent):
+        raise FileNotFoundError(
+            f"parent directory does not exist for index artifact: {parent}"
+        )
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2)
     return path
@@ -103,6 +133,7 @@ def write_bootstrap_success(
         "resume_kind": resume_kind,
         "source": source,
         "captured_at": captured_at,
+        "failure_reason": None,
     }
     path = get_bootstrap_artifact_path(run_dir, invocation_id)
     return _write_json(path, payload)
@@ -124,6 +155,9 @@ def write_bootstrap_failure(
         "phase": "bootstrap",
         "authoritative": False,
         "resume_handle": None,
+        "resume_kind": None,
+        "source": None,
+        "captured_at": None,
         "failure_reason": failure_reason,
     }
     path = get_bootstrap_artifact_path(run_dir, invocation_id)
@@ -139,8 +173,7 @@ def read_bootstrap_artifact(run_dir: str, invocation_id: str) -> dict:
     Raises ``FileNotFoundError`` if the artifact file does not exist.
     """
     path = get_bootstrap_artifact_path(run_dir, invocation_id)
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    return _read_json(path)
 
 
 def is_bootstrap_successful(artifact: dict) -> bool:
@@ -170,14 +203,13 @@ def write_bootstrap_index(run_dir: str, active_targets: dict) -> str:
     """
     payload = {"active_targets": active_targets}
     path = get_bootstrap_index_path(run_dir)
-    return _write_json(path, payload)
+    return _write_json_root(path, payload)
 
 
 def read_bootstrap_index(run_dir: str) -> dict:
     """Read and return the parsed bootstrap index dict."""
     path = get_bootstrap_index_path(run_dir)
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    return _read_json(path)
 
 
 def resolve_active_bootstrap_artifact(run_dir: str, logical_target: str) -> dict:
@@ -188,8 +220,7 @@ def resolve_active_bootstrap_artifact(run_dir: str, logical_target: str) -> dict
     index = read_bootstrap_index(run_dir)
     relative_path = index["active_targets"][logical_target]
     artifact_path = os.path.join(run_dir, relative_path)
-    with open(artifact_path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    return _read_json(artifact_path)
 
 
 # ── Validation ──────────────────────────────────────────────────────────
