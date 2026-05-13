@@ -7,5 +7,6 @@
   "ALLOWED_RUNTIME_ROOTS": [
     "~/.openclaw/skills",
     "~/.gemini/skills"
-  ]
+  ],
+  "continuity_mode": "legacy"
 }

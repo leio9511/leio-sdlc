@@ -17,6 +17,28 @@ SDLC_RUNTIME_DIR = os.getenv("SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw
 NOTIFICATION_BRIDGE_BINARY = os.getenv("NOTIFICATION_BRIDGE_BINARY", "openclaw")
 SDLC_NOTIFICATION_VERSION = int(os.getenv("SDLC_NOTIFICATION_VERSION", "2"))
 
+# Continuity mode flag: controls strong-continuity gating behaviour.
+# Valid values: legacy | case1_strict
+SDLC_CONTINUITY_MODE = os.getenv("SDLC_CONTINUITY_MODE", "legacy")
+
+_VALID_CONTINUITY_MODES = ("legacy", "case1_strict")
+
+
+def get_continuity_mode():
+    """Return the resolved continuity mode after validating it is a known value.
+
+    Environment variable SDLC_CONTINUITY_MODE takes precedence over the
+    config-file value merged by load_or_merge_config().  If the resolved
+    value is not one of the valid modes, raise ValueError.
+    """
+    mode = os.getenv("SDLC_CONTINUITY_MODE", SDLC_CONTINUITY_MODE)
+    if mode not in _VALID_CONTINUITY_MODES:
+        raise ValueError(
+            f"Unrecognized SDLC_CONTINUITY_MODE value: {mode!r}. "
+            f"Valid modes are: {', '.join(_VALID_CONTINUITY_MODES)}"
+        )
+    return mode
+
 
 def load_or_merge_config(sdlc_root):
     template_path = os.path.join(sdlc_root, "config", "sdlc_config.json.template")
@@ -42,14 +64,22 @@ def load_or_merge_config(sdlc_root):
             # PR-002: Prevent physical config write if in test mode
             with open(config_path, "w") as fw:
                 json.dump(local_config, fw, indent=4)
-        return local_config
+        result = local_config
     else:
         if os.environ.get("SDLC_TEST_MODE") != "true":
             # PR-002: Prevent physical config write if in test mode
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             with open(config_path, "w") as f:
                 json.dump(config_template, f, indent=4)
-        return config_template
+        result = config_template
+
+    # Merge continuity_mode from config file (env var takes precedence —
+    # already resolved at module-import time into SDLC_CONTINUITY_MODE).
+    global SDLC_CONTINUITY_MODE
+    if "SDLC_CONTINUITY_MODE" not in os.environ and "continuity_mode" in result:
+        SDLC_CONTINUITY_MODE = result["continuity_mode"]
+
+    return result
 
 
 def get_allowed_runtime_roots(app_config):
