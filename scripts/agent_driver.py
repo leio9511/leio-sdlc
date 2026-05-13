@@ -373,6 +373,88 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
 
 RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
+# ── Bootstrap artifact integration (PR-002) ─────────────────────────────
+# Thin convenience layer on top of bootstrap_artifact that exposes
+# the artifact lifecycle to the agent-driver runtime.  All schema and
+# classification logic lives in bootstrap_artifact.py.
+
+
+def ensure_bootstrap_dir(run_dir: str) -> str:
+    """Ensure the bootstrap artifact directory exists and return its path."""
+    from bootstrap_artifact import get_bootstrap_dir
+    bd = get_bootstrap_dir(run_dir)
+    os.makedirs(bd, exist_ok=True)
+    return bd
+
+
+def record_bootstrap_success(
+    run_dir: str,
+    invocation_id: str,
+    engine: str,
+    resume_handle: str,
+    resume_kind: str,
+    source: str = "cli_runtime",
+    captured_at: str | None = None,
+) -> str:
+    """Record a successful Phase-1 bootstrap and return the artifact path.
+
+    Convenience wrapper around ``bootstrap_artifact.write_bootstrap_success``.
+    """
+    from bootstrap_artifact import write_bootstrap_success
+    return write_bootstrap_success(
+        run_dir=run_dir,
+        invocation_id=invocation_id,
+        engine=engine,
+        resume_handle=resume_handle,
+        resume_kind=resume_kind,
+        source=source,
+        captured_at=captured_at,
+    )
+
+
+def record_bootstrap_failure(
+    run_dir: str,
+    invocation_id: str,
+    engine: str,
+    failure_reason: str = "missing_authoritative_resume_handle",
+) -> str:
+    """Record a failed Phase-1 bootstrap and return the artifact path.
+
+    Convenience wrapper around ``bootstrap_artifact.write_bootstrap_failure``.
+    """
+    from bootstrap_artifact import write_bootstrap_failure
+    return write_bootstrap_failure(
+        run_dir=run_dir,
+        invocation_id=invocation_id,
+        engine=engine,
+        failure_reason=failure_reason,
+    )
+
+
+def record_bootstrap_index(run_dir: str, active_targets: dict) -> str:
+    """Write the bootstrap index artifact.
+
+    Convenience wrapper around ``bootstrap_artifact.write_bootstrap_index``.
+    """
+    from bootstrap_artifact import write_bootstrap_index
+    return write_bootstrap_index(run_dir=run_dir, active_targets=active_targets)
+
+
+def is_eligible_for_strong_continuity(run_dir: str, invocation_id: str) -> bool:
+    """Check whether a bootstrap artifact authorises strong continuity.
+
+    Returns True only when the artifact exists, ``ok`` is True, and
+    ``authoritative`` is True.
+    """
+    from bootstrap_artifact import read_bootstrap_artifact, is_bootstrap_successful
+    try:
+        artifact = read_bootstrap_artifact(run_dir, invocation_id)
+        return is_bootstrap_successful(artifact)
+    except FileNotFoundError:
+        return False
+
+
 def build_prompt(role, **kwargs):
     # Support dual-source prompt loading
     import inspect
