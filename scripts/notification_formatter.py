@@ -87,4 +87,42 @@ def format_notification(event_type: str, context: dict) -> str:
     elif event_type == "uat_error":
         return f"❌ [{prd_match}] UAT Verification Error: 测试报告解析失败或发生异常。"
     
+
+    # Pipeline visibility for new event types
+    elif event_type == "coder_timeout":
+        return f"⏰ [Coder] Timeout while implementing {pr_match}."
+    elif event_type == "coder_failed":
+        return f"❌ [Coder] Failed with non-zero exit for {pr_match}."
+    elif event_type == "coder_workspace_dirty":
+        return f"⚠️ [Coder] Left workspace dirty for {pr_match}."
+    elif event_type == "coder_no_output":
+        return f"⚠️ [Coder] Produced no output for {pr_match}."
+    elif event_type == "reviewer_failed":
+        return f"🚨 [Reviewer] Pipeline failure for {pr_match}."
+    elif event_type == "reviewer_placeholder_stuck":
+        return f"🚨 [Reviewer] Assessment stuck in placeholder for {pr_match}."
+    elif event_type == "reviewer_unknown_verdict":
+        return f"🚨 [Reviewer] Unknown assessment verdict for {pr_match}."
+    elif event_type == "reviewer_invalid_json":
+        return f"🚨 [Reviewer] Invalid JSON response for {pr_match}."
+    elif event_type == "reviewer_no_output":
+        return f"🚨 [Reviewer] No output produced for {pr_match}."
+    elif event_type == "planner_split_start":
+        return f"🔄 [Planner] PR {pr_match} failed repeatedly. Starting planner split recovery."
+    elif event_type == "planner_split_complete":
+        return f"✅ [Planner] Successfully split {pr_match} into smaller slices."
+    elif event_type == "planner_split_failed":
+        return f"❌ [Planner] Split recovery failed for {pr_match}."
+    elif event_type == "uat_recovery_plan_start":
+        return f"🔄 [UAT] Triggered recovery replanning based on findings for {prd_match}."
+    elif event_type == "uat_recovery_exhausted":
+        return f"🚨 [UAT] 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。({prd_match})"
+    elif event_type == "uat_blocked":
+        return f"🚨 [UAT] Findings non-actionable or need human judgment. 自动恢复已阻塞。({prd_match})"
+    
+    elif event_type == "preflight_failed":
+        attempt = context.get('attempt', '?')
+        limit = context.get('limit', '?')
+        return f"❌ [Preflight] Failed for {pr_match} (attempt {attempt}/{limit}). Retrying Coder..."
+    
     return f"🤖 [SDLC Engine] 未知事件: {event_type}"
