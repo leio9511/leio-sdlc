@@ -98,14 +98,19 @@ def format_notification(event_type: str, context: dict) -> str:
     elif event_type == "coder_no_output":
         return f"⚠️ [Coder] Coder produced no effective output for {pr_match}."
     elif event_type == "reviewer_failed":
+        # Handle generic reviewer failure
         return f"🚨 [Reviewer] Pipeline failure for {pr_match}."
     elif event_type == "reviewer_placeholder_stuck":
+        # Handle NOT_STARTED stuck state
         return f"🚨 [Reviewer] Assessment stuck in placeholder for {pr_match}."
     elif event_type == "reviewer_unknown_verdict":
+        # Handle unrecognized overall_assessment
         return f"🚨 [Reviewer] Unknown assessment verdict for {pr_match}."
     elif event_type == "reviewer_invalid_json":
+        # Handle JSON parsing errors
         return f"🚨 [Reviewer] Invalid JSON response for {pr_match}."
     elif event_type == "reviewer_no_output":
+        # Handle empty or missing artifact
         return f"🚨 [Reviewer] No output produced for {pr_match}."
     elif event_type == "planner_split_start":
         return f"🔄 [Planner] PR {pr_match} failed repeatedly. Starting planner split recovery."

@@ -1081,6 +1081,7 @@ def main():
                     proc.wait()
                     
                     if proc.returncode != 0:
+                        # Emits generic reviewer pipeline failure if the process crashes
                         notify_channel(effective_channel, f"🚨 Reviewer pipeline failure for {base_filename}: reviewer_failed", "reviewer_failed", {"pr_id": base_filename})
                         state_5_trigger = True
                         break
@@ -1099,6 +1100,8 @@ def main():
                             # Use new robust parser
                             data = extract_and_parse_json(review_content)
                             assessment = data.get("overall_assessment") if isinstance(data, dict) else None
+                            
+                            # Map standard verdict and distinct pipeline errors
                             if assessment in ["EXCELLENT", "GOOD_WITH_MINOR_SUGGESTIONS"]:
                                 verdict = "APPROVED"
                                 reviewer_failure_reason = None
@@ -1128,6 +1131,7 @@ def main():
                             else:
                                 break # pipeline failure, don't retry json
                         except ValueError as e:
+                            # Classify parse errors based on whether content exists
                             reviewer_failure_reason = "reviewer_invalid_json" if review_content.strip() else "reviewer_no_output"
                             json_retry_count += 1
                             logger.warning(f"Failed to parse Reviewer JSON (Attempt {json_retry_count}/{max_json_retries}). Retrying with system alert.")
