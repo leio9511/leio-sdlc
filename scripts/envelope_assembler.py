@@ -454,40 +454,6 @@ def render_envelope_to_prompt(envelope):
     return "\n".join(prompt_lines)
 
 
-def verify_phase2_envelope_integrity(prompt: str) -> bool:
-    """Validate that a Phase 2 prompt preserves the full main-task envelope.
-
-    Returns ``True`` when the prompt:
-    - Contains the role prologue (IDENTITY & PRIMARY GOAL section)
-    - Contains the execution contract section
-    - Contains the reference index section
-    - Does NOT contain any bootstrap instruction markers
-
-    This function does **not** modify the prompt — it is a validation gate only.
-    See PRD FR-9 and NFR-3.
-    """
-    # Required sections (case-sensitive exact markers)
-    required_sections = [
-        "IDENTITY & PRIMARY GOAL",
-        "EXECUTION CONTRACT",
-        "REFERENCE INDEX",
-    ]
-    for section in required_sections:
-        if section not in prompt:
-            return False
-
-    # Bootstrap contamination markers (exact labels from PRD section 7)
-    # The Phase 2 prompt must NOT carry any Phase-1 bootstrap instructions
-    bootstrap_markers = [
-        "Phase 1: bootstrap",
-    ]
-    for marker in bootstrap_markers:
-        if marker in prompt:
-            return False
-
-    return True
-
-
 def save_envelope_artifacts(role, out_dir, envelope, rendered_prompt, extra_artifacts=None, artifact_subdir=None):
     debug_dir = os.path.join(out_dir, f"{role}_debug")
     if artifact_subdir:
