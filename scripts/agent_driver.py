@@ -66,17 +66,6 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
             print(f"[FATAL] Notification delivery failed: {e}", file=sys.stderr)
             sys.exit(1)
 
-def is_case1_strict_mode() -> bool:
-    """Return True only when the resolved continuity mode is 'case1_strict'.
-
-    This is the single observation point that downstream PRs will use to
-    gate case-1 strong-continuity behaviour.  It is purely an observer — it
-    must NOT introduce any behaviour changes to the existing invoke path.
-    """
-    from config import get_continuity_mode
-    return get_continuity_mode() == "case1_strict"
-
-
 def send_ignition_handshake(channel: str) -> None:
     import config
     if getattr(config, "SDLC_NOTIFICATION_VERSION", 2) == 1:
