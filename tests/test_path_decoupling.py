@@ -31,7 +31,7 @@ class TestPathDecoupling(unittest.TestCase):
     @patch("spawn_planner.os.path.isfile", return_value=True)
     @patch("spawn_planner.os.path.getsize", return_value=100)
     @patch("spawn_planner.build_prompt", return_value="mock prompt")
-    @patch("spawn_planner.invoke_agent_gated")
+    @patch("spawn_planner.invoke_agent")
     @patch("spawn_planner.open", create=True)
     @patch("spawn_planner.os.makedirs")
     @patch("sys.argv", ["spawn_planner.py", "--prd-file", "dummy.md", "--workdir", ".", "--run-dir", "/tmp/run"])

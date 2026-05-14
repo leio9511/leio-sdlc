@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
-from agent_driver import invoke_agent, build_prompt, notify_channel
+from agent_driver import invoke_agent, invoke_agent_gated, is_case1_eligible, build_prompt, notify_channel
 proc = None
 import glob
 import subprocess
@@ -340,14 +340,18 @@ def main():
     execution_log_msg = f"Orchestrator Engine Configured -> Engine: {args.engine}, Model: {args.model}"
     print(execution_log_msg)
 
-    # ── Continuity mode awareness (observability only) ──────────────────
-    # Engine eligibility and mode-gated dispatch are handled at invocation
-    # time by invoke_agent_gated() in agent_driver.py.  The orchestrator
-    # does not gate here — that is delegated to the spawn scripts so that
-    # Gemini can reach the two-phase bootstrap protocol in case1_strict mode.
+    # ── Continuity mode awareness and engine eligibility gate ──────────
     from config import get_continuity_mode
+    from agent_driver import is_case1_strict_mode, is_case1_eligible
     continuity_mode = get_continuity_mode()
     print(f"Continuity Mode: {continuity_mode}")
+
+    if is_case1_strict_mode() and not is_case1_eligible(args.engine):
+        print(
+            f"[FATAL] Engine '{args.engine}' is not case-1 eligible in case1_strict mode. "
+            f"Only case-1 engines are in scope for strong continuity support."
+        )
+        sys.exit(1)
 
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"

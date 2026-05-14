@@ -55,7 +55,7 @@ class TestSpawnVerifier(unittest.TestCase):
         if mock_result is None:
             mock_result = AgentResult(session_key="subtask-verifier", stdout="dummy")
 
-        with patch("spawn_verifier.invoke_agent_gated") as mock_invoke_agent, \
+        with patch("spawn_verifier.invoke_agent") as mock_invoke_agent, \
              patch("utils_api_key.setup_spawner_api_key") as mock_setup_key, \
              patch.object(sys, "argv", test_args), \
              patch.dict(os.environ, env, clear=False):

@@ -153,7 +153,7 @@ def test_prd_template_contains_section_7():
 
 
 @patch("utils_api_key.assign_gemini_api_key")
-@patch("spawn_auditor.invoke_agent_gated")
+@patch("spawn_auditor.invoke_agent")
 def test_auditor_uses_shared_key_utility(mock_invoke_agent, mock_assign_api_key, tmp_path, monkeypatch):
     mock_invoke_agent.return_value = MagicMock(stdout='{"status": "APPROVED"}', returncode=0)
     mock_assign_api_key.return_value = "TEST_API_KEY"
@@ -200,7 +200,7 @@ def test_spawn_auditor_startup_validation_uses_allowed_runtime_roots(mock_runtim
         cfg.get_allowed_runtime_roots.return_value = ["/custom_runtime_dir"]
 
     try:
-        with patch("spawn_auditor.invoke_agent_gated"), \
+        with patch("spawn_auditor.invoke_agent"), \
              patch("spawn_auditor.os.makedirs"), \
              patch("spawn_auditor.os.chdir"), \
              patch("spawn_auditor.os.path.exists", return_value=True), \
@@ -238,7 +238,7 @@ def test_spawn_auditor_startup_validation_rejects_path_outside_allowed_runtime_r
 
 @patch("agent_driver.notify_channel")
 @patch("agent_driver.send_ignition_handshake")
-@patch("spawn_auditor.invoke_agent_gated")
+@patch("spawn_auditor.invoke_agent")
 def test_auditor_file_first_success(mock_invoke_agent, mock_handshake, mock_notify, capsys, monkeypatch, tmp_path):
     prd_file = tmp_path / "file_first_success_prd.md"
     _write_valid_prd(prd_file)
@@ -265,7 +265,7 @@ def test_auditor_file_first_success(mock_invoke_agent, mock_handshake, mock_noti
 
 @patch("agent_driver.notify_channel")
 @patch("agent_driver.send_ignition_handshake")
-@patch("spawn_auditor.invoke_agent_gated")
+@patch("spawn_auditor.invoke_agent")
 def test_auditor_file_first_rejection(mock_invoke_agent, mock_handshake, mock_notify, capsys, monkeypatch, tmp_path):
     prd_file = tmp_path / "file_first_rejection_prd.md"
     _write_valid_prd(prd_file)
@@ -291,7 +291,7 @@ def test_auditor_file_first_rejection(mock_invoke_agent, mock_handshake, mock_no
 
 @patch("agent_driver.notify_channel")
 @patch("agent_driver.send_ignition_handshake")
-@patch("spawn_auditor.invoke_agent_gated")
+@patch("spawn_auditor.invoke_agent")
 def test_auditor_legacy_stdout_fallback(mock_invoke_agent, mock_handshake, mock_notify, capsys, monkeypatch, tmp_path):
     prd_file = tmp_path / "legacy_stdout_prd.md"
     _write_valid_prd(prd_file)
@@ -315,7 +315,7 @@ def test_auditor_legacy_stdout_fallback(mock_invoke_agent, mock_handshake, mock_
 
 @patch("agent_driver.notify_channel")
 @patch("agent_driver.send_ignition_handshake")
-@patch("spawn_auditor.invoke_agent_gated")
+@patch("spawn_auditor.invoke_agent")
 def test_auditor_conflicting_stdout_and_file(mock_invoke_agent, mock_handshake, mock_notify, capsys, monkeypatch, tmp_path):
     prd_file = tmp_path / "conflicting_stdout_prd.md"
     _write_valid_prd(prd_file)
@@ -342,7 +342,7 @@ def test_auditor_conflicting_stdout_and_file(mock_invoke_agent, mock_handshake, 
 
 @patch("agent_driver.notify_channel")
 @patch("agent_driver.send_ignition_handshake")
-@patch("spawn_auditor.invoke_agent_gated")
+@patch("spawn_auditor.invoke_agent")
 def test_auditor_missing_file_invalid_stdout(mock_invoke_agent, mock_handshake, mock_notify, capsys, monkeypatch, tmp_path):
     prd_file = tmp_path / "missing_file_invalid_stdout_prd.md"
     _write_valid_prd(prd_file)

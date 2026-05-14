@@ -12,7 +12,7 @@ import spawn_coder
 
 class TestCoderStartupEnvelope(unittest.TestCase):
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent_gated')
+    @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_coder_saves_revision_bootstrap_artifacts(self, mock_setup_key, mock_invoke, mock_check_output):
         from agent_driver import AgentResult
@@ -65,7 +65,7 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             self.assertEqual(feedback_refs[0]["path"], feedback_file)
 
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent_gated')
+    @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_coder_saves_system_alert_artifacts(self, mock_setup_key, mock_invoke, mock_check_output):
         from agent_driver import AgentResult
@@ -112,7 +112,7 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_text)
 
     @patch('spawn_coder.subprocess.check_output')
-    @patch('spawn_coder.invoke_agent_gated')
+    @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
     def test_spawn_coder_rendered_prompt_references_coder_playbook_without_inlining(self, mock_setup_key, mock_invoke, mock_check_output):
         from agent_driver import AgentResult

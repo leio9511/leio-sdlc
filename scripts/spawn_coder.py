@@ -10,7 +10,7 @@ from pathlib import Path
 
 import config
 import envelope_assembler
-from agent_driver import invoke_agent, invoke_agent_gated
+from agent_driver import invoke_agent
 from thinking_resolver import resolve_thinking
 
 
@@ -379,7 +379,7 @@ def save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt):
 
 
 def send_feedback(session_key, message, workdir=".", run_dir=".", thinking: str | None = None):
-    result = invoke_agent_gated(message, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
+    result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
     print(f"Sent feedback to session {result.session_key}")
 
 
@@ -444,7 +444,7 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir, thinking=thinking)
         return True, session_key
     else:
-        result = invoke_agent_gated(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
         with open(session_file, "w") as f:
             f.write(result.session_key)
         print(f"Spawned new session {result.session_key} with feedback")
@@ -508,7 +508,7 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
         send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir, thinking=thinking)
         return True, session_key
     else:
-        result = invoke_agent_gated(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
         with open(session_file, "w") as f:
             f.write(result.session_key)
         print(f"Spawned new session {result.session_key} with system alert")
@@ -630,7 +630,7 @@ def main():
     else:
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
 
-    result = invoke_agent_gated(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir, thinking=resolved_thinking)
+    result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir, thinking=resolved_thinking)
     if not os.path.exists(session_file):
         with open(session_file, "w") as f:
             f.write(result.session_key)
