@@ -113,17 +113,17 @@ def format_notification(event_type: str, context: dict) -> str:
         # Handle empty or missing artifact
         return f"🚨 [Reviewer] No output produced for {pr_match}."
     elif event_type == "planner_split_start":
-        return f"🔄 [Planner] PR {pr_match} failed repeatedly. Starting planner split recovery."
+        return f"🔄 [Planner] PR {pr_match} failed repeatedly. Starting planner split recovery."  # PR-004
     elif event_type == "planner_split_complete":
-        return f"✅ [Planner] Successfully split {pr_match} into smaller slices."
+        return f"✅ [Planner] Successfully split {pr_match} into smaller slices."  # PR-004
     elif event_type == "planner_split_failed":
-        return f"❌ [Planner] Split recovery failed for {pr_match}."
+        return f"❌ [Planner] Split recovery failed for {pr_match}."  # PR-004
     elif event_type == "uat_recovery_plan_start":
-        return f"🔄 [UAT] Triggered recovery replanning based on findings for {prd_match}."
+        return f"🔄 [UAT] Triggered recovery replanning based on findings for {prd_match}."  # PR-004
     elif event_type == "uat_recovery_exhausted":
-        return f"🚨 [UAT] 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。({prd_match})"
+        return f"🚨 [UAT] 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理。({prd_match})"  # PR-004
     elif event_type == "uat_blocked":
-        return f"🚨 [UAT] Findings non-actionable or need human judgment. 自动恢复已阻塞。({prd_match})"
+        return f"🚨 [UAT] Findings non-actionable or need human judgment. 自动恢复已阻塞。({prd_match})"  # PR-004
     
     elif event_type == "preflight_failed":
         attempt = context.get('attempt', '?')

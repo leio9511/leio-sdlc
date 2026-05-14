@@ -933,7 +933,7 @@ def main():
                         actionable_items = [item for item in uat_data.get("verification_details", []) if item.get("status") in ["MISSING", "PARTIAL"]]
                         if actionable_items:
                             if uat_recovery_count < max_uat_recovery_attempts:
-                                notify_channel(effective_channel, "UAT triggered recovery replanning based on findings.", "uat_recovery_plan_start", {"prd_id": prd_filename})
+                                notify_channel(effective_channel, "UAT triggered recovery replanning based on findings.", "uat_recovery_plan_start", {"prd_id": prd_filename})  # PR-004
                                 logger.info("STATE_UAT_RECOVERY")
                                 write_resume_state(run_dir, "UAT_RECOVERY_ACTIVE", get_baseline_commit(run_dir), recovery_mode="uat_recovery")
                                 uat_recovery_count += 1
@@ -952,14 +952,14 @@ def main():
                                 continue
                             else:
                                 print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Retries exceeded.")
-                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理 。排查完毕后可使用 `--resume` 恢复执行。*", "uat_recovery_exhausted", {"prd_id": prd_filename})
+                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理 。排查完毕后可使用 `--resume` 恢复执行。*", "uat_recovery_exhausted", {"prd_id": prd_filename})  # PR-004
                                 with open(os.path.join(workdir, "STATE.md"), "w") as f: f.write("UAT_BLOCKED\n")
                                 logger.info("STATE_UAT_BLOCKED")
                                 write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                                 sys.exit(1)
                         else:
                             print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo.")
-                            notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT findings non-actionable or need human judgment. 自动恢复已阻塞。*", "uat_blocked", {"prd_id": prd_filename})
+                            notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT findings non-actionable or need human judgment. 自动恢复已阻塞。*", "uat_blocked", {"prd_id": prd_filename})  # PR-004
                             write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                             sys.exit(1)
 
@@ -1221,25 +1221,25 @@ def main():
                             
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
-                            notify_channel(effective_channel, f"PR {base_filename} failed repeatedly. Starting planner split recovery.", "planner_split_start", {"pr_id": base_filename})
+                            notify_channel(effective_channel, f"PR {base_filename} failed repeatedly. Starting planner split recovery.", "planner_split_start", {"pr_id": base_filename})  # PR-004
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before
                             if len(new_files) >= 2:
-                                notify_channel(effective_channel, f"Planner successfully split {base_filename} into smaller slices.", "planner_split_complete", {"pr_id": base_filename})
+                                notify_channel(effective_channel, f"Planner successfully split {base_filename} into smaller slices.", "planner_split_complete", {"pr_id": base_filename})  # PR-004
                                 set_pr_status(current_pr, "superseded")
                                 write_resume_state(run_dir, "PLANNER_ACTIVE", get_baseline_commit(run_dir), recovery_mode="split", split_allowed=False)
                                 pr_done = True
                                 break
                             else:
-                                notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}.", "planner_split_failed", {"pr_id": base_filename})
+                                notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}.", "planner_split_failed", {"pr_id": base_filename})  # PR-004
                                 set_pr_status(current_pr, "blocked_fatal")
                                 print(HandoffPrompter.get_prompt("dead_end"))
                                 sys.exit(1)
                         else:
-                            notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}. Max split depth reached.", "planner_split_failed", {"pr_id": base_filename})
+                            notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}. Max split depth reached.", "planner_split_failed", {"pr_id": base_filename})  # PR-004
                             set_pr_status(current_pr, "blocked_fatal")
                             print(HandoffPrompter.get_prompt("dead_end"))
                             sys.exit(1)
