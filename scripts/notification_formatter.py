@@ -90,13 +90,13 @@ def format_notification(event_type: str, context: dict) -> str:
 
     # Pipeline visibility for new event types
     elif event_type == "coder_timeout":
-        return f"⏰ [Coder] Timeout while implementing {pr_match}."
+        return f"⏰ [Coder] Coder execution timed out for {pr_match}."
     elif event_type == "coder_failed":
-        return f"❌ [Coder] Failed with non-zero exit for {pr_match}."
+        return f"❌ [Coder] Coder execution failed for {pr_match}."
     elif event_type == "coder_workspace_dirty":
-        return f"⚠️ [Coder] Left workspace dirty for {pr_match}."
+        return f"⚠️ [Coder] Coder left an unexpected workspace state for {pr_match}."
     elif event_type == "coder_no_output":
-        return f"⚠️ [Coder] Produced no output for {pr_match}."
+        return f"⚠️ [Coder] Coder produced no effective output for {pr_match}."
     elif event_type == "reviewer_failed":
         return f"🚨 [Reviewer] Pipeline failure for {pr_match}."
     elif event_type == "reviewer_placeholder_stuck":

@@ -1013,14 +1013,14 @@ def main():
                         except subprocess.TimeoutExpired:
                             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                             proc.wait()
-                        notify_channel(effective_channel, f"Coder timed out for {base_filename}", "coder_timeout", {"pr_id": base_filename})
+                        notify_channel(effective_channel, f"Coder execution timed out for {base_filename}", "coder_timeout", {"pr_id": base_filename})
                         state_5_trigger = True
                         break
                     class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
                     coder_result = _CoderRes()
                     coder_result.returncode = proc.returncode
                     if coder_result.returncode != 0:
-                        notify_channel(effective_channel, f"Coder failed with non-zero exit for {base_filename}", "coder_failed", {"pr_id": base_filename})
+                        notify_channel(effective_channel, f"Coder execution failed for {base_filename} (non-zero exit)", "coder_failed", {"pr_id": base_filename})
                         state_5_trigger = True
                         break
 
@@ -1032,7 +1032,7 @@ def main():
                     if status_output.strip():
                         dlog(f"Dirty status detected: {repr(status_output)}")
                         orch_yellow_counter += 1
-                        notify_channel(effective_channel, f"Coder left workspace dirty for {base_filename}", "coder_workspace_dirty", {"pr_id": base_filename})
+                        notify_channel(effective_channel, f"Coder left an unexpected workspace state for {base_filename}", "coder_workspace_dirty", {"pr_id": base_filename})
                         if orch_yellow_counter >= yellow_retry_limit:
                             state_5_trigger = True
                             break
@@ -1045,7 +1045,7 @@ def main():
                             f"baseline_head={coder_attempt_head}, current_head={current_head}"
                         )
                         orch_yellow_counter += 1
-                        notify_channel(effective_channel, f"Coder produced no output for {base_filename}", "coder_no_output", {"pr_id": base_filename})
+                        notify_channel(effective_channel, f"Coder produced no effective output for {base_filename}", "coder_no_output", {"pr_id": base_filename})
                         if orch_yellow_counter >= yellow_retry_limit:
                             state_5_trigger = True
                             break
