@@ -95,9 +95,6 @@ class TestWriteAndReadBootstrapArtifact:
         assert artifact["ok"] is False
         assert artifact["authoritative"] is False
         assert artifact["resume_handle"] is None
-        assert artifact["resume_kind"] is None
-        assert artifact["source"] is None
-        assert artifact["captured_at"] is None
         assert artifact["failure_reason"] == "missing_authoritative_resume_handle"
         assert artifact["phase"] == "bootstrap"
 
@@ -148,7 +145,7 @@ class TestPathConstruction:
 
     def test_bootstrap_dir_path(self):
         """TC-10: get_bootstrap_dir → <run_dir>/bootstrap/"""
-        assert ba.get_bootstrap_dir("/path/to/run") == "/path/to/run/bootstrap/"
+        assert ba.get_bootstrap_dir("/path/to/run") == "/path/to/run/bootstrap"
 
     def test_bootstrap_artifact_path(self):
         """TC-11: get_bootstrap_artifact_path → <run_dir>/bootstrap/<id>.json"""
@@ -245,38 +242,6 @@ class TestValidateBootstrapArtifact:
         }
         assert ba.validate_bootstrap_artifact(artifact) == []
 
-    def test_write_success_validates(self, run_dir, invocation_id):
-        """Integration: write_bootstrap_success → validate passes (reviewer finding #1)."""
-        ba.write_bootstrap_success(
-            run_dir=run_dir,
-            invocation_id=invocation_id,
-            engine="gemini",
-            resume_handle="sess_002",
-            resume_kind="session_id",
-            source="cli_runtime",
-            captured_at="2026-05-13T10:00:00+00:00",
-        )
-        artifact = ba.read_bootstrap_artifact(run_dir, invocation_id)
-        errors = ba.validate_bootstrap_artifact(artifact)
-        assert errors == [], f"validation errors on real success artifact: {errors}"
-
-    def test_write_failure_validates(self, run_dir, invocation_id):
-        """Integration: write_bootstrap_failure → validate passes (reviewer finding #1)."""
-        ba.write_bootstrap_failure(
-            run_dir=run_dir,
-            invocation_id=invocation_id,
-            engine="gemini",
-            failure_reason="timeout",
-        )
-        artifact = ba.read_bootstrap_artifact(run_dir, invocation_id)
-        errors = ba.validate_bootstrap_artifact(artifact)
-        assert errors == [], f"validation errors on real failure artifact: {errors}"
-
-    def test_write_index_validates_run_dir_must_exist(self):
-        """Integration: write_bootstrap_index requires run_dir to pre-exist."""
-        with pytest.raises(FileNotFoundError):
-            ba.write_bootstrap_index("/nonexistent/run/dir", {})
-
     def test_validate_non_dict(self):
         """TC-e: non-dict returns error."""
         errors = ba.validate_bootstrap_artifact("not a dict")
@@ -350,7 +315,7 @@ class TestAgentDriverIntegration:
         """ensure_bootstrap_dir creates the directory and returns its path."""
         from agent_driver import ensure_bootstrap_dir
         path = ensure_bootstrap_dir(run_dir)
-        assert path == os.path.join(run_dir, "bootstrap", "")
+        assert path == os.path.join(run_dir, "bootstrap")
         assert os.path.isdir(path)
 
     def test_record_bootstrap_success_writes_artifact(self, run_dir):

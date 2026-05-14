@@ -378,9 +378,6 @@ RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
 # Thin convenience layer on top of bootstrap_artifact that exposes
 # the artifact lifecycle to the agent-driver runtime.  All schema and
 # classification logic lives in bootstrap_artifact.py.
-#
-# Imports are lazy (per-function) to avoid breaking sandboxed deployment
-# copies that may not include bootstrap_artifact.py alongside agent_driver.
 
 
 def ensure_bootstrap_dir(run_dir: str) -> str:
