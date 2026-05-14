@@ -531,6 +531,8 @@ def main():
     logger = setup_orchestrator_logger(workdir, args.debug)
     dlog(f"Workdir: {workdir}")
     
+    effective_channel = args.channel or os.environ.get("OPENCLAW_SESSION_KEY") or os.environ.get("OPENCLAW_CHANNEL_ID")
+    
     # 1. Blast Radius Control: Scan and delete all .coder_session files using glob
     dlog("Executing Blast Radius Control...")
     import glob
@@ -599,8 +601,10 @@ def main():
             
             # Split Execution Workflow
             current_pr = state_data.get("currentPrPath")
+            base_filename = os.path.splitext(os.path.basename(current_pr))[0]
             slice_depth = get_pr_slice_depth(current_pr)
             if slice_depth < 2:
+                notify_channel(effective_channel, f"PR {base_filename} failed repeatedly. Starting planner split recovery.", "planner_split_start", {"pr_id": base_filename})
                 # Leverage existing planner slicing capabilities
                 pr_files_before = set(glob.glob(os.path.join(resume_job_dir, "PR_*.md")))
                 proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", resume_job_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
@@ -608,14 +612,17 @@ def main():
                 pr_files_after = set(glob.glob(os.path.join(resume_job_dir, "PR_*.md")))
                 new_files = pr_files_after - pr_files_before
                 if len(new_files) >= 2:
+                    notify_channel(effective_channel, f"Planner successfully split {base_filename} into smaller slices.", "planner_split_complete", {"pr_id": base_filename})
                     # Mark original active PR as superseded
                     set_pr_status(current_pr, "superseded")
                     # Update resume_state.json to reflect new planner continuation path
                     write_resume_state(resume_job_dir, "PLANNER_ACTIVE", get_baseline_commit(resume_job_dir), recovery_mode="split", split_allowed=False)
                 else:
+                    notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}.", "planner_split_failed", {"pr_id": base_filename})
                     print("[FATAL] Split failed: Planner did not generate at least 2 slices.")
                     sys.exit(1)
             else:
+                notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}. Max split depth reached.", "planner_split_failed", {"pr_id": base_filename})
                 print("[FATAL] Split failed: Maximum slice depth reached.")
                 sys.exit(1)
         else:
