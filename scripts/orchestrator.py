@@ -926,6 +926,7 @@ def main():
                         actionable_items = [item for item in uat_data.get("verification_details", []) if item.get("status") in ["MISSING", "PARTIAL"]]
                         if actionable_items:
                             if uat_recovery_count < max_uat_recovery_attempts:
+                                notify_channel(effective_channel, "UAT triggered recovery replanning based on findings.", "uat_recovery_plan_start", {"prd_id": prd_filename})
                                 logger.info("STATE_UAT_RECOVERY")
                                 write_resume_state(run_dir, "UAT_RECOVERY_ACTIVE", get_baseline_commit(run_dir), recovery_mode="uat_recovery")
                                 uat_recovery_count += 1
@@ -944,13 +945,14 @@ def main():
                                 continue
                             else:
                                 print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Retries exceeded.")
-                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理 。排查完毕后可使用 `--resume` 恢复执行。*", "uat_error", {"prd_id": prd_filename})
+                                notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT 补救次数已达上限。自动恢复流已熔断，现场已冻结，请人工介入处理 。排查完毕后可使用 `--resume` 恢复执行。*", "uat_recovery_exhausted", {"prd_id": prd_filename})
                                 with open(os.path.join(workdir, "STATE.md"), "w") as f: f.write("UAT_BLOCKED\n")
                                 logger.info("STATE_UAT_BLOCKED")
                                 write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                                 sys.exit(1)
                         else:
                             print("[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo.")
+                            notify_channel(effective_channel, "🚨 *SDLC Pipeline Blocked: UAT findings non-actionable or need human judgment. 自动恢复已阻塞。*", "uat_blocked", {"prd_id": prd_filename})
                             write_resume_state(run_dir, "BLOCKED", get_baseline_commit(run_dir))
                             sys.exit(1)
 
@@ -1011,12 +1013,14 @@ def main():
                         except subprocess.TimeoutExpired:
                             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                             proc.wait()
+                        notify_channel(effective_channel, f"Coder timed out for {base_filename}", "coder_timeout", {"pr_id": base_filename})
                         state_5_trigger = True
                         break
                     class _CoderRes: pass # Reaper safety check: process already reaped or pgid not found
                     coder_result = _CoderRes()
                     coder_result.returncode = proc.returncode
                     if coder_result.returncode != 0:
+                        notify_channel(effective_channel, f"Coder failed with non-zero exit for {base_filename}", "coder_failed", {"pr_id": base_filename})
                         state_5_trigger = True
                         break
 
@@ -1028,6 +1032,7 @@ def main():
                     if status_output.strip():
                         dlog(f"Dirty status detected: {repr(status_output)}")
                         orch_yellow_counter += 1
+                        notify_channel(effective_channel, f"Coder left workspace dirty for {base_filename}", "coder_workspace_dirty", {"pr_id": base_filename})
                         if orch_yellow_counter >= yellow_retry_limit:
                             state_5_trigger = True
                             break
@@ -1040,6 +1045,7 @@ def main():
                             f"baseline_head={coder_attempt_head}, current_head={current_head}"
                         )
                         orch_yellow_counter += 1
+                        notify_channel(effective_channel, f"Coder produced no output for {base_filename}", "coder_no_output", {"pr_id": base_filename})
                         if orch_yellow_counter >= yellow_retry_limit:
                             state_5_trigger = True
                             break
@@ -1074,27 +1080,55 @@ def main():
                     proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                     proc.wait()
                     
+                    if proc.returncode != 0:
+                        notify_channel(effective_channel, f"🚨 Reviewer pipeline failure for {base_filename}: reviewer_failed", "reviewer_failed", {"pr_id": base_filename})
+                        state_5_trigger = True
+                        break
+                    
                     json_retry_count = 0
                     max_json_retries = 3
                     verdict = None
+                    reviewer_failure_reason = None
                     
                     while json_retry_count < max_json_retries:
                         if os.path.exists(review_report_path):
                             with open(review_report_path, 'r', encoding='utf-8') as f: review_content = f.read()
                         else: review_content = ""
-                    
+
                         try:
                             # Use new robust parser
                             data = extract_and_parse_json(review_content)
                             assessment = data.get("overall_assessment") if isinstance(data, dict) else None
                             if assessment in ["EXCELLENT", "GOOD_WITH_MINOR_SUGGESTIONS"]:
                                 verdict = "APPROVED"
+                                reviewer_failure_reason = None
                             elif assessment in ["NEEDS_ATTENTION", "NEEDS_IMMEDIATE_REWORK"]:
                                 verdict = "ACTION_REQUIRED"
+                                reviewer_failure_reason = None
+                            elif assessment == "NOT_STARTED":
+                                verdict = None
+                                reviewer_failure_reason = "reviewer_placeholder_stuck"
                             else:
                                 verdict = None
-                            break # successfully parsed, exit loop
+                                reviewer_failure_reason = "reviewer_unknown_verdict"
+                                
+                            if verdict is not None:
+                                try:
+                                    import shutil
+                                    reviews_dir = os.path.join(run_dir, "reviews")
+                                    os.makedirs(reviews_dir, exist_ok=True)
+                                    pr_id = os.path.splitext(os.path.basename(current_pr))[0]
+                                    existing_reviews = [f for f in os.listdir(reviews_dir) if f.startswith(f"{pr_id}.") and f.endswith(".review.json")]
+                                    attempt_num = len(existing_reviews) + 1
+                                    history_path = os.path.join(reviews_dir, f"{pr_id}.{attempt_num}.review.json")
+                                    shutil.copy2(review_report_path, history_path)
+                                except Exception as e:
+                                    dlog(f"Failed to preserve review history: {e}")
+                                break # successfully parsed, exit loop
+                            else:
+                                break # pipeline failure, don't retry json
                         except ValueError as e:
+                            reviewer_failure_reason = "reviewer_invalid_json" if review_content.strip() else "reviewer_no_output"
                             json_retry_count += 1
                             logger.warning(f"Failed to parse Reviewer JSON (Attempt {json_retry_count}/{max_json_retries}). Retrying with system alert.")
                             if json_retry_count >= max_json_retries:
@@ -1130,6 +1164,8 @@ def main():
                             state_5_trigger = True
                             break
                     else:
+                        reason = reviewer_failure_reason or "reviewer_failed"
+                        notify_channel(effective_channel, f"🚨 Reviewer pipeline failure for {base_filename}: {reason}", reason, {"pr_id": base_filename})
                         state_5_trigger = True
                         break
                 if state_5_trigger:
@@ -1174,21 +1210,25 @@ def main():
                             
                         slice_depth = get_pr_slice_depth(current_pr)
                         if slice_depth < 2:
+                            notify_channel(effective_channel, f"PR {base_filename} failed repeatedly. Starting planner split recovery.", "planner_split_start", {"pr_id": base_filename})
                             pr_files_before = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_planner.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--slice-failed-pr", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir], start_new_session=True, env=get_env_with_gemini_key(f"{base_name}_planner", gemini_api_keys, global_dir))
                             proc.wait()
                             pr_files_after = set(glob.glob(os.path.join(job_dir, "PR_*.md")))
                             new_files = pr_files_after - pr_files_before
                             if len(new_files) >= 2:
+                                notify_channel(effective_channel, f"Planner successfully split {base_filename} into smaller slices.", "planner_split_complete", {"pr_id": base_filename})
                                 set_pr_status(current_pr, "superseded")
                                 write_resume_state(run_dir, "PLANNER_ACTIVE", get_baseline_commit(run_dir), recovery_mode="split", split_allowed=False)
                                 pr_done = True
                                 break
                             else:
+                                notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}.", "planner_split_failed", {"pr_id": base_filename})
                                 set_pr_status(current_pr, "blocked_fatal")
                                 print(HandoffPrompter.get_prompt("dead_end"))
                                 sys.exit(1)
                         else:
+                            notify_channel(effective_channel, f"Planner split recovery failed for {base_filename}. Max split depth reached.", "planner_split_failed", {"pr_id": base_filename})
                             set_pr_status(current_pr, "blocked_fatal")
                             print(HandoffPrompter.get_prompt("dead_end"))
                             sys.exit(1)
