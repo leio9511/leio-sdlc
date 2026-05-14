@@ -340,31 +340,14 @@ def main():
     execution_log_msg = f"Orchestrator Engine Configured -> Engine: {args.engine}, Model: {args.model}"
     print(execution_log_msg)
 
-    # ── Continuity mode awareness and engine eligibility gate ──────────
+    # ── Continuity mode awareness (observability only) ──────────────────
+    # Engine eligibility and mode-gated dispatch are handled at invocation
+    # time by invoke_agent_gated() in agent_driver.py.  The orchestrator
+    # does not gate here — that is delegated to the spawn scripts so that
+    # Gemini can reach the two-phase bootstrap protocol in case1_strict mode.
     from config import get_continuity_mode
-    from agent_driver import is_case1_strict_mode, is_case1_eligible
     continuity_mode = get_continuity_mode()
     print(f"Continuity Mode: {continuity_mode}")
-
-    # Pre-flight engine eligibility check: in case1_strict mode, reject
-    # engines that are neither the OpenClaw baseline nor Geminis (which
-    # reaches the two-phase bootstrap protocol via invoke_agent_gated).
-    # This ensures the orchestrator logs and aborts early rather than
-    # silently spawning subprocesses that will each be rejected.
-    if is_case1_strict_mode():
-        engine = args.engine
-        if engine != "openclaw" and engine != "gemini":
-            rejection_msg = (
-                f"[FATAL] Engine '{engine}' is not case-1 eligible in case1_strict mode. "
-                f"Only case-1 engines are in scope for strong continuity support."
-            )
-            print(rejection_msg, file=sys.stderr)
-            sys.exit(1)
-        # OpenClaw is the case-1 baseline (direct invoke, no two-phase)
-        if engine == "openclaw":
-            print("OpenClaw is the case-1 baseline — direct invoke, no two-phase bootstrap needed.")
-        elif engine == "gemini":
-            print("Gemini will use the two-phase bootstrap protocol (invoke_agent_two_phase).")
 
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"

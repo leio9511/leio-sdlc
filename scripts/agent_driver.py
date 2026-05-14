@@ -106,9 +106,6 @@ def invoke_agent_gated(
 ):
     """Mode-gated invoke dispatch for strong continuity.
 
-    If *engine* is ``None``, the function resolves it from the
-    ``LLM_DRIVER`` environment variable, defaulting to ``"openclaw"``.
-
     Routing rules:
     - ``legacy`` mode: delegate to ``invoke_agent()`` (unchanged behavior)
     - ``case1_strict`` mode:
