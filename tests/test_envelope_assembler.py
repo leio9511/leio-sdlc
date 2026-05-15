@@ -195,6 +195,21 @@ class TestEnvelopeAssembler(unittest.TestCase):
         for rule in self.REVIEWER_EVIDENCE_ONLY_BOUNDARY_RULES:
             self.assertIn(rule, prompt)
 
+    def test_repo_coder_playbook_v2_explicitly_forbids_all_merge_operations_and_requires_refactor_for_quality(self):
+        playbook_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "playbooks",
+            "coder_playbook_v2.md",
+        )
+
+        with open(playbook_path, "r", encoding="utf-8") as f:
+            playbook_text = f.read()
+
+        self.assertIn("- DO NOT merge.", playbook_text)
+        self.assertNotIn("DO NOT merge into master.", playbook_text)
+        self.assertIn("- Use Red → Green → Refactor.", playbook_text)
+        self.assertIn("- Refactor when needed to keep implementation quality high.", playbook_text)
+
     def test_v2_new_session_prompts_report_single_assembly_authority_without_spawn_coder_owned_prompt_bodies(self):
         playbook_path = os.path.join(self.temp_dir, "coder_playbook_v2.md")
         feedback_path = os.path.join(self.temp_dir, "review.json")

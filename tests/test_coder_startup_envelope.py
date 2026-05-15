@@ -231,6 +231,85 @@ class TestCoderStartupEnvelope(unittest.TestCase):
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
+    def test_v2_new_session_prompts_inline_strengthened_merge_and_refactor_clauses_for_all_scenarios(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        from agent_driver import AgentResult
+
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="mock-session", stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            feedback_file = os.path.join(tmp_dir, "feedback.json")
+
+            Path(pr_file).write_text("mock pr", encoding="utf-8")
+            Path(prd_file).write_text("mock prd", encoding="utf-8")
+            Path(feedback_file).write_text("mock feedback", encoding="utf-8")
+
+            scenarios = [
+                {
+                    "mode": "initial",
+                    "artifact_subdir": os.path.join("coder_debug", "initial"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                },
+                {
+                    "mode": "revision_bootstrap",
+                    "artifact_subdir": os.path.join("coder_debug", "revision_bootstrap_001"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--feedback-file", feedback_file,
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                },
+                {
+                    "mode": "system_alert_bootstrap",
+                    "artifact_subdir": os.path.join("coder_debug", "system_alert_001"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--system-alert", "git status is dirty",
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                },
+            ]
+
+            for scenario in scenarios:
+                session_file = Path(tmp_dir) / ".coder_session"
+                if session_file.exists():
+                    session_file.unlink()
+                mock_invoke.reset_mock()
+
+                with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                    with patch.object(sys, 'argv', scenario["args"]):
+                        spawn_coder.main()
+
+                prompt_path = Path(tmp_dir) / scenario["artifact_subdir"] / "rendered_prompt.txt"
+                self.assertTrue(prompt_path.exists(), scenario["mode"])
+                prompt = prompt_path.read_text(encoding="utf-8")
+
+                self.assertIn("- DO NOT merge.", prompt)
+                self.assertNotIn("DO NOT merge into master.", prompt)
+                self.assertIn("- Use Red → Green → Refactor.", prompt)
+                self.assertIn("- Refactor when needed to keep implementation quality high.", prompt)
+
+    @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 2})
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('utils_api_key.setup_spawner_api_key')
     def test_bootstrap_v2_prompts_keep_refs_to_pr_contract_and_prd_but_inline_only_the_immediate_action_target(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
         from agent_driver import AgentResult
         mock_check_output.return_value = "feature/test"
