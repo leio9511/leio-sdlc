@@ -80,6 +80,76 @@ class TestSpawnCoderRefactor(unittest.TestCase):
             self.assertTrue(self.original_exists(packet_file))
             self.assertTrue(self.original_exists(prompt_file))
 
+    @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 2})
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_same_session_continuations_ignore_coder_playbook_version_and_never_render_full_startup_envelopes(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="existing-session", stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            feedback_file = os.path.join(tmp_dir, "feedback.json")
+            session_file = os.path.join(tmp_dir, ".coder_session")
+            with open(pr_file, "w") as f:
+                f.write("pr content")
+            with open(prd_file, "w") as f:
+                f.write("prd content")
+            with open(feedback_file, "w") as f:
+                f.write('{"status": "NEEDS_FIX", "comments": "delta only"}')
+            with open(session_file, "w") as f:
+                f.write("existing-session")
+
+            revision_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--feedback-file", feedback_file,
+                "--workdir", tmp_dir,
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch.object(sys, 'argv', revision_args):
+                    spawn_coder.main()
+
+            revision_prompt = mock_invoke.call_args[0][0]
+            revision_kwargs = mock_invoke.call_args[1]
+            self.assertEqual(revision_kwargs["session_key"], "existing-session")
+            self.assertIn("# REVIEW REPORT JSON", revision_prompt)
+            self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, revision_prompt)
+            self.assertNotIn("## CODER PLAYBOOK", revision_prompt)
+            self.assertNotIn("# Coder Playbook V2", revision_prompt)
+            self.assertNotIn("## REFERENCE INDEX", revision_prompt)
+            self.assertNotIn("## EXECUTION CONTRACT", revision_prompt)
+
+            mock_invoke.reset_mock()
+
+            alert_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--system-alert", "git dirty",
+                "--workdir", tmp_dir,
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch.object(sys, 'argv', alert_args):
+                    spawn_coder.main()
+
+            alert_prompt = mock_invoke.call_args[0][0]
+            alert_kwargs = mock_invoke.call_args[1]
+            self.assertEqual(alert_kwargs["session_key"], "existing-session")
+            self.assertIn("# SYSTEM ALERT YOU MUST FIX", alert_prompt)
+            self.assertIn(spawn_coder.SYSTEM_ALERT_CONTINUATION_RULE, alert_prompt)
+            self.assertNotIn("## CODER PLAYBOOK", alert_prompt)
+            self.assertNotIn("# Coder Playbook V2", alert_prompt)
+            self.assertNotIn("## REFERENCE INDEX", alert_prompt)
+            self.assertNotIn("## EXECUTION CONTRACT", alert_prompt)
+
     def test_resolve_coder_artifact_subdir_numbers_repeated_modes(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             self.assertEqual(spawn_coder.resolve_coder_artifact_subdir(tmp_dir, "initial"), "initial")

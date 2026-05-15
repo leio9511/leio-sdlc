@@ -8,9 +8,116 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
 
+import config
 import spawn_coder
 
+
 class TestCoderStartupEnvelope(unittest.TestCase):
+    @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 2})
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_new_session_startup_packets_expose_version_scenario_and_assembly_authority(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        from agent_driver import AgentResult
+
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="mock-session", stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            feedback_file = os.path.join(tmp_dir, "feedback.json")
+
+            Path(pr_file).write_text("mock pr", encoding="utf-8")
+            Path(prd_file).write_text("mock prd", encoding="utf-8")
+            Path(feedback_file).write_text("mock feedback", encoding="utf-8")
+
+            scenarios = [
+                {
+                    "mode": "initial",
+                    "artifact_subdir": os.path.join("coder_debug", "initial"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                    "expected": {
+                        "startup_version": "v2",
+                        "coder_playbook_version": 2,
+                        "scenario_type": "initial",
+                        "mode": "initial",
+                        "lifecycle": "new_session_startup",
+                        "prompt_kind": "coder_initial_v2_startup",
+                    },
+                },
+                {
+                    "mode": "revision_bootstrap",
+                    "artifact_subdir": os.path.join("coder_debug", "revision_bootstrap_001"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--feedback-file", feedback_file,
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                    "expected": {
+                        "startup_version": "v2",
+                        "coder_playbook_version": 2,
+                        "scenario_type": "revision_bootstrap",
+                        "mode": "revision_bootstrap",
+                        "lifecycle": "recovery_bootstrap_startup",
+                        "prompt_kind": "coder_revision_bootstrap_v2_startup",
+                    },
+                },
+                {
+                    "mode": "system_alert_bootstrap",
+                    "artifact_subdir": os.path.join("coder_debug", "system_alert_001"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--system-alert", "git status is dirty",
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                    "expected": {
+                        "startup_version": "v2",
+                        "coder_playbook_version": 2,
+                        "scenario_type": "system_alert_bootstrap",
+                        "mode": "system_alert_bootstrap",
+                        "lifecycle": "recovery_bootstrap_startup",
+                        "prompt_kind": "coder_system_alert_bootstrap_v2_startup",
+                    },
+                },
+            ]
+
+            for scenario in scenarios:
+                session_file = Path(tmp_dir) / ".coder_session"
+                if session_file.exists():
+                    session_file.unlink()
+                mock_invoke.reset_mock()
+                with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                    with patch.object(sys, 'argv', scenario["args"]):
+                        spawn_coder.main()
+
+                packet_path = Path(tmp_dir) / scenario["artifact_subdir"] / "startup_packet.json"
+                prompt_path = Path(tmp_dir) / scenario["artifact_subdir"] / "rendered_prompt.txt"
+                self.assertTrue(packet_path.exists(), scenario["mode"])
+                self.assertTrue(prompt_path.exists(), scenario["mode"])
+
+                packet = json.loads(packet_path.read_text(encoding="utf-8"))
+                prompt = prompt_path.read_text(encoding="utf-8")
+                for key, value in scenario["expected"].items():
+                    self.assertEqual(packet[key], value, f"{scenario['mode']} missing {key}")
+                self.assertEqual(packet["assembly_authority_path"], "scripts/envelope_assembler.py")
+                self.assertEqual(mock_invoke.call_args[0][0], prompt)
+
     @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 1})
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')

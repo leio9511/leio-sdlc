@@ -141,6 +141,8 @@ def build_coder_continuation_packet(
     feedback_file=None,
     current_branch=None,
     latest_commit_hash=None,
+    startup_version=None,
+    coder_playbook_version=None,
 ):
     references = {
         "pr_contract_file": os.path.abspath(pr_file),
@@ -257,7 +259,7 @@ def build_coder_continuation_packet(
             "Report the latest commit hash when handing work back.",
         ]
 
-    return {
+    packet = {
         "role": "coder",
         "mode": mode,
         "lifecycle": lifecycle,
@@ -270,6 +272,19 @@ def build_coder_continuation_packet(
         "continuation_semantics": continuation_semantics,
         "final_checklist": final_checklist,
     }
+
+    if startup_version is not None and coder_playbook_version is not None:
+        packet.update(
+            envelope_assembler._build_coder_startup_metadata(
+                mode=mode,
+                startup_version=startup_version,
+                playbook_version=coder_playbook_version,
+                lifecycle=lifecycle,
+                prompt_kind=prompt_kind,
+            )
+        )
+
+    return packet
 
 
 def _append_coder_context(lines, workdir, pr_file, prd_file, playbook_path, feedback_file=None, current_branch=None, latest_commit_hash=None):
@@ -464,6 +479,8 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
                 feedback_file=feedback_file,
                 current_branch=current_branch,
                 latest_commit_hash=latest_commit_hash,
+                startup_version="v1",
+                coder_playbook_version=config.CODER_PLAYBOOK_V1,
             )
         else:
             v2_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
@@ -551,6 +568,8 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
                 playbook_path=playbook_path,
                 current_branch=current_branch,
                 latest_commit_hash=latest_commit_hash,
+                startup_version="v1",
+                coder_playbook_version=config.CODER_PLAYBOOK_V1,
             )
         else:
             v2_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")

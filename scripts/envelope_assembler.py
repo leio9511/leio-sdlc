@@ -48,6 +48,48 @@ CODER_OPERATING_CONSTRAINTS = [
     "DO NOT merge into master.",
 ]
 
+CODER_STARTUP_ASSEMBLY_AUTHORITY_PATH = "scripts/envelope_assembler.py"
+
+
+def _build_coder_startup_metadata(mode, startup_version, playbook_version, lifecycle=None, prompt_kind=None):
+    metadata = {
+        "mode": mode,
+        "scenario_type": mode,
+        "startup_version": startup_version,
+        "coder_playbook_version": playbook_version,
+        "assembly_authority_path": CODER_STARTUP_ASSEMBLY_AUTHORITY_PATH,
+    }
+    if lifecycle is not None:
+        metadata["lifecycle"] = lifecycle
+    if prompt_kind is not None:
+        metadata["prompt_kind"] = prompt_kind
+    return metadata
+
+
+def _build_coder_v1_startup_metadata(mode):
+    metadata_by_mode = {
+        "initial": {
+            "lifecycle": "new_session_startup",
+            "prompt_kind": "coder_initial_startup",
+        },
+        "revision_bootstrap": {
+            "lifecycle": "recovery_bootstrap_continuation",
+            "prompt_kind": "coder_revision_recovery_bootstrap",
+        },
+        "system_alert_bootstrap": {
+            "lifecycle": "recovery_bootstrap_continuation",
+            "prompt_kind": "coder_system_alert_recovery_bootstrap",
+        },
+    }
+    selected = metadata_by_mode[mode]
+    return _build_coder_startup_metadata(
+        mode=mode,
+        startup_version="v1",
+        playbook_version=1,
+        lifecycle=selected["lifecycle"],
+        prompt_kind=selected["prompt_kind"],
+    )
+
 
 def _read_text_file(path):
     with open(path, "r") as f:
@@ -81,13 +123,9 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
     reference_index = _build_coder_v2_reference_index(references)
 
     if mode == "initial_v2":
-        return {
+        envelope = {
             "role": "coder",
             "mode": "initial",
-            "lifecycle": "new_session_startup",
-            "prompt_kind": "coder_initial_v2_startup",
-            "startup_version": "v2",
-            "assembly_authority_path": "scripts/envelope_assembler.py",
             "workdir": workdir,
             "mission": "This is the initial new-session coder startup. Start executing the PR contract immediately from the current workspace.",
             "inline_playbook": {
@@ -98,6 +136,16 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
             "execution_contract": [f"Locked Working Directory: `{workdir}`"],
             "final_checklist": [],
         }
+        envelope.update(
+            _build_coder_startup_metadata(
+                mode="initial",
+                startup_version="v2",
+                playbook_version=2,
+                lifecycle="new_session_startup",
+                prompt_kind="coder_initial_v2_startup",
+            )
+        )
+        return envelope
 
     current_branch = contract_params.get("current_branch")
     latest_commit_hash = contract_params.get("latest_commit_hash")
@@ -113,13 +161,9 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
 
     if mode == "revision_bootstrap_v2":
         continuation_constraints.append("The reviewer feedback below is the immediate action target.")
-        return {
+        envelope = {
             "role": "coder",
             "mode": "revision_bootstrap",
-            "lifecycle": "recovery_bootstrap_startup",
-            "prompt_kind": "coder_revision_bootstrap_v2_startup",
-            "startup_version": "v2",
-            "assembly_authority_path": "scripts/envelope_assembler.py",
             "workdir": workdir,
             "mission": "This is a recovery bootstrap for reviewer-driven continuation. This is not a fresh start. Resume from the current branch and the on-disk implementation already present.",
             "inline_playbook": {
@@ -136,16 +180,22 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
             "continuation_constraints": continuation_constraints,
             "start_instruction": START_WORK_CTA.format(role_upper="CODER"),
         }
+        envelope.update(
+            _build_coder_startup_metadata(
+                mode="revision_bootstrap",
+                startup_version="v2",
+                playbook_version=2,
+                lifecycle="recovery_bootstrap_startup",
+                prompt_kind="coder_revision_bootstrap_v2_startup",
+            )
+        )
+        return envelope
 
     if mode == "system_alert_bootstrap_v2":
         continuation_constraints.append("The system alert below is the immediate corrective target.")
-        return {
+        envelope = {
             "role": "coder",
             "mode": "system_alert_bootstrap",
-            "lifecycle": "recovery_bootstrap_startup",
-            "prompt_kind": "coder_system_alert_bootstrap_v2_startup",
-            "startup_version": "v2",
-            "assembly_authority_path": "scripts/envelope_assembler.py",
             "workdir": workdir,
             "mission": "This is a recovery bootstrap for system-alert continuation. This is not a fresh start. Resume from the current branch and the on-disk implementation already present.",
             "inline_playbook": {
@@ -161,6 +211,16 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
             "continuation_constraints": continuation_constraints,
             "start_instruction": START_WORK_CTA.format(role_upper="CODER"),
         }
+        envelope.update(
+            _build_coder_startup_metadata(
+                mode="system_alert_bootstrap",
+                startup_version="v2",
+                playbook_version=2,
+                lifecycle="recovery_bootstrap_startup",
+                prompt_kind="coder_system_alert_bootstrap_v2_startup",
+            )
+        )
+        return envelope
 
     raise ValueError(f"Unsupported coder v2 mode: {mode}")
 
@@ -516,7 +576,17 @@ def _build_coder_envelope(workdir, references, contract_params, mode):
     if mode in {"revision", "revision_bootstrap"}:
         final_checklist.insert(1, "Address the reviewer findings with code changes, not acknowledgment-only output.")
 
-    return execution_contract, reference_index, final_checklist
+    envelope = {
+        "role": "coder",
+        "execution_contract": execution_contract,
+        "reference_index": reference_index,
+        "final_checklist": final_checklist,
+    }
+
+    if mode in {"initial", "revision_bootstrap", "system_alert_bootstrap"}:
+        envelope.update(_build_coder_v1_startup_metadata(mode))
+
+    return envelope
 
 
 def build_startup_envelope(role, workdir, out_dir, references, contract_params, mode="standard"):
@@ -539,9 +609,7 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
     elif role == "coder":
         if mode in {"initial_v2", "revision_bootstrap_v2", "system_alert_bootstrap_v2"}:
             return build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
-        execution_contract, reference_index, final_checklist = _build_coder_envelope(
-            workdir, references, contract_params, mode
-        )
+        return _build_coder_envelope(workdir, references, contract_params, mode)
     else:
         execution_contract, reference_index, final_checklist = [], [], []
 

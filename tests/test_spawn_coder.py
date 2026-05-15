@@ -67,6 +67,119 @@ class TestSpawnCoder(unittest.TestCase):
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
+    def test_switching_coder_playbook_version_from_2_to_1_restores_v1_new_session_prompt_shapes(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            feedback_file = os.path.join(tmp_dir, "feedback.json")
+            with open(pr_file, "w") as f:
+                f.write("pr content")
+            with open(prd_file, "w") as f:
+                f.write("prd content")
+            with open(feedback_file, "w") as f:
+                f.write('{"status": "NEEDS_FIX", "comments": "rollback"}')
+
+            scenarios = [
+                {
+                    "name": "initial",
+                    "artifact_subdir": os.path.join("coder_debug", "initial"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                },
+                {
+                    "name": "revision_bootstrap",
+                    "artifact_subdir": os.path.join("coder_debug", "revision_bootstrap_001"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--feedback-file", feedback_file,
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                },
+                {
+                    "name": "system_alert_bootstrap",
+                    "artifact_subdir": os.path.join("coder_debug", "system_alert_001"),
+                    "args": [
+                        "spawn_coder.py",
+                        "--pr-file", pr_file,
+                        "--prd-file", prd_file,
+                        "--system-alert", "git dirty",
+                        "--workdir", tmp_dir,
+                        "--run-dir", tmp_dir,
+                        "--enable-exec-from-workspace",
+                    ],
+                },
+            ]
+
+            for version, expected_startup_version in [
+                (config.CODER_PLAYBOOK_V2, "v2"),
+                (config.CODER_PLAYBOOK_V1, "v1"),
+            ]:
+                mock_load_config.return_value = {config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: version}
+                for scenario in scenarios:
+                    session_file = os.path.join(tmp_dir, ".coder_session")
+                    if os.path.exists(session_file):
+                        os.remove(session_file)
+                    artifact_dir = os.path.join(tmp_dir, scenario["artifact_subdir"])
+                    if os.path.isdir(artifact_dir):
+                        for root, dirs, files in os.walk(artifact_dir, topdown=False):
+                            for name in files:
+                                os.remove(os.path.join(root, name))
+                            for name in dirs:
+                                os.rmdir(os.path.join(root, name))
+                        os.rmdir(artifact_dir)
+                    mock_invoke.reset_mock()
+
+                    with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                        with patch.object(sys, 'argv', scenario["args"]):
+                            spawn_coder.main()
+
+                    prompt = mock_invoke.call_args[0][0]
+                    packet_path = os.path.join(tmp_dir, scenario["artifact_subdir"], "startup_packet.json")
+                    with open(packet_path, "r", encoding="utf-8") as f:
+                        packet = json.load(f)
+
+                    self.assertEqual(packet["startup_version"], expected_startup_version)
+                    self.assertEqual(packet["coder_playbook_version"], version)
+                    self.assertEqual(packet["scenario_type"], scenario["name"])
+                    self.assertEqual(packet["assembly_authority_path"], "scripts/envelope_assembler.py")
+
+                    if version == config.CODER_PLAYBOOK_V2:
+                        self.assertIn("## CODER PLAYBOOK", prompt)
+                        self.assertIn("# Coder Playbook V2", prompt)
+                        self.assertIn("## REFERENCE INDEX", prompt)
+                        self.assertNotIn("/playbooks/coder_playbook.md", prompt)
+                    else:
+                        self.assertNotIn("## CODER PLAYBOOK", prompt)
+                        self.assertIn("/playbooks/coder_playbook.md", prompt)
+                        if scenario["name"] == "initial":
+                            self.assertIn("## EXECUTION CONTRACT", prompt)
+                            self.assertIn("## REFERENCE INDEX", prompt)
+                        elif scenario["name"] == "revision_bootstrap":
+                            self.assertIn("# CODER REVISION RECOVERY CONTINUATION", prompt)
+                            self.assertIn("# REVIEW REPORT JSON", prompt)
+                            self.assertNotIn("## REFERENCE INDEX", prompt)
+                        else:
+                            self.assertIn("# CODER SYSTEM ALERT RECOVERY CONTINUATION", prompt)
+                            self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt)
+                            self.assertNotIn("## REFERENCE INDEX", prompt)
+
+    @patch('spawn_coder.config.load_or_merge_config')
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('utils_api_key.setup_spawner_api_key')
     def test_initial_mode_switches_between_v1_and_v2_using_coder_playbook_version(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
         mock_check_output.return_value = "feature/test"
         mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
@@ -108,7 +221,10 @@ class TestSpawnCoder(unittest.TestCase):
             with open(os.path.join(tmp_dir, "coder_debug", "initial", "startup_packet.json")) as f:
                 v1_packet = json.load(f)
             self.assertIn("coder_playbook", [ref["id"] for ref in v1_packet["reference_index"]])
-            self.assertNotIn("startup_version", v1_packet)
+            self.assertEqual(v1_packet["startup_version"], "v1")
+            self.assertEqual(v1_packet["coder_playbook_version"], config.CODER_PLAYBOOK_V1)
+            self.assertEqual(v1_packet["scenario_type"], "initial")
+            self.assertEqual(v1_packet["assembly_authority_path"], "scripts/envelope_assembler.py")
 
             mock_invoke.reset_mock()
 

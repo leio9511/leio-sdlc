@@ -194,6 +194,80 @@ class TestEnvelopeAssembler(unittest.TestCase):
         for rule in self.REVIEWER_EVIDENCE_ONLY_BOUNDARY_RULES:
             self.assertIn(rule, prompt)
 
+    def test_v2_new_session_prompts_report_single_assembly_authority_without_spawn_coder_owned_prompt_bodies(self):
+        playbook_path = os.path.join(self.temp_dir, "coder_playbook_v2.md")
+        feedback_path = os.path.join(self.temp_dir, "review.json")
+        with open(playbook_path, "w", encoding="utf-8") as f:
+            f.write("# Coder Playbook V2\n\nUse Red → Green → Refactor.\n")
+        with open(feedback_path, "w", encoding="utf-8") as f:
+            f.write('{"status": "NEEDS_FIX"}')
+
+        scenarios = [
+            (
+                "initial_v2",
+                {},
+                {
+                    "mode": "initial",
+                    "scenario_type": "initial",
+                    "startup_version": "v2",
+                    "coder_playbook_version": 2,
+                    "lifecycle": "new_session_startup",
+                    "prompt_kind": "coder_initial_v2_startup",
+                },
+            ),
+            (
+                "revision_bootstrap_v2",
+                {"current_branch": "feature/test", "latest_commit_hash": "abc123"},
+                {
+                    "mode": "revision_bootstrap",
+                    "scenario_type": "revision_bootstrap",
+                    "startup_version": "v2",
+                    "coder_playbook_version": 2,
+                    "lifecycle": "recovery_bootstrap_startup",
+                    "prompt_kind": "coder_revision_bootstrap_v2_startup",
+                },
+            ),
+            (
+                "system_alert_bootstrap_v2",
+                {"system_alert": "git dirty", "current_branch": "feature/test", "latest_commit_hash": "abc123"},
+                {
+                    "mode": "system_alert_bootstrap",
+                    "scenario_type": "system_alert_bootstrap",
+                    "startup_version": "v2",
+                    "coder_playbook_version": 2,
+                    "lifecycle": "recovery_bootstrap_startup",
+                    "prompt_kind": "coder_system_alert_bootstrap_v2_startup",
+                },
+            ),
+        ]
+
+        for mode, contract_params, expected in scenarios:
+            references = {
+                "pr_contract_file": "/test/contracts/PR_001.md",
+                "prd_file": "/test/docs/PRD.md",
+                "playbook_path": playbook_path,
+            }
+            if mode == "revision_bootstrap_v2":
+                references["feedback_file"] = feedback_path
+
+            envelope = build_startup_envelope(
+                role="coder",
+                workdir="/test/workdir",
+                out_dir="/test/run_dir",
+                references=references,
+                contract_params=contract_params,
+                mode=mode,
+            )
+            prompt = render_envelope_to_prompt(envelope)
+
+            self.assertEqual(envelope["assembly_authority_path"], "scripts/envelope_assembler.py")
+            for key, value in expected.items():
+                self.assertEqual(envelope[key], value)
+            self.assertIn("## CODER PLAYBOOK", prompt)
+            self.assertIn("# Coder Playbook V2", prompt)
+            self.assertIn("Use Red → Green → Refactor.", prompt)
+            self.assertNotIn("spawn_coder.py", prompt)
+
     def test_build_coder_initial_v2_envelope_keeps_thin_shell_and_removes_playbook_from_required_refs(self):
         playbook_path = os.path.join(self.temp_dir, "coder_playbook_v2.md")
         with open(playbook_path, "w", encoding="utf-8") as f:
@@ -214,6 +288,8 @@ class TestEnvelopeAssembler(unittest.TestCase):
 
         self.assertEqual(envelope["role"], "coder")
         self.assertEqual(envelope["startup_version"], "v2")
+        self.assertEqual(envelope["coder_playbook_version"], 2)
+        self.assertEqual(envelope["scenario_type"], "initial")
         self.assertEqual(envelope["mode"], "initial")
         self.assertEqual(envelope["lifecycle"], "new_session_startup")
         self.assertEqual(envelope["assembly_authority_path"], "scripts/envelope_assembler.py")
@@ -247,7 +323,16 @@ class TestEnvelopeAssembler(unittest.TestCase):
         )
 
         self.assertEqual(envelope["role"], "coder")
-        self.assertEqual(set(envelope.keys()), {"role", "execution_contract", "reference_index", "final_checklist"})
+        self.assertEqual(envelope["mode"], "initial")
+        self.assertEqual(envelope["scenario_type"], "initial")
+        self.assertEqual(envelope["startup_version"], "v1")
+        self.assertEqual(envelope["coder_playbook_version"], 1)
+        self.assertEqual(envelope["assembly_authority_path"], "scripts/envelope_assembler.py")
+        self.assertEqual(envelope["lifecycle"], "new_session_startup")
+        self.assertEqual(envelope["prompt_kind"], "coder_initial_startup")
+        self.assertIn("execution_contract", envelope)
+        self.assertIn("reference_index", envelope)
+        self.assertIn("final_checklist", envelope)
 
         refs_by_id = {ref["id"]: ref for ref in envelope["reference_index"]}
         self.assertEqual(refs_by_id["pr_contract"]["path"], "/test/PR_001.md")
