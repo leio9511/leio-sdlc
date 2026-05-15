@@ -49,6 +49,76 @@ CODER_OPERATING_CONSTRAINTS = [
 ]
 
 
+def _read_text_file(path):
+    with open(path, "r") as f:
+        return f.read()
+
+
+def build_coder_initial_v2_envelope(workdir, out_dir, references):
+    playbook_path = references.get("playbook_path")
+    playbook_text = _read_text_file(playbook_path)
+
+    reference_index = [
+        {
+            "id": "pr_contract",
+            "kind": "pr_contract",
+            "path": references.get("pr_contract_file"),
+            "required": True,
+            "priority": 1,
+            "purpose": "execution_contract_source",
+        },
+        {
+            "id": "prd",
+            "kind": "prd",
+            "path": references.get("prd_file"),
+            "required": True,
+            "priority": 1,
+            "purpose": "authoritative_requirements",
+        },
+    ]
+
+    return {
+        "role": "coder",
+        "mode": "initial",
+        "lifecycle": "new_session_startup",
+        "prompt_kind": "coder_initial_v2_startup",
+        "startup_version": "v2",
+        "assembly_authority_path": "scripts/envelope_assembler.py",
+        "workdir": workdir,
+        "mission": "This is the initial new-session coder startup. Start executing the PR contract immediately from the current workspace.",
+        "inline_playbook": {
+            "path": playbook_path,
+            "content": playbook_text,
+        },
+        "reference_index": reference_index,
+        "execution_contract": [f"Locked Working Directory: `{workdir}`"],
+        "final_checklist": [],
+    }
+
+
+def render_coder_initial_v2_prompt(envelope):
+    prompt_lines = [
+        "## IDENTITY & PRIMARY GOAL",
+        ROLE_PROLOGUES["coder"],
+        "",
+        "## MISSION",
+        envelope.get("mission", ""),
+        "",
+        "## CODER PLAYBOOK",
+        envelope.get("inline_playbook", {}).get("content", ""),
+        "",
+        "## REFERENCE INDEX",
+        json.dumps(envelope.get("reference_index", []), indent=2),
+        "",
+        "## WORKSPACE",
+        f"- Locked Working Directory: `{envelope.get('workdir', '')}`",
+        "",
+        "## START WORK",
+        START_WORK_CTA.format(role_upper="CODER"),
+    ]
+    return "\n".join(prompt_lines)
+
+
 def _build_planner_envelope(workdir, out_dir, references, contract_params, mode):
     execution_contract = [
         f"The only valid output location for PR contract artifacts in this run is `{out_dir}`.",
@@ -368,6 +438,8 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
             workdir, references, contract_params
         )
     elif role == "coder":
+        if mode == "initial_v2":
+            return build_coder_initial_v2_envelope(workdir, out_dir, references)
         execution_contract, reference_index, final_checklist = _build_coder_envelope(
             workdir, references, contract_params, mode
         )
@@ -383,6 +455,9 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
 
 
 def render_envelope_to_prompt(envelope):
+    if envelope.get("role") == "coder" and envelope.get("startup_version") == "v2":
+        return render_coder_initial_v2_prompt(envelope)
+
     role = envelope.get("role", "agent")
     
     prompt_lines = []

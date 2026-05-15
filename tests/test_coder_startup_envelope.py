@@ -114,7 +114,7 @@ class TestCoderStartupEnvelope(unittest.TestCase):
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
-    def test_spawn_coder_rendered_prompt_references_coder_playbook_without_inlining(self, mock_setup_key, mock_invoke, mock_check_output):
+    def test_spawn_coder_saves_initial_v2_artifacts_with_inline_playbook(self, mock_setup_key, mock_invoke, mock_check_output):
         from agent_driver import AgentResult
         mock_check_output.return_value = "feature/test"
         mock_invoke.return_value = AgentResult(session_key="mock-session", stdout="")
@@ -124,9 +124,9 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             prd_file = os.path.join(tmp_dir, "PRD.md")
             
             with open(pr_file, "w") as f:
-                f.write("mock")
+                f.write("UNIQUE PR CONTRACT BODY SHOULD NOT BE INLINED")
             with open(prd_file, "w") as f:
-                f.write("mock")
+                f.write("UNIQUE PRD BODY SHOULD NOT BE INLINED")
                 
             test_args = [
                 "spawn_coder.py",
@@ -147,17 +147,22 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             
             with open(os.path.join(initial_dir, "rendered_prompt.txt")) as f:
                 rendered = f.read()
-            
-            # Should reference playbook path
-            self.assertIn("coder_playbook.md", rendered)
-            # Should not inline the full PRD or Playbook (we just check it's shorter than before, but we can check the packet structure)
-            
             with open(os.path.join(initial_dir, "startup_packet.json")) as f:
                 packet = json.load(f)
-            
-            playbook_refs = [ref for ref in packet["reference_index"] if "coder_playbook.md" in ref["path"]]
-            self.assertEqual(len(playbook_refs), 1)
-            self.assertTrue(playbook_refs[0]["required"])
+
+            self.assertEqual(packet["startup_version"], "v2")
+            self.assertEqual(packet["mode"], "initial")
+            self.assertIn("## CODER PLAYBOOK", rendered)
+            self.assertIn("# Coder Playbook V2", rendered)
+            self.assertIn("Red → Green → Refactor", rendered)
+            self.assertIn(pr_file, rendered)
+            self.assertIn(prd_file, rendered)
+            self.assertNotIn("UNIQUE PR CONTRACT BODY SHOULD NOT BE INLINED", rendered)
+            self.assertNotIn("UNIQUE PRD BODY SHOULD NOT BE INLINED", rendered)
+
+            ref_ids = [ref["id"] for ref in packet["reference_index"]]
+            self.assertEqual(ref_ids, ["pr_contract", "prd"])
+            self.assertNotIn("coder_playbook", ref_ids)
 
 if __name__ == '__main__':
     unittest.main()

@@ -194,6 +194,44 @@ class TestEnvelopeAssembler(unittest.TestCase):
         for rule in self.REVIEWER_EVIDENCE_ONLY_BOUNDARY_RULES:
             self.assertIn(rule, prompt)
 
+    def test_build_coder_initial_v2_envelope_keeps_thin_shell_and_removes_playbook_from_required_refs(self):
+        playbook_path = os.path.join(self.temp_dir, "coder_playbook_v2.md")
+        with open(playbook_path, "w", encoding="utf-8") as f:
+            f.write("# Coder Playbook V2\n\nUse Red → Green → Refactor.\n")
+
+        envelope = build_startup_envelope(
+            role="coder",
+            workdir="/test/workdir",
+            out_dir="/test/run_dir",
+            references={
+                "pr_contract_file": "/test/PR_001.md",
+                "prd_file": "/test/PRD.md",
+                "playbook_path": playbook_path,
+            },
+            contract_params={},
+            mode="initial_v2",
+        )
+
+        self.assertEqual(envelope["role"], "coder")
+        self.assertEqual(envelope["startup_version"], "v2")
+        self.assertEqual(envelope["mode"], "initial")
+        self.assertEqual(envelope["lifecycle"], "new_session_startup")
+        self.assertEqual(envelope["assembly_authority_path"], "scripts/envelope_assembler.py")
+        self.assertIn("immediately", envelope["mission"])
+        self.assertIn("# Coder Playbook V2", envelope["inline_playbook"]["content"])
+        self.assertEqual([ref["id"] for ref in envelope["reference_index"]], ["pr_contract", "prd"])
+        self.assertNotIn("coder_playbook", [ref["id"] for ref in envelope["reference_index"]])
+
+        prompt = render_envelope_to_prompt(envelope)
+        self.assertIn("## MISSION", prompt)
+        self.assertIn("## CODER PLAYBOOK", prompt)
+        self.assertIn("# Coder Playbook V2", prompt)
+        self.assertIn("/test/PR_001.md", prompt)
+        self.assertIn("/test/PRD.md", prompt)
+        self.assertNotIn("coder_playbook_v2.md", json.dumps(envelope["reference_index"]))
+        self.assertNotIn("## EXECUTION CONTRACT", prompt)
+        self.assertNotIn("## FINAL CHECKLIST", prompt)
+
     def test_build_coder_initial_startup_envelope(self):
         envelope = build_startup_envelope(
             role="coder",
@@ -241,6 +279,36 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertNotIn("--- PR Contract", prompt)
         self.assertNotIn("--- PRD", prompt)
         self.assertNotIn("--- CODER PLAYBOOK ---", prompt)
+
+    def test_initial_v2_prompt_inlines_coder_playbook_and_keeps_pr_contract_and_prd_as_refs(self):
+        playbook_path = os.path.join(self.temp_dir, "coder_playbook_v2.md")
+        with open(playbook_path, "w", encoding="utf-8") as f:
+            f.write("# Coder Playbook V2\n\nUse Red → Green → Refactor.\n")
+
+        envelope = build_startup_envelope(
+            role="coder",
+            workdir="/test/workdir",
+            out_dir="/test/run_dir",
+            references={
+                "pr_contract_file": "/test/contracts/PR_001.md",
+                "prd_file": "/test/docs/PRD.md",
+                "playbook_path": playbook_path,
+            },
+            contract_params={},
+            mode="initial_v2",
+        )
+
+        prompt = render_envelope_to_prompt(envelope)
+
+        self.assertIn("## CODER PLAYBOOK", prompt)
+        self.assertIn("# Coder Playbook V2", prompt)
+        self.assertIn("Use Red → Green → Refactor.", prompt)
+        self.assertIn("/test/contracts/PR_001.md", prompt)
+        self.assertIn("/test/docs/PRD.md", prompt)
+        self.assertNotIn("coder_playbook_v2.md", prompt)
+        self.assertNotIn("read playbook", prompt.lower())
+        self.assertNotIn("--- PR Contract", prompt)
+        self.assertNotIn("--- PRD", prompt)
 
     def test_build_verifier_startup_envelope_splits_multi_prd_references(self):
         envelope = build_startup_envelope(

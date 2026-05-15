@@ -69,6 +69,13 @@ def build_coder_startup_packet_and_prompt(workdir, run_dir, pr_file, prd_file, p
     return envelope, rendered_prompt
 
 
+def resolve_initial_coder_startup_mode(app_config):
+    version = config.resolve_coder_playbook_version(app_config)
+    if version == config.CODER_PLAYBOOK_V1:
+        return "initial"
+    return "initial_v2"
+
+
 REVISION_CONTINUATION_RULE = "Do not restart problem-solving from scratch. Modify the existing implementation to satisfy the reviewer findings."
 SYSTEM_ALERT_CONTINUATION_RULE = "Do not re-plan the whole PR. Fix the exact operational failure shown below, rerun validation, and continue from the current branch state."
 RECOVERY_CONTINUATION_WARNING = "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts."
@@ -592,15 +599,20 @@ def main():
         sys.exit(1)
 
     sdlc_root = os.path.dirname(runtime_dir)
-    playbook_path = os.path.join(sdlc_root, "playbooks", "coder_playbook.md")
+    app_config = config.load_or_merge_config(sdlc_root)
+    v1_playbook_path = os.path.join(sdlc_root, "playbooks", "coder_playbook.md")
+    initial_mode = resolve_initial_coder_startup_mode(app_config)
+    initial_playbook_path = v1_playbook_path
+    if initial_mode == "initial_v2":
+        initial_playbook_path = os.path.join(sdlc_root, "playbooks", "coder_playbook_v2.md")
     session_file = os.path.join(args.run_dir, ".coder_session")
 
     if args.system_alert:
-        handle_system_alert_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.system_alert, pr_id, test_mode=test_mode, thinking=resolved_thinking)
+        handle_system_alert_routing(workdir, args.run_dir, args.pr_file, args.prd_file, v1_playbook_path, args.system_alert, pr_id, test_mode=test_mode, thinking=resolved_thinking)
         return
 
     if args.feedback_file:
-        handle_feedback_routing(workdir, args.run_dir, args.pr_file, args.prd_file, playbook_path, args.feedback_file, pr_id, test_mode=test_mode, thinking=resolved_thinking)
+        handle_feedback_routing(workdir, args.run_dir, args.pr_file, args.prd_file, v1_playbook_path, args.feedback_file, pr_id, test_mode=test_mode, thinking=resolved_thinking)
         return
 
     envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
@@ -608,8 +620,8 @@ def main():
         run_dir=args.run_dir,
         pr_file=args.pr_file,
         prd_file=args.prd_file,
-        playbook_path=playbook_path,
-        mode="initial",
+        playbook_path=initial_playbook_path,
+        mode=initial_mode,
     )
 
     save_coder_debug_artifacts(args.run_dir, "initial", envelope, rendered_prompt)

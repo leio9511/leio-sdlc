@@ -3,12 +3,14 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch, mock_open
+import json
 
 # Add scripts directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
 
 import builtins
 
+import config
 import spawn_coder
 from agent_driver import AgentResult
 
@@ -61,6 +63,133 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, called_msg)
         self.assertNotIn("# REFERENCE INDEX", called_msg)
 
+    @patch('spawn_coder.config.load_or_merge_config')
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_initial_mode_switches_between_v1_and_v2_using_coder_playbook_version(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            pr_content = "UNIQUE PR CONTRACT BODY SHOULD NOT BE INLINED"
+            prd_content = "UNIQUE PRD BODY SHOULD NOT BE INLINED"
+            with open(pr_file, "w") as f:
+                f.write(pr_content)
+            with open(prd_file, "w") as f:
+                f.write(prd_content)
+
+            test_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--workdir", tmp_dir,
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
+
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch.object(sys, 'argv', test_args):
+                    mock_load_config.return_value = {config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: config.CODER_PLAYBOOK_V1}
+                    spawn_coder.main()
+
+            self.assertTrue(mock_invoke.called)
+            v1_task_string = mock_invoke.call_args[0][0]
+            self.assertTrue(v1_task_string.startswith("## IDENTITY & PRIMARY GOAL"))
+            self.assertIn(os.path.abspath(pr_file), v1_task_string)
+            self.assertIn(os.path.abspath(prd_file), v1_task_string)
+            self.assertIn(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "playbooks", "coder_playbook.md")), v1_task_string)
+            self.assertNotIn("# Coder Playbook V2", v1_task_string)
+            self.assertNotIn(pr_content, v1_task_string)
+            self.assertNotIn(prd_content, v1_task_string)
+
+            with open(os.path.join(tmp_dir, "coder_debug", "initial", "startup_packet.json")) as f:
+                v1_packet = json.load(f)
+            self.assertIn("coder_playbook", [ref["id"] for ref in v1_packet["reference_index"]])
+            self.assertNotIn("startup_version", v1_packet)
+
+            mock_invoke.reset_mock()
+
+            with tempfile.TemporaryDirectory() as tmp_dir_v2:
+                pr_file_v2 = os.path.join(tmp_dir_v2, "PR_001.md")
+                prd_file_v2 = os.path.join(tmp_dir_v2, "PRD.md")
+                with open(pr_file_v2, "w") as f:
+                    f.write(pr_content)
+                with open(prd_file_v2, "w") as f:
+                    f.write(prd_content)
+
+                test_args_v2 = [
+                    "spawn_coder.py",
+                    "--pr-file", pr_file_v2,
+                    "--prd-file", prd_file_v2,
+                    "--workdir", tmp_dir_v2,
+                    "--run-dir", tmp_dir_v2,
+                    "--enable-exec-from-workspace",
+                ]
+
+                with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                    with patch.object(sys, 'argv', test_args_v2):
+                        mock_load_config.return_value = {config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: config.CODER_PLAYBOOK_V2}
+                        spawn_coder.main()
+
+                v2_task_string = mock_invoke.call_args[0][0]
+                self.assertIn("## CODER PLAYBOOK", v2_task_string)
+                self.assertIn("# Coder Playbook V2", v2_task_string)
+                self.assertIn(os.path.abspath(pr_file_v2), v2_task_string)
+                self.assertIn(os.path.abspath(prd_file_v2), v2_task_string)
+                self.assertNotIn(pr_content, v2_task_string)
+                self.assertNotIn(prd_content, v2_task_string)
+
+                with open(os.path.join(tmp_dir_v2, "coder_debug", "initial", "startup_packet.json")) as f:
+                    v2_packet = json.load(f)
+                self.assertEqual(v2_packet["startup_version"], "v2")
+                self.assertEqual([ref["id"] for ref in v2_packet["reference_index"]], ["pr_contract", "prd"])
+
+    @patch('spawn_coder.config.load_or_merge_config')
+    @patch('spawn_coder.subprocess.check_output')
+    @patch('spawn_coder.invoke_agent')
+    @patch('utils_api_key.setup_spawner_api_key')
+    def test_initial_v2_default_comes_from_config_when_key_is_absent_from_runtime_env(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
+        mock_load_config.return_value = {}
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            pr_content = "UNIQUE PR CONTRACT BODY SHOULD NOT BE INLINED"
+            prd_content = "UNIQUE PRD BODY SHOULD NOT BE INLINED"
+            with open(pr_file, "w") as f:
+                f.write(pr_content)
+            with open(prd_file, "w") as f:
+                f.write(prd_content)
+
+            test_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--workdir", tmp_dir,
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
+
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch.object(sys, 'argv', test_args):
+                    spawn_coder.main()
+
+            task_string = mock_invoke.call_args[0][0]
+            self.assertIn("# Coder Playbook V2", task_string)
+            self.assertNotIn(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "playbooks", "coder_playbook.md")), task_string)
+            self.assertNotIn(pr_content, task_string)
+            self.assertNotIn(prd_content, task_string)
+
+            with open(os.path.join(tmp_dir, "coder_debug", "initial", "startup_packet.json")) as f:
+                packet = json.load(f)
+            self.assertEqual(packet["startup_version"], "v2")
+            self.assertEqual([ref["id"] for ref in packet["reference_index"]], ["pr_contract", "prd"])
+
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
@@ -96,7 +225,8 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertTrue(task_string.startswith("## IDENTITY & PRIMARY GOAL"))
             self.assertIn(os.path.abspath(pr_file), task_string)
             self.assertIn(os.path.abspath(prd_file), task_string)
-            self.assertIn(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "playbooks", "coder_playbook.md")), task_string)
+            self.assertIn("## CODER PLAYBOOK", task_string)
+            self.assertIn("# Coder Playbook V2", task_string)
             self.assertNotIn(pr_content, task_string)
             self.assertNotIn(prd_content, task_string)
             mock_setup_key.assert_called_once()

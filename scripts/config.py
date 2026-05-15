@@ -11,6 +11,10 @@ DEFAULT_ALLOWED_RUNTIME_ROOTS = [
     "~/.openclaw/skills",
     "~/.gemini/skills",
 ]
+CODER_PLAYBOOK_VERSION_CONFIG_KEY = "coder_playbook_version"
+CODER_PLAYBOOK_V1 = 1
+CODER_PLAYBOOK_V2 = 2
+DEFAULT_CODER_PLAYBOOK_VERSION = CODER_PLAYBOOK_V2
 
 SDLC_SKILLS_ROOT = os.getenv("SDLC_SKILLS_ROOT", os.path.expanduser("~/.openclaw/skills"))
 SDLC_RUNTIME_DIR = os.getenv("SDLC_RUNTIME_DIR", os.path.expanduser("~/.openclaw/skills"))
@@ -50,6 +54,17 @@ def load_or_merge_config(sdlc_root):
             with open(config_path, "w") as f:
                 json.dump(config_template, f, indent=4)
         return config_template
+
+
+def resolve_coder_playbook_version(app_config):
+    raw_value = app_config.get(CODER_PLAYBOOK_VERSION_CONFIG_KEY, DEFAULT_CODER_PLAYBOOK_VERSION)
+    try:
+        version = int(raw_value)
+    except (TypeError, ValueError):
+        return DEFAULT_CODER_PLAYBOOK_VERSION
+    if version not in {CODER_PLAYBOOK_V1, CODER_PLAYBOOK_V2}:
+        return DEFAULT_CODER_PLAYBOOK_VERSION
+    return version
 
 
 def get_allowed_runtime_roots(app_config):
