@@ -225,6 +225,119 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
     raise ValueError(f"Unsupported coder v2 mode: {mode}")
 
 
+def _build_coder_v1_bootstrap_envelope(workdir, references, contract_params, mode):
+    envelope = _build_coder_envelope(workdir, references, contract_params, mode)
+    envelope.update(
+        {
+            "workdir": workdir,
+            "pr_contract_path": references.get("pr_contract_file"),
+            "prd_path": references.get("prd_file"),
+            "playbook_path": references.get("playbook_path"),
+            "current_branch": contract_params.get("current_branch"),
+            "latest_commit_hash": contract_params.get("latest_commit_hash"),
+        }
+    )
+
+    if mode == "revision_bootstrap":
+        envelope.update(
+            {
+                "feedback_file_path": references.get("feedback_file"),
+                "inline_review_json": _read_text_file(references.get("feedback_file")),
+                "behavioral_rules": [
+                    "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts.",
+                ],
+                "continuation_semantics": {
+                    "fresh_task": False,
+                    "existing_branch_state_authoritative": True,
+                    "same_session_required": False,
+                    "inline_review_section": "# REVIEW REPORT JSON",
+                },
+            }
+        )
+        return envelope
+
+    if mode == "system_alert_bootstrap":
+        envelope.update(
+            {
+                "system_alert": contract_params.get("system_alert", ""),
+                "behavioral_rules": [
+                    "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts.",
+                ],
+                "continuation_semantics": {
+                    "fresh_task": False,
+                    "existing_branch_state_authoritative": True,
+                    "same_session_required": False,
+                    "inline_alert_section": "# SYSTEM ALERT YOU MUST FIX",
+                },
+            }
+        )
+        return envelope
+
+    raise ValueError(f"Unsupported coder v1 bootstrap mode: {mode}")
+
+
+def _append_coder_v1_supporting_context(prompt_lines, envelope):
+    prompt_lines.extend(
+        [
+            "# SUPPORTING CONTEXT",
+            f"- Locked workdir: `{envelope.get('workdir', '')}`",
+            f"- PR contract path: `{envelope.get('pr_contract_path', '')}`",
+            f"- PRD path: `{envelope.get('prd_path', '')}`",
+            f"- Coder playbook path: `{envelope.get('playbook_path', '')}`",
+        ]
+    )
+    if envelope.get("feedback_file_path"):
+        prompt_lines.append(f"- Feedback file path: `{envelope.get('feedback_file_path')}`")
+    if envelope.get("current_branch"):
+        prompt_lines.append(f"- Current branch: `{envelope.get('current_branch')}`")
+    if envelope.get("latest_commit_hash"):
+        prompt_lines.append(f"- Latest commit hash: `{envelope.get('latest_commit_hash')}`")
+
+    prompt_lines.extend(
+        [
+            "",
+            "# VALIDATION AND GIT HYGIENE REMINDERS",
+            "- Stay on the current feature branch; never switch branches and never work on `master` or `main`.",
+            "- Do not `git push`.",
+            "- Use explicit `git add <file>` only for files you changed; never use `git add .`.",
+            "- Run the relevant tests and `./preflight.sh` if it exists until green.",
+            "- Commit the exact files you changed, leave `git status` clean, then report `LATEST_HASH=$(git rev-parse HEAD)`.",
+        ]
+    )
+
+
+def render_coder_v1_bootstrap_prompt(envelope):
+    if envelope.get("mode") == "revision_bootstrap":
+        prompt_lines = [
+            "# CODER REVISION RECOVERY CONTINUATION",
+            "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts.",
+            "Prioritize restoring task context from the existing branch and fixing the reviewer findings before rereading supporting references.",
+            "The current implementation is authoritative; do not discard or restart the work already present on disk.",
+            "",
+            "# REVIEW REPORT JSON",
+            envelope.get("inline_review_json", ""),
+            "",
+        ]
+        _append_coder_v1_supporting_context(prompt_lines, envelope)
+        return "\n".join(prompt_lines)
+
+    if envelope.get("mode") == "system_alert_bootstrap":
+        prompt_lines = [
+            "# CODER SYSTEM ALERT RECOVERY CONTINUATION",
+            "This is a recovery continuation, not a fresh task start. Existing branch state and current implementation are authoritative facts.",
+            "The immediate objective is corrective action for the operational failure below, not replanning the PR.",
+            "Recover context from the current branch, fix the exact failure, rerun validation, commit if needed, and leave the workspace clean.",
+            "",
+            "# SYSTEM ALERT YOU MUST FIX",
+            envelope.get("system_alert", ""),
+            "",
+        ]
+        _append_coder_v1_supporting_context(prompt_lines, envelope)
+        return "\n".join(prompt_lines)
+
+    raise ValueError(f"Unsupported coder v1 bootstrap prompt mode: {envelope.get('mode')}")
+
+
 def render_coder_v2_prompt(envelope):
     if envelope.get("mode") == "initial":
         prompt_lines = [
@@ -609,6 +722,8 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
     elif role == "coder":
         if mode in {"initial_v2", "revision_bootstrap_v2", "system_alert_bootstrap_v2"}:
             return build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
+        if mode in {"revision_bootstrap", "system_alert_bootstrap"}:
+            return _build_coder_v1_bootstrap_envelope(workdir, references, contract_params, mode)
         return _build_coder_envelope(workdir, references, contract_params, mode)
     else:
         execution_contract, reference_index, final_checklist = [], [], []
@@ -624,6 +739,8 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
 def render_envelope_to_prompt(envelope):
     if envelope.get("role") == "coder" and envelope.get("startup_version") == "v2":
         return render_coder_v2_prompt(envelope)
+    if envelope.get("role") == "coder" and envelope.get("mode") in {"revision_bootstrap", "system_alert_bootstrap"} and envelope.get("startup_version") == "v1":
+        return render_coder_v1_bootstrap_prompt(envelope)
 
     role = envelope.get("role", "agent")
     

@@ -459,37 +459,28 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
     else:
         mode = resolve_recovery_bootstrap_mode(app_config or {}, "revision_bootstrap")
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+        selected_playbook_path = playbook_path
         if mode == "revision_bootstrap":
-            rendered_prompt = build_coder_revision_recovery_prompt(
-                workdir=workdir,
-                pr_file=pr_file,
-                prd_file=prd_file,
-                playbook_path=playbook_path,
-                review_report_json=review_report_json,
-                feedback_file=feedback_file,
-                current_branch=current_branch,
-                latest_commit_hash=latest_commit_hash,
-            )
-            packet = build_coder_continuation_packet(
-                mode=mode,
-                workdir=workdir,
-                pr_file=pr_file,
-                prd_file=prd_file,
-                playbook_path=playbook_path,
-                feedback_file=feedback_file,
-                current_branch=current_branch,
-                latest_commit_hash=latest_commit_hash,
-                startup_version="v1",
-                coder_playbook_version=config.CODER_PLAYBOOK_V1,
-            )
-        else:
-            v2_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
             envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
                 workdir=workdir,
                 run_dir=run_dir,
                 pr_file=pr_file,
                 prd_file=prd_file,
-                playbook_path=v2_playbook_path,
+                playbook_path=selected_playbook_path,
+                mode=mode,
+                feedback_file=feedback_file,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+            packet = envelope
+        else:
+            selected_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
+            envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+                workdir=workdir,
+                run_dir=run_dir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=selected_playbook_path,
                 mode=mode,
                 feedback_file=feedback_file,
                 current_branch=current_branch,
@@ -550,35 +541,28 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
     else:
         mode = resolve_recovery_bootstrap_mode(app_config or {}, "system_alert_bootstrap")
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+        selected_playbook_path = playbook_path
         if mode == "system_alert_bootstrap":
-            rendered_prompt = build_coder_system_alert_recovery_prompt(
-                workdir=workdir,
-                pr_file=pr_file,
-                prd_file=prd_file,
-                playbook_path=playbook_path,
-                system_alert=system_alert,
-                current_branch=current_branch,
-                latest_commit_hash=latest_commit_hash,
-            )
-            packet = build_coder_continuation_packet(
-                mode=mode,
-                workdir=workdir,
-                pr_file=pr_file,
-                prd_file=prd_file,
-                playbook_path=playbook_path,
-                current_branch=current_branch,
-                latest_commit_hash=latest_commit_hash,
-                startup_version="v1",
-                coder_playbook_version=config.CODER_PLAYBOOK_V1,
-            )
-        else:
-            v2_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
             envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
                 workdir=workdir,
                 run_dir=run_dir,
                 pr_file=pr_file,
                 prd_file=prd_file,
-                playbook_path=v2_playbook_path,
+                playbook_path=selected_playbook_path,
+                mode=mode,
+                system_alert=system_alert,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+            packet = envelope
+        else:
+            selected_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
+            envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+                workdir=workdir,
+                run_dir=run_dir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=selected_playbook_path,
                 mode=mode,
                 system_alert=system_alert,
                 current_branch=current_branch,

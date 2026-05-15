@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 import config
 import spawn_coder
+import envelope_assembler
 
 
 class TestCoderStartupEnvelope(unittest.TestCase):
@@ -162,9 +163,12 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             with open(os.path.join(bootstrap_dir, "rendered_prompt.txt")) as f:
                 rendered_prompt = f.read()
                 
+            expected_prompt = envelope_assembler.render_envelope_to_prompt(packet)
+            self.assertEqual(rendered_prompt, expected_prompt)
             self.assertEqual(packet["mode"], "revision_bootstrap")
             self.assertEqual(packet["lifecycle"], "recovery_bootstrap_continuation")
             self.assertFalse(packet["continuation_semantics"]["fresh_task"])
+            self.assertEqual(packet["assembly_authority_path"], "scripts/envelope_assembler.py")
             self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, rendered_prompt)
             self.assertIn("# REVIEW REPORT JSON", rendered_prompt)
             self.assertIn("mock feedback", rendered_prompt)
@@ -214,9 +218,12 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             self.assertEqual(packet["mode"], "system_alert_bootstrap")
             self.assertEqual(packet["lifecycle"], "recovery_bootstrap_continuation")
             self.assertFalse(packet["continuation_semantics"]["fresh_task"])
+            self.assertEqual(packet["assembly_authority_path"], "scripts/envelope_assembler.py")
             
             with open(os.path.join(alert_dir, "rendered_prompt.txt")) as f:
                 prompt_text = f.read()
+            expected_prompt = envelope_assembler.render_envelope_to_prompt(packet)
+            self.assertEqual(prompt_text, expected_prompt)
             self.assertIn("git status is dirty", prompt_text)
             self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_text)
 

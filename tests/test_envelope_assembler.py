@@ -12,7 +12,8 @@ from envelope_assembler import (
     build_startup_envelope,
     render_envelope_to_prompt,
     save_envelope_artifacts,
-    ROLE_PROLOGUES
+    ROLE_PROLOGUES,
+    render_coder_v1_bootstrap_prompt,
 )
 
 
@@ -267,6 +268,59 @@ class TestEnvelopeAssembler(unittest.TestCase):
             self.assertIn("# Coder Playbook V2", prompt)
             self.assertIn("Use Red → Green → Refactor.", prompt)
             self.assertNotIn("spawn_coder.py", prompt)
+
+    def test_v1_bootstrap_prompts_render_from_envelope_assembler_with_matching_authority_metadata(self):
+        feedback_path = os.path.join(self.temp_dir, "review.json")
+        with open(feedback_path, "w", encoding="utf-8") as f:
+            f.write('{"status": "NEEDS_FIX", "comments": "restore via v1"}')
+
+        revision_envelope = build_startup_envelope(
+            role="coder",
+            workdir="/test/workdir",
+            out_dir="/test/run_dir",
+            references={
+                "pr_contract_file": "/test/contracts/PR_001.md",
+                "prd_file": "/test/docs/PRD.md",
+                "playbook_path": "/test/playbooks/coder_playbook.md",
+                "feedback_file": feedback_path,
+            },
+            contract_params={
+                "current_branch": "feature/test",
+                "latest_commit_hash": "abc123",
+            },
+            mode="revision_bootstrap",
+        )
+        revision_prompt = render_envelope_to_prompt(revision_envelope)
+        self.assertEqual(revision_envelope["assembly_authority_path"], "scripts/envelope_assembler.py")
+        self.assertEqual(revision_envelope["startup_version"], "v1")
+        self.assertIn("# CODER REVISION RECOVERY CONTINUATION", revision_prompt)
+        self.assertIn("# REVIEW REPORT JSON", revision_prompt)
+        self.assertIn("restore via v1", revision_prompt)
+        self.assertEqual(revision_prompt, render_coder_v1_bootstrap_prompt(revision_envelope))
+
+        alert_envelope = build_startup_envelope(
+            role="coder",
+            workdir="/test/workdir",
+            out_dir="/test/run_dir",
+            references={
+                "pr_contract_file": "/test/contracts/PR_001.md",
+                "prd_file": "/test/docs/PRD.md",
+                "playbook_path": "/test/playbooks/coder_playbook.md",
+            },
+            contract_params={
+                "system_alert": "git dirty",
+                "current_branch": "feature/test",
+                "latest_commit_hash": "abc123",
+            },
+            mode="system_alert_bootstrap",
+        )
+        alert_prompt = render_envelope_to_prompt(alert_envelope)
+        self.assertEqual(alert_envelope["assembly_authority_path"], "scripts/envelope_assembler.py")
+        self.assertEqual(alert_envelope["startup_version"], "v1")
+        self.assertIn("# CODER SYSTEM ALERT RECOVERY CONTINUATION", alert_prompt)
+        self.assertIn("# SYSTEM ALERT YOU MUST FIX", alert_prompt)
+        self.assertIn("git dirty", alert_prompt)
+        self.assertEqual(alert_prompt, render_coder_v1_bootstrap_prompt(alert_envelope))
 
     def test_build_coder_initial_v2_envelope_keeps_thin_shell_and_removes_playbook_from_required_refs(self):
         playbook_path = os.path.join(self.temp_dir, "coder_playbook_v2.md")
