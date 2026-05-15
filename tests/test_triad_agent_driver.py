@@ -89,12 +89,12 @@ class TestAgentDriverTriad(unittest.TestCase):
         args, kwargs = mock_agent_call.call_args
     
         # Revision bootstrap must inline the exact reviewer feedback as the primary recovery input.
-        self.assertIn("# REVIEW REPORT JSON", args[0])
+        self.assertIn("## REVIEWER FEEDBACK", args[0])
         self.assertIn("```json", args[0])
         self.assertIn('"overall_assessment": "NEEDS_ATTENTION"', args[0])
-        self.assertIn(feedback_file, args[0])
+        self.assertNotIn(feedback_file, args[0])
         self.assertIn('"description": "raw JSON test"', args[0])
-        self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, args[0])
+        self.assertIn("## RECOVERY MISSION", args[0])
         mock_setup_key.assert_called()
 
     def test_build_prompt_resolves_correctly(self):

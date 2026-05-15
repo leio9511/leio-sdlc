@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scripts')))
 
+import config
 import spawn_coder
 from agent_driver import AgentResult
 
@@ -22,10 +23,12 @@ class TestCoderRevisionRouting(unittest.TestCase):
         pr_file = os.path.join(tmp_dir, "PR_001.md")
         prd_file = os.path.join(tmp_dir, "PRD.md")
         playbook_file = os.path.join(tmp_dir, "coder_playbook.md")
+        playbook_v2_file = os.path.join(tmp_dir, "coder_playbook_v2.md")
         feedback_file = os.path.join(tmp_dir, "review_report.json")
         Path(pr_file).write_text("PR contract", encoding="utf-8")
         Path(prd_file).write_text("PRD", encoding="utf-8")
         Path(playbook_file).write_text("Playbook", encoding="utf-8")
+        Path(playbook_v2_file).write_text("# Coder Playbook V2\n\nUse Red → Green → Refactor.\n", encoding="utf-8")
         Path(feedback_file).write_text(RAW_REVIEW_JSON, encoding="utf-8")
         return pr_file, prd_file, playbook_file, feedback_file
 
@@ -57,32 +60,45 @@ class TestCoderRevisionRouting(unittest.TestCase):
             self.assertIn("Existing branch state", prompt)
             self.assertNotIn("# REFERENCE INDEX", prompt)
 
-    @patch('spawn_coder.get_current_branch', return_value='feature/revision-bootstrap')
-    @patch('spawn_coder.get_latest_commit_hash', return_value='def456')
+    @patch('spawn_coder.get_current_branch', return_value='feature/revision-bootstrap-v2')
+    @patch('spawn_coder.get_latest_commit_hash', return_value='v2hash123')
     @patch('spawn_coder.invoke_agent')
-    def test_feedback_without_session_spawns_revision_bootstrap_recovery_prompt(self, mock_invoke, mock_commit, mock_branch):
+    def test_revision_bootstrap_v2_inlines_reviewer_feedback_and_marks_existing_state_authoritative(self, mock_invoke, mock_commit, mock_branch):
         mock_invoke.return_value = AgentResult(session_key="new-session", stdout="")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             pr_file, prd_file, playbook_file, feedback_file = self._write_common_files(tmp_dir)
 
             is_existing, key = spawn_coder.handle_feedback_routing(
-                tmp_dir, tmp_dir, pr_file, prd_file, playbook_file, feedback_file, "PR_001"
+                tmp_dir,
+                tmp_dir,
+                pr_file,
+                prd_file,
+                playbook_file,
+                feedback_file,
+                "PR_001",
+                app_config={config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: config.CODER_PLAYBOOK_V2},
             )
 
             self.assertFalse(is_existing)
             self.assertEqual(key, "new-session")
             prompt = mock_invoke.call_args[0][0]
-            self.assertIn(RECOVERY_WARNING, prompt)
-            self.assertIn("# REVIEW REPORT JSON", prompt)
+            self.assertIn("## CODER PLAYBOOK", prompt)
+            self.assertIn("# Coder Playbook V2", prompt)
+            self.assertIn("## REVIEWER FEEDBACK", prompt)
             self.assertIn(RAW_REVIEW_JSON, prompt)
+            self.assertIn("not a fresh start", prompt.lower())
+            self.assertIn("existing branch state and on-disk implementation are authoritative", prompt.lower())
+            self.assertIn("immediate action target", prompt.lower())
             self.assertIn(os.path.abspath(pr_file), prompt)
             self.assertIn(os.path.abspath(prd_file), prompt)
-            self.assertIn(os.path.abspath(playbook_file), prompt)
-            self.assertIn(os.path.abspath(feedback_file), prompt)
-            self.assertIn("feature/revision-bootstrap", prompt)
-            self.assertIn("def456", prompt)
+            self.assertNotIn(os.path.abspath(playbook_file), prompt)
             self.assertEqual(Path(os.path.join(tmp_dir, ".coder_session")).read_text(encoding="utf-8"), "new-session")
+
+            packet = json.loads((Path(tmp_dir) / "coder_debug" / "revision_bootstrap_001" / "startup_packet.json").read_text(encoding="utf-8"))
+            self.assertEqual(packet["startup_version"], "v2")
+            self.assertEqual(packet["mode"], "revision_bootstrap")
+            self.assertEqual([ref["id"] for ref in packet["reference_index"]], ["pr_contract", "prd"])
 
     @patch('spawn_coder.get_current_branch', return_value='feature/revision-routing')
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
@@ -117,7 +133,16 @@ class TestCoderRevisionRouting(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             pr_file, prd_file, playbook_file, feedback_file = self._write_common_files(tmp_dir)
-            spawn_coder.handle_feedback_routing(tmp_dir, tmp_dir, pr_file, prd_file, playbook_file, feedback_file, "PR_001")
+            spawn_coder.handle_feedback_routing(
+                tmp_dir,
+                tmp_dir,
+                pr_file,
+                prd_file,
+                playbook_file,
+                feedback_file,
+                "PR_001",
+                app_config={config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: config.CODER_PLAYBOOK_V1},
+            )
 
             bootstrap_dir = Path(tmp_dir) / "coder_debug" / "revision_bootstrap_001"
             packet_file = bootstrap_dir / "startup_packet.json"

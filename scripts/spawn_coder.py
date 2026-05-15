@@ -44,7 +44,18 @@ def resolve_coder_artifact_subdir(run_dir, mode):
     return f"{prefix}{max_index + 1:03d}"
 
 
-def build_coder_startup_packet_and_prompt(workdir, run_dir, pr_file, prd_file, playbook_path, mode, feedback_file=None, system_alert=None):
+def build_coder_startup_packet_and_prompt(
+    workdir,
+    run_dir,
+    pr_file,
+    prd_file,
+    playbook_path,
+    mode,
+    feedback_file=None,
+    system_alert=None,
+    current_branch=None,
+    latest_commit_hash=None,
+):
     references = {
         "pr_contract_file": os.path.abspath(pr_file),
         "prd_file": os.path.abspath(prd_file),
@@ -56,6 +67,10 @@ def build_coder_startup_packet_and_prompt(workdir, run_dir, pr_file, prd_file, p
     contract_params = {}
     if system_alert:
         contract_params["system_alert"] = system_alert
+    if current_branch:
+        contract_params["current_branch"] = current_branch
+    if latest_commit_hash:
+        contract_params["latest_commit_hash"] = latest_commit_hash
 
     envelope = envelope_assembler.build_startup_envelope(
         role="coder",
@@ -74,6 +89,13 @@ def resolve_initial_coder_startup_mode(app_config):
     if version == config.CODER_PLAYBOOK_V1:
         return "initial"
     return "initial_v2"
+
+
+def resolve_recovery_bootstrap_mode(app_config, bootstrap_kind):
+    version = config.resolve_coder_playbook_version(app_config)
+    if version == config.CODER_PLAYBOOK_V1:
+        return bootstrap_kind
+    return f"{bootstrap_kind}_v2"
 
 
 REVISION_CONTINUATION_RULE = "Do not restart problem-solving from scratch. Modify the existing implementation to satisfy the reviewer findings."
@@ -390,7 +412,7 @@ def send_feedback(session_key, message, workdir=".", run_dir=".", thinking: str 
     print(f"Sent feedback to session {result.session_key}")
 
 
-def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False, thinking: str | None = None):
+def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False, thinking: str | None = None, app_config=None):
     session_file = os.path.join(run_dir, ".coder_session")
     current_branch = get_current_branch(workdir)
     latest_commit_hash = get_latest_commit_hash(workdir)
@@ -409,36 +431,60 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
             current_branch=current_branch,
             latest_commit_hash=latest_commit_hash,
         )
-    else:
-        mode = "revision_bootstrap"
-        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-        rendered_prompt = build_coder_revision_recovery_prompt(
+        packet = build_coder_continuation_packet(
+            mode=mode,
             workdir=workdir,
             pr_file=pr_file,
             prd_file=prd_file,
             playbook_path=playbook_path,
-            review_report_json=review_report_json,
             feedback_file=feedback_file,
             current_branch=current_branch,
             latest_commit_hash=latest_commit_hash,
         )
+    else:
+        mode = resolve_recovery_bootstrap_mode(app_config or {}, "revision_bootstrap")
+        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+        if mode == "revision_bootstrap":
+            rendered_prompt = build_coder_revision_recovery_prompt(
+                workdir=workdir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=playbook_path,
+                review_report_json=review_report_json,
+                feedback_file=feedback_file,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+            packet = build_coder_continuation_packet(
+                mode=mode,
+                workdir=workdir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=playbook_path,
+                feedback_file=feedback_file,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+        else:
+            v2_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
+            envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+                workdir=workdir,
+                run_dir=run_dir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=v2_playbook_path,
+                mode=mode,
+                feedback_file=feedback_file,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+            packet = envelope
 
-    packet = build_coder_continuation_packet(
-        mode=mode,
-        workdir=workdir,
-        pr_file=pr_file,
-        prd_file=prd_file,
-        playbook_path=playbook_path,
-        feedback_file=feedback_file,
-        current_branch=current_branch,
-        latest_commit_hash=latest_commit_hash,
-    )
-    
-    save_coder_debug_artifacts(run_dir, mode, packet, rendered_prompt)
+    save_coder_debug_artifacts(run_dir, packet.get("mode", mode), packet, rendered_prompt)
 
     if test_mode:
         Path(run_dir).mkdir(parents=True, exist_ok=True)
-        if mode == "revision_bootstrap":
+        if mode in {"revision_bootstrap", "revision_bootstrap_v2"}:
             with open(session_file, "w") as f:
                 f.write("mock-session-key")
         Path("tests").mkdir(exist_ok=True)
@@ -458,7 +504,7 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         return False, result.session_key
 
 
-def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_path, system_alert, pr_id, test_mode=False, thinking: str | None = None):
+def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_path, system_alert, pr_id, test_mode=False, thinking: str | None = None, app_config=None):
     session_file = os.path.join(run_dir, ".coder_session")
     current_branch = get_current_branch(workdir)
     latest_commit_hash = get_latest_commit_hash(workdir)
@@ -475,34 +521,57 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
             current_branch=current_branch,
             latest_commit_hash=latest_commit_hash,
         )
-    else:
-        mode = "system_alert_bootstrap"
-        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
-        rendered_prompt = build_coder_system_alert_recovery_prompt(
+        packet = build_coder_continuation_packet(
+            mode=mode,
             workdir=workdir,
             pr_file=pr_file,
             prd_file=prd_file,
             playbook_path=playbook_path,
-            system_alert=system_alert,
             current_branch=current_branch,
             latest_commit_hash=latest_commit_hash,
         )
+    else:
+        mode = resolve_recovery_bootstrap_mode(app_config or {}, "system_alert_bootstrap")
+        session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
+        if mode == "system_alert_bootstrap":
+            rendered_prompt = build_coder_system_alert_recovery_prompt(
+                workdir=workdir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=playbook_path,
+                system_alert=system_alert,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+            packet = build_coder_continuation_packet(
+                mode=mode,
+                workdir=workdir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=playbook_path,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+        else:
+            v2_playbook_path = os.path.join(os.path.dirname(playbook_path), "coder_playbook_v2.md")
+            envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
+                workdir=workdir,
+                run_dir=run_dir,
+                pr_file=pr_file,
+                prd_file=prd_file,
+                playbook_path=v2_playbook_path,
+                mode=mode,
+                system_alert=system_alert,
+                current_branch=current_branch,
+                latest_commit_hash=latest_commit_hash,
+            )
+            packet = envelope
 
-    packet = build_coder_continuation_packet(
-        mode=mode,
-        workdir=workdir,
-        pr_file=pr_file,
-        prd_file=prd_file,
-        playbook_path=playbook_path,
-        current_branch=current_branch,
-        latest_commit_hash=latest_commit_hash,
-    )
-    
-    save_coder_debug_artifacts(run_dir, mode, packet, rendered_prompt)
+    save_coder_debug_artifacts(run_dir, packet.get("mode", mode), packet, rendered_prompt)
 
     if test_mode:
         Path(run_dir).mkdir(parents=True, exist_ok=True)
-        if mode == "system_alert_bootstrap":
+        if mode in {"system_alert_bootstrap", "system_alert_bootstrap_v2"}:
             with open(session_file, "w") as f:
                 f.write("mock-session-key")
         Path("tests").mkdir(exist_ok=True)
@@ -608,11 +677,33 @@ def main():
     session_file = os.path.join(args.run_dir, ".coder_session")
 
     if args.system_alert:
-        handle_system_alert_routing(workdir, args.run_dir, args.pr_file, args.prd_file, v1_playbook_path, args.system_alert, pr_id, test_mode=test_mode, thinking=resolved_thinking)
+        handle_system_alert_routing(
+            workdir,
+            args.run_dir,
+            args.pr_file,
+            args.prd_file,
+            v1_playbook_path,
+            args.system_alert,
+            pr_id,
+            test_mode=test_mode,
+            thinking=resolved_thinking,
+            app_config=app_config,
+        )
         return
 
     if args.feedback_file:
-        handle_feedback_routing(workdir, args.run_dir, args.pr_file, args.prd_file, v1_playbook_path, args.feedback_file, pr_id, test_mode=test_mode, thinking=resolved_thinking)
+        handle_feedback_routing(
+            workdir,
+            args.run_dir,
+            args.pr_file,
+            args.prd_file,
+            v1_playbook_path,
+            args.feedback_file,
+            pr_id,
+            test_mode=test_mode,
+            thinking=resolved_thinking,
+            app_config=app_config,
+        )
         return
 
     envelope, rendered_prompt = build_coder_startup_packet_and_prompt(

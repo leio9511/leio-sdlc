@@ -54,11 +54,8 @@ def _read_text_file(path):
         return f.read()
 
 
-def build_coder_initial_v2_envelope(workdir, out_dir, references):
-    playbook_path = references.get("playbook_path")
-    playbook_text = _read_text_file(playbook_path)
-
-    reference_index = [
+def _build_coder_v2_reference_index(references):
+    return [
         {
             "id": "pr_contract",
             "kind": "pr_contract",
@@ -77,31 +74,125 @@ def build_coder_initial_v2_envelope(workdir, out_dir, references):
         },
     ]
 
-    return {
-        "role": "coder",
-        "mode": "initial",
-        "lifecycle": "new_session_startup",
-        "prompt_kind": "coder_initial_v2_startup",
-        "startup_version": "v2",
-        "assembly_authority_path": "scripts/envelope_assembler.py",
-        "workdir": workdir,
-        "mission": "This is the initial new-session coder startup. Start executing the PR contract immediately from the current workspace.",
-        "inline_playbook": {
-            "path": playbook_path,
-            "content": playbook_text,
-        },
-        "reference_index": reference_index,
-        "execution_contract": [f"Locked Working Directory: `{workdir}`"],
-        "final_checklist": [],
-    }
+
+def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode):
+    playbook_path = references.get("playbook_path")
+    playbook_text = _read_text_file(playbook_path)
+    reference_index = _build_coder_v2_reference_index(references)
+
+    if mode == "initial_v2":
+        return {
+            "role": "coder",
+            "mode": "initial",
+            "lifecycle": "new_session_startup",
+            "prompt_kind": "coder_initial_v2_startup",
+            "startup_version": "v2",
+            "assembly_authority_path": "scripts/envelope_assembler.py",
+            "workdir": workdir,
+            "mission": "This is the initial new-session coder startup. Start executing the PR contract immediately from the current workspace.",
+            "inline_playbook": {
+                "path": playbook_path,
+                "content": playbook_text,
+            },
+            "reference_index": reference_index,
+            "execution_contract": [f"Locked Working Directory: `{workdir}`"],
+            "final_checklist": [],
+        }
+
+    current_branch = contract_params.get("current_branch")
+    latest_commit_hash = contract_params.get("latest_commit_hash")
+    continuation_constraints = [
+        f"Locked Working Directory: `{workdir}`",
+        "This is not a fresh start.",
+        "The existing branch state and on-disk implementation are authoritative.",
+    ]
+    if current_branch:
+        continuation_constraints.append(f"Current branch: `{current_branch}`")
+    if latest_commit_hash:
+        continuation_constraints.append(f"Latest commit hash: `{latest_commit_hash}`")
+
+    if mode == "revision_bootstrap_v2":
+        continuation_constraints.append("The reviewer feedback below is the immediate action target.")
+        return {
+            "role": "coder",
+            "mode": "revision_bootstrap",
+            "lifecycle": "recovery_bootstrap_startup",
+            "prompt_kind": "coder_revision_bootstrap_v2_startup",
+            "startup_version": "v2",
+            "assembly_authority_path": "scripts/envelope_assembler.py",
+            "workdir": workdir,
+            "mission": "This is a recovery bootstrap for reviewer-driven continuation. This is not a fresh start. Resume from the current branch and the on-disk implementation already present.",
+            "inline_playbook": {
+                "path": playbook_path,
+                "content": playbook_text,
+            },
+            "reference_index": reference_index,
+            "inline_action_target": {
+                "heading": "## REVIEWER FEEDBACK",
+                "kind": "reviewer_feedback",
+                "path": references.get("feedback_file"),
+                "content": _read_text_file(references.get("feedback_file")),
+            },
+            "continuation_constraints": continuation_constraints,
+            "start_instruction": START_WORK_CTA.format(role_upper="CODER"),
+        }
+
+    if mode == "system_alert_bootstrap_v2":
+        continuation_constraints.append("The system alert below is the immediate corrective target.")
+        return {
+            "role": "coder",
+            "mode": "system_alert_bootstrap",
+            "lifecycle": "recovery_bootstrap_startup",
+            "prompt_kind": "coder_system_alert_bootstrap_v2_startup",
+            "startup_version": "v2",
+            "assembly_authority_path": "scripts/envelope_assembler.py",
+            "workdir": workdir,
+            "mission": "This is a recovery bootstrap for system-alert continuation. This is not a fresh start. Resume from the current branch and the on-disk implementation already present.",
+            "inline_playbook": {
+                "path": playbook_path,
+                "content": playbook_text,
+            },
+            "reference_index": reference_index,
+            "inline_action_target": {
+                "heading": "## SYSTEM ALERT",
+                "kind": "system_alert",
+                "content": contract_params.get("system_alert", ""),
+            },
+            "continuation_constraints": continuation_constraints,
+            "start_instruction": START_WORK_CTA.format(role_upper="CODER"),
+        }
+
+    raise ValueError(f"Unsupported coder v2 mode: {mode}")
 
 
-def render_coder_initial_v2_prompt(envelope):
+def render_coder_v2_prompt(envelope):
+    if envelope.get("mode") == "initial":
+        prompt_lines = [
+            "## IDENTITY & PRIMARY GOAL",
+            ROLE_PROLOGUES["coder"],
+            "",
+            "## MISSION",
+            envelope.get("mission", ""),
+            "",
+            "## CODER PLAYBOOK",
+            envelope.get("inline_playbook", {}).get("content", ""),
+            "",
+            "## REFERENCE INDEX",
+            json.dumps(envelope.get("reference_index", []), indent=2),
+            "",
+            "## WORKSPACE",
+            f"- Locked Working Directory: `{envelope.get('workdir', '')}`",
+            "",
+            "## START WORK",
+            START_WORK_CTA.format(role_upper="CODER"),
+        ]
+        return "\n".join(prompt_lines)
+
     prompt_lines = [
         "## IDENTITY & PRIMARY GOAL",
         ROLE_PROLOGUES["coder"],
         "",
-        "## MISSION",
+        "## RECOVERY MISSION",
         envelope.get("mission", ""),
         "",
         "## CODER PLAYBOOK",
@@ -110,12 +201,20 @@ def render_coder_initial_v2_prompt(envelope):
         "## REFERENCE INDEX",
         json.dumps(envelope.get("reference_index", []), indent=2),
         "",
-        "## WORKSPACE",
-        f"- Locked Working Directory: `{envelope.get('workdir', '')}`",
+        envelope.get("inline_action_target", {}).get("heading", "## ACTION TARGET"),
+        envelope.get("inline_action_target", {}).get("content", ""),
         "",
-        "## START WORK",
-        START_WORK_CTA.format(role_upper="CODER"),
+        "## CONTINUATION CONSTRAINTS",
     ]
+    for constraint in envelope.get("continuation_constraints", []):
+        prompt_lines.append(f"- {constraint}")
+    prompt_lines.extend(
+        [
+            "",
+            "## START WORK",
+            envelope.get("start_instruction", START_WORK_CTA.format(role_upper="CODER")),
+        ]
+    )
     return "\n".join(prompt_lines)
 
 
@@ -438,8 +537,8 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
             workdir, references, contract_params
         )
     elif role == "coder":
-        if mode == "initial_v2":
-            return build_coder_initial_v2_envelope(workdir, out_dir, references)
+        if mode in {"initial_v2", "revision_bootstrap_v2", "system_alert_bootstrap_v2"}:
+            return build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
         execution_contract, reference_index, final_checklist = _build_coder_envelope(
             workdir, references, contract_params, mode
         )
@@ -456,7 +555,7 @@ def build_startup_envelope(role, workdir, out_dir, references, contract_params, 
 
 def render_envelope_to_prompt(envelope):
     if envelope.get("role") == "coder" and envelope.get("startup_version") == "v2":
-        return render_coder_initial_v2_prompt(envelope)
+        return render_coder_v2_prompt(envelope)
 
     role = envelope.get("role", "agent")
     

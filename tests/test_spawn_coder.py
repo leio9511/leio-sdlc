@@ -270,11 +270,12 @@ class TestSpawnCoder(unittest.TestCase):
 
         mock_invoke.assert_called()
         prompt_sent = mock_invoke.call_args[0][0]
-        self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, prompt_sent)
-        self.assertIn("# REVIEW REPORT JSON", prompt_sent)
+        self.assertIn("## RECOVERY MISSION", prompt_sent)
+        self.assertIn("## REVIEWER FEEDBACK", prompt_sent)
         self.assertIn('{"status": "NEEDS_FIX", "comments": "Missing stuff"}', prompt_sent)
-        self.assertIn(os.path.abspath("feedback.json"), prompt_sent)
-        self.assertNotIn("# REFERENCE INDEX", prompt_sent)
+        self.assertIn("The reviewer feedback below is the immediate action target.", prompt_sent)
+        self.assertNotIn(os.path.abspath("feedback.json"), prompt_sent)
+        self.assertNotIn("# REVIEW REPORT JSON", prompt_sent)
         mock_setup_key.assert_called_once()
 
     @patch('spawn_coder.subprocess.check_output')
@@ -320,43 +321,73 @@ class TestSpawnCoder(unittest.TestCase):
         self.assertNotIn("# REFERENCE INDEX", prompt_sent)
         mock_setup_key.assert_called_once()
 
+    @patch('spawn_coder.config.load_or_merge_config')
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
-    @patch('os.path.exists')
     @patch('utils_api_key.setup_spawner_api_key')
-    def test_mocked_system_alert_prompt_injection(self, mock_setup_key, mock_exists, mock_invoke, mock_check_output):
-        def custom_exists(path):
-            if ".coder_session" in str(path):
-                return False
-            if "PR" in str(path) or "PRD" in str(path) or "prompts.json" in str(path):
-                return True
-            return real_exists(path)
+    def test_existing_session_revision_and_system_alert_paths_remain_same_session_delta_prompts_even_when_v2_is_selected(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
+        mock_check_output.return_value = "feature/test"
+        mock_invoke.return_value = AgentResult(session_key="existing-session", stdout="")
+        mock_load_config.return_value = {config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: config.CODER_PLAYBOOK_V2}
 
-        mock_exists.side_effect = custom_exists
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pr_file = os.path.join(tmp_dir, "PR_001.md")
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            feedback_file = os.path.join(tmp_dir, "feedback.json")
+            session_file = os.path.join(tmp_dir, ".coder_session")
+            with open(pr_file, "w") as f:
+                f.write("pr content")
+            with open(prd_file, "w") as f:
+                f.write("prd content")
+            with open(feedback_file, "w") as f:
+                f.write('{"status": "NEEDS_FIX", "comments": "delta only"}')
+            with open(session_file, "w") as f:
+                f.write("existing-session")
 
-        def mock_file_open(path, *args, **kwargs):
-            if "PR_001.md" in str(path) or "PRD.md" in str(path):
-                return mock_open(read_data="Mocked Content")(path, *args, **kwargs)
-            if ".coder_session" in str(path):
-                return mock_open()(path, *args, **kwargs)
-            return real_open(path, *args, **kwargs)
+            revision_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--workdir", tmp_dir,
+                "--feedback-file", feedback_file,
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
 
-        test_args = ["spawn_coder.py", "--pr-file", "PR_001.md", "--prd-file", "PRD.md", "--system-alert", "git dirty", "--workdir", "/tmp", "--enable-exec-from-workspace"]
-        with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}):
-            with patch.object(sys, 'argv', test_args):
-                mock_check_output.return_value = "feature/test"
-                mock_invoke.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
-
-                with patch('builtins.open', side_effect=mock_file_open):
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch.object(sys, 'argv', revision_args):
                     spawn_coder.main()
 
-        mock_invoke.assert_called()
-        prompt_sent = mock_invoke.call_args[0][0]
-        self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_sent)
-        self.assertIn("git dirty", prompt_sent)
-        self.assertNotIn("System alert requiring corrective action:", prompt_sent)
-        self.assertIn(spawn_coder.RECOVERY_CONTINUATION_WARNING, prompt_sent)
-        mock_setup_key.assert_called_once()
+            revision_prompt = mock_invoke.call_args[0][0]
+            self.assertIn("# REVIEW REPORT JSON", revision_prompt)
+            self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, revision_prompt)
+            self.assertNotIn("## CODER PLAYBOOK", revision_prompt)
+            self.assertNotIn("# Coder Playbook V2", revision_prompt)
+            self.assertNotIn("## REFERENCE INDEX", revision_prompt)
+
+            mock_invoke.reset_mock()
+
+            alert_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--workdir", tmp_dir,
+                "--system-alert", "git dirty",
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
+
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "false"}, clear=False):
+                with patch.object(sys, 'argv', alert_args):
+                    spawn_coder.main()
+
+            alert_prompt = mock_invoke.call_args[0][0]
+            self.assertIn("# SYSTEM ALERT YOU MUST FIX", alert_prompt)
+            self.assertIn(spawn_coder.SYSTEM_ALERT_CONTINUATION_RULE, alert_prompt)
+            self.assertNotIn("## CODER PLAYBOOK", alert_prompt)
+            self.assertNotIn("# Coder Playbook V2", alert_prompt)
+            self.assertNotIn("## REFERENCE INDEX", alert_prompt)
+
 
 
 if __name__ == '__main__':
