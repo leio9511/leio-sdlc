@@ -31,10 +31,11 @@ class TestAgentDriverTriad(unittest.TestCase):
         else:
             del os.environ["SDLC_TEST_MODE"]
 
+    @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 2})
     @patch('spawn_coder.invoke_agent')
     @patch('subprocess.check_output')
     @patch('utils_api_key.setup_spawner_api_key')
-    def test_spawn_coder_payload_injection(self, mock_setup_key, mock_check_output, mock_agent_call):
+    def test_spawn_coder_payload_injection(self, mock_setup_key, mock_check_output, mock_agent_call, mock_load_config):
         import spawn_coder
         mock_check_output.return_value = "feature-branch\n"
         mock_agent_call.return_value = AgentResult(session_key='subtask-123', stdout='dummy')

@@ -111,10 +111,11 @@ class TestCoderStartupEnvelope(unittest.TestCase):
             self.assertIn("git status is dirty", prompt_text)
             self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt_text)
 
+    @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 2})
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.invoke_agent')
     @patch('utils_api_key.setup_spawner_api_key')
-    def test_spawn_coder_saves_initial_v2_artifacts_with_inline_playbook(self, mock_setup_key, mock_invoke, mock_check_output):
+    def test_initial_v2_prompt_inlines_coder_playbook_and_keeps_pr_contract_and_prd_as_refs(self, mock_setup_key, mock_invoke, mock_check_output, mock_load_config):
         from agent_driver import AgentResult
         mock_check_output.return_value = "feature/test"
         mock_invoke.return_value = AgentResult(session_key="mock-session", stdout="")

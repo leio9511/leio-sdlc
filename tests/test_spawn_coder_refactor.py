@@ -13,12 +13,13 @@ class TestSpawnCoderRefactor(unittest.TestCase):
     def setUp(self):
         self.original_exists = os.path.exists
 
+    @patch('spawn_coder.config.load_or_merge_config', return_value={"coder_playbook_version": 2})
     @patch('spawn_coder.uuid.uuid4')
     @patch('spawn_coder.invoke_agent')
     @patch('spawn_coder.os.chdir')
     @patch('spawn_coder.subprocess.check_output')
     @patch('spawn_coder.os.path.exists')
-    def test_spawn_coder_uses_invoke_agent(self, mock_exists, mock_check_output, mock_chdir, mock_invoke, mock_uuid4):
+    def test_spawn_coder_uses_invoke_agent(self, mock_exists, mock_check_output, mock_chdir, mock_invoke, mock_uuid4, mock_load_config):
         mock_check_output.return_value = "feature-branch\n"
         mock_invoke.return_value = AgentResult(session_key="mocked-session-key", stdout="")
         mock_uuid4.return_value = MagicMock(hex="mockedsession")
