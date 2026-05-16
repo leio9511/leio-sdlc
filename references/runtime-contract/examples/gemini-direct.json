@@ -1,0 +1,11 @@
+{
+  "engine_id": "gemini_direct",
+  "display_name": "Gemini Direct CLI",
+  "registration_mode": "public_builtin",
+  "runtime_mode": "direct_cli",
+  "continuity_mode": "mapped_resume",
+  "resume_requires_same_runtime_state": true,
+  "fallback_policy": "fallback_to_stateless",
+  "capability_surface": "runtime_managed",
+  "orchestration_support_level": "partial"
+}

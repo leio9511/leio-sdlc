@@ -1,0 +1,11 @@
+{
+  "engine_id": "openclaw_native",
+  "display_name": "OpenClaw Native Runtime",
+  "registration_mode": "public_builtin",
+  "runtime_mode": "openclaw_native",
+  "continuity_mode": "authoritative_resume",
+  "resume_requires_same_runtime_state": false,
+  "fallback_policy": "fail_closed",
+  "capability_surface": "runtime_managed",
+  "orchestration_support_level": "native"
+}

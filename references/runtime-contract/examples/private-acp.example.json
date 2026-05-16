@@ -1,0 +1,11 @@
+{
+  "engine_id": "private_acp_example",
+  "display_name": "Private ACP Example",
+  "registration_mode": "local_override_only",
+  "runtime_mode": "acp",
+  "continuity_mode": "authoritative_resume",
+  "resume_requires_same_runtime_state": true,
+  "fallback_policy": "fail_closed",
+  "capability_surface": "client_mediated",
+  "orchestration_support_level": "compatible_with_client_layer"
+}

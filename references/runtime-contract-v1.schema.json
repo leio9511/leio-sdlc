@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/leio-sdlc/runtime-contract-v1.schema.json",
+  "title": "Runtime Contract v1",
+  "description": "Minimal runtime decision contract for registration, orchestration, continuity, and fallback.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "engine_id",
+    "display_name",
+    "registration_mode",
+    "runtime_mode",
+    "continuity_mode",
+    "resume_requires_same_runtime_state",
+    "fallback_policy",
+    "capability_surface",
+    "orchestration_support_level"
+  ],
+  "properties": {
+    "engine_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable logical identifier used for matching, policy, and orchestration logic."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable label only. Not used for logic."
+    },
+    "registration_mode": {
+      "type": "string",
+      "enum": ["public_builtin", "local_override_only"]
+    },
+    "runtime_mode": {
+      "type": "string",
+      "enum": ["openclaw_native", "direct_cli", "acp"]
+    },
+    "continuity_mode": {
+      "type": "string",
+      "enum": ["authoritative_resume", "mapped_resume", "degraded_resume", "stateless_only"]
+    },
+    "resume_requires_same_runtime_state": {
+      "type": "boolean"
+    },
+    "fallback_policy": {
+      "type": "string",
+      "enum": ["fail_closed", "fallback_to_stateless", "fallback_to_legacy_runtime", "disallowed"]
+    },
+    "capability_surface": {
+      "type": "string",
+      "enum": ["runtime_managed", "client_mediated", "mixed", "unknown"]
+    },
+    "orchestration_support_level": {
+      "type": "string",
+      "enum": ["native", "compatible_with_client_layer", "partial", "unsupported", "unknown"]
+    },
+    "launch_surface": {
+      "type": "string",
+      "enum": ["managed_runtime", "subprocess", "protocol_adapter"]
+    },
+    "handle_acquisition_strategy": {
+      "type": "string",
+      "enum": ["protocol_native", "session_id_returned", "local_mapping", "heuristic_discovery", "none"]
+    },
+    "handle_scope": {
+      "type": "string",
+      "enum": ["session", "conversation", "turn_only", "unknown"]
+    },
+    "file_io_surface": {
+      "type": "string",
+      "enum": ["runtime_managed", "client_mediated", "mixed", "unknown"]
+    },
+    "terminal_execution_surface": {
+      "type": "string",
+      "enum": ["runtime_managed", "client_mediated", "unsupported", "unknown"]
+    }
+  }
+}
