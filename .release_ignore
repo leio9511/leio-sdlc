@@ -3,6 +3,8 @@ tests/
 .sdlc_runs/
 docs/
 memory/
+.venv/
+fake-bin/
 preflight.sh
 ARCHITECTURE.md
 README.md

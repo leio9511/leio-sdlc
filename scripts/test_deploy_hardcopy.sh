@@ -45,8 +45,8 @@ assert_files_equal() {
 assert_tree_equal() {
     local left="$1"
     local right="$2"
-    if ! diff -ru "$left" "$right" >/dev/null; then
-        diff -ru "$left" "$right"
+    if ! diff -ru --exclude='.venv' --exclude='__pycache__' "$left" "$right" >/dev/null; then
+        diff -ru --exclude='.venv' --exclude='__pycache__' "$left" "$right"
         fail "Expected directory trees to match: $left vs $right"
     fi
 }
@@ -109,6 +109,29 @@ create_mock_repo() {
     cp "$REPO_ROOT/.gitignore" "$repo_dir/.gitignore"
     cp "$REPO_ROOT/.release_ignore" "$repo_dir/.release_ignore"
 
+    cat > "$repo_dir/requirements.txt" <<'EOF'
+EOF
+    cat > "$repo_dir/scripts/yaml.py" <<'EOF'
+__version__ = "test-stub"
+EOF
+    cat > "$repo_dir/scripts/config.py" <<'EOF'
+VALUE = "test-config"
+EOF
+    cat > "$repo_dir/scripts/utils_json.py" <<'EOF'
+def loads(value):
+    return value
+EOF
+    cat > "$repo_dir/scripts/runtime_launch_guard.py" <<'EOF'
+def validate_runtime_interpreter(*args, **kwargs):
+    return "test-runtime-python"
+EOF
+    cat > "$repo_dir/scripts/runtime_smoke.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+print("runtime smoke ok")
+sys.exit(0)
+EOF
+    chmod +x "$repo_dir/scripts/runtime_smoke.py"
     cat > "$repo_dir/version.txt" <<'EOF'
 v1
 EOF

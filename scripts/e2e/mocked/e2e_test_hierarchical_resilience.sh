@@ -171,7 +171,30 @@ function test_deploy_hot_preservation() {
     # Mock preflight and release
     mkdir -p scripts
     echo "exit 0" > scripts/test_sdlc_cujs.sh
-    echo "mkdir -p .dist && echo 'new_code' > .dist/main.py" > scripts/build_release.sh
+    cat > scripts/build_release.sh <<'INNER_EOF'
+mkdir -p .dist/scripts
+: > .dist/requirements.txt
+echo 'new_code' > .dist/main.py
+cat > .dist/scripts/yaml.py <<'PY'
+__version__ = "test-stub"
+PY
+cat > .dist/scripts/config.py <<'PY'
+VALUE = "test-config"
+PY
+cat > .dist/scripts/utils_json.py <<'PY'
+def loads(value):
+    return value
+PY
+cat > .dist/scripts/runtime_launch_guard.py <<'PY'
+def validate_runtime_interpreter(*args, **kwargs):
+    return "test-runtime-python"
+PY
+cat > .dist/scripts/runtime_smoke.py <<'PY'
+#!/usr/bin/env python3
+print("runtime smoke ok")
+PY
+chmod +x .dist/scripts/runtime_smoke.py
+INNER_EOF
     chmod +x scripts/*.sh
     
     bash deploy.sh --no-restart > deploy.log 2>&1

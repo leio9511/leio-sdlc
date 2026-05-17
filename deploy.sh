@@ -107,6 +107,35 @@ perform_hard_copy_deployment() {
         cp -a TEMPLATES/openclaw_execution_agent/* "$TMP_DIR/TEMPLATES/openclaw_execution_agent/"
     fi
 
+    # Provision and validate the deployed runtime before production promotion.
+    echo "🐍 Provisioning runtime Python in staging release..."
+    local RUNTIME_VENV="$TMP_DIR/.venv"
+    local RUNTIME_PYTHON="$RUNTIME_VENV/bin/python"
+    local STAGED_REQUIREMENTS="$TMP_DIR/requirements.txt"
+    local STAGED_RUNTIME_SMOKE="$TMP_DIR/scripts/runtime_smoke.py"
+
+    rm -rf "$RUNTIME_VENV"
+
+    if [ ! -f "$STAGED_REQUIREMENTS" ]; then
+        echo "❌ Runtime provisioning failed: staged requirements.txt is missing."
+        exit 1
+    fi
+
+    if [ ! -f "$STAGED_RUNTIME_SMOKE" ]; then
+        echo "❌ Runtime provisioning failed: staged scripts/runtime_smoke.py is missing."
+        exit 1
+    fi
+
+    python3 -m venv "$RUNTIME_VENV"
+    "$RUNTIME_PYTHON" -m pip install --upgrade -r "$STAGED_REQUIREMENTS"
+
+    echo "🐍 Running minimal import smoke..."
+    "$RUNTIME_PYTHON" -c "import sys; from pathlib import Path; scripts_dir = Path('$TMP_DIR') / 'scripts'; sys.path.insert(0, str(scripts_dir)); import yaml; import config; import utils_json; import runtime_launch_guard"
+
+    echo "🐍 Running official runtime smoke..."
+    "$RUNTIME_PYTHON" "$STAGED_RUNTIME_SMOKE" --skill-root "$TMP_DIR"
+    echo "✅ Runtime provisioning and smoke validation passed."
+
     # Hot Preservation (PRD-1088)
     local HOT_CONFIG=""
     if [ -f "$PROD_DIR/config/sdlc_config.json" ]; then

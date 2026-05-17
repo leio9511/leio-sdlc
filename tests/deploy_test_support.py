@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -35,6 +36,69 @@ def canonical_skill_dir(mock_home: str | os.PathLike[str], slug: str) -> str:
 
 def canonical_releases_dir(mock_home: str | os.PathLike[str], slug: str) -> str:
     return os.path.join(canonical_openclaw_home(mock_home), ".releases", slug)
+
+
+def install_fake_python_toolchain(
+    repo_root: str | os.PathLike[str], env: dict[str, str], *, fail_step: str | None = None
+) -> Path:
+    """Install a network-free fake python3/venv/pip toolchain for deploy tests."""
+    fake_bin = Path(repo_root) / "fake-bin"
+    fake_bin.mkdir(exist_ok=True)
+    log_path = Path(repo_root) / "deploy-python.log"
+    real_python = os.environ.get("PYTHON", sys.executable)
+
+    python_sh = fake_bin / "python3"
+    python_sh.write_text(
+        f"""#!/bin/sh
+set -eu
+LOG_FILE=\"${{LEIO_DEPLOY_TEST_LOG:-{log_path}}}\"
+REAL_PYTHON={real_python!r}
+if [ \"${{1:-}}\" = \"-m\" ] && [ \"${{2:-}}\" = \"venv\" ]; then
+  VENV_DIR=\"${{3:-}}\"
+  echo \"venv:$VENV_DIR\" >> \"$LOG_FILE\"
+  if [ \"${{LEIO_DEPLOY_FAKE_FAIL_STEP:-}}\" = \"venv\" ]; then exit 91; fi
+  mkdir -p \"$VENV_DIR/bin\"
+  cat > \"$VENV_DIR/bin/python\" <<PY
+#!/bin/sh
+set -eu
+LOG_FILE=\"\\${{LEIO_DEPLOY_TEST_LOG:-{log_path}}}\"
+if [ \"\\${{1:-}}\" = \"-m\" ] && [ \"\\${{2:-}}\" = \"pip\" ]; then
+  REQUIREMENTS_ARG=\"\"
+  for arg in \"\\$@\"; do
+    REQUIREMENTS_ARG=\"\\$arg\"
+  done
+  echo \"pip:\\$REQUIREMENTS_ARG\" >> \"\\$LOG_FILE\"
+  if [ \"\\${{LEIO_DEPLOY_FAKE_FAIL_STEP:-}}\" = \"pip\" ]; then exit 92; fi
+  exit 0
+fi
+if [ \"\\${{1:-}}\" = \"-c\" ]; then
+  echo \"import-smoke:\\$0\" >> \"\\$LOG_FILE\"
+  if [ \"\\${{LEIO_DEPLOY_FAKE_FAIL_STEP:-}}\" = \"import\" ]; then exit 93; fi
+  exit 0
+fi
+case \"\\${{1:-}}\" in
+  */scripts/runtime_smoke.py)
+    echo \"runtime-smoke:\\$0:\\$*\" >> \"\\$LOG_FILE\"
+    if [ \"\\${{LEIO_DEPLOY_FAKE_FAIL_STEP:-}}\" = \"runtime_smoke\" ]; then exit 94; fi
+    exit 0
+    ;;
+esac
+exec \"$REAL_PYTHON\" \"\\$@\"
+PY
+  chmod +x \"$VENV_DIR/bin/python\"
+  exit 0
+fi
+exec \"$REAL_PYTHON\" \"$@\"
+""",
+        encoding="utf-8",
+    )
+    python_sh.chmod(0o755)
+
+    env["PATH"] = f"{fake_bin}:{env['PATH']}"
+    env["LEIO_DEPLOY_TEST_LOG"] = str(log_path)
+    if fail_step:
+        env["LEIO_DEPLOY_FAKE_FAIL_STEP"] = fail_step
+    return log_path
 
 
 @contextmanager
