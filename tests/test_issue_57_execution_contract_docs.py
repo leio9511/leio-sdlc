@@ -30,6 +30,21 @@ REQUIRED_CORE_GOAL = (
     "Define a controlled, repeatable Python execution contract for local development, testing, "
     "deployed skill runtime, and GitHub CI without depending on unmanaged system Python state."
 )
+REQUIRED_CONTRACT_SURFACES = (
+    "formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, "
+    "and execution-contract-related smoke/tests"
+)
+FOLLOWUP_ISSUE = "Issue #59"
+FORBIDDEN_DISTRIBUTION_SCOPE = (
+    "ClawHub installation, public packaging/distribution contract, and cross-skill global runtime unification"
+)
+NONCRITICAL_BUCKETS = [
+    "historical docs",
+    "archived PRDs",
+    "generated `.dist`",
+    "templates/reference materials",
+    "non-default mocked/e2e examples",
+]
 
 
 def _read(path):
@@ -160,6 +175,57 @@ def test_official_issue_57_doc_states_unique_dependency_and_scope():
     assert "ClawHub installation" in doc
     assert "public packaging/distribution contract" in doc
     assert "cross-skill global runtime unification" in doc
+
+
+def test_noncritical_python3_residuals_are_documented_as_issue_59_followup():
+    doc = _read(ISSUE_DOC)
+    readme = _read(README)
+    combined = f"{doc}\n{readme}"
+
+    assert FOLLOWUP_ISSUE in doc
+    assert FOLLOWUP_ISSUE in readme
+    for bucket in NONCRITICAL_BUCKETS:
+        assert bucket in combined
+    assert "nonblocking follow-up debt" in combined
+    assert "whole-repository `python3` text purge" in combined
+
+
+def test_docs_preserve_distribution_scope_boundary():
+    doc = _read(ISSUE_DOC)
+    readme = _read(README)
+    combined = f"{doc}\n{readme}"
+
+    assert FORBIDDEN_DISTRIBUTION_SCOPE in doc
+    assert "does not define or broaden into" in doc
+    assert "not the final install or distribution solution" in combined
+    assert "ClawHub installation" in combined
+    assert "public packaging/distribution contract" in combined
+    assert "cross-skill global runtime unification" in combined
+
+
+def test_debt_boundary_does_not_exempt_contract_critical_surfaces():
+    doc = _read(ISSUE_DOC)
+    readme = _read(README)
+    combined = f"{doc}\n{readme}"
+
+    assert REQUIRED_CONTRACT_SURFACES in doc
+    assert REQUIRED_CONTRACT_SURFACES in readme
+    assert "Issue #59 does not exempt these surfaces" in doc
+    assert "not an exemption for contract-critical surfaces" in readme
+    assert "must not keep ambient bare `python3` execution as their official contract" in doc
+
+
+def test_current_docs_keep_issue_57_scope_limited_to_local_ci_runtime_contract():
+    doc = _read(ISSUE_DOC)
+    readme = _read(README)
+    combined = f"{doc}\n{readme}"
+
+    assert REQUIRED_SCOPE in doc
+    assert REQUIRED_SCOPE in readme
+    assert REQUIRED_CORE_GOAL in doc
+    assert REQUIRED_CORE_GOAL in readme
+    assert "ACP feature work" not in combined
+    assert "migrate all skills" not in combined.lower()
 
 
 def test_readme_documents_controlled_dev_execution_without_manual_activation_contract():

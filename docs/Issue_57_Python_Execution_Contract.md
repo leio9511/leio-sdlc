@@ -10,7 +10,19 @@ Define a controlled, repeatable Python execution contract for local development,
 
 This contract applies to leio-sdlc local development, testing, deployed runtime execution, and GitHub CI only.
 
-It explicitly does not define or broaden into ClawHub installation, public packaging/distribution contract, and cross-skill global runtime unification.
+It explicitly does not define or broaden into ClawHub installation, public packaging/distribution contract, and cross-skill global runtime unification. Issue #57 is not the final install or distribution solution for leio-sdlc.
+
+## Contract-critical Python surfaces
+
+Issue #57 controls formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, and execution-contract-related smoke/tests.
+
+Those contract-critical surfaces must not keep ambient bare `python3` execution as their official contract. They must use the controlled development/test `.venv`, the deployed runtime `.venv`, or an explicitly documented wrapper that resolves to the appropriate interpreter. Issue #59 does not exempt these surfaces.
+
+## Noncritical `python3` residual debt
+
+Residual `python3` references in historical docs, archived PRDs, generated `.dist`, templates/reference materials, and non-default mocked/e2e examples are nonblocking follow-up debt for Issue #59.
+
+This bucket is intentionally narrow. It exists to avoid turning Issue #57 into a brittle whole-repository text purge while keeping the active contract-critical surfaces controlled. Reviewers should classify residual references by surface: if a reference is part of formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, or execution-contract-related smoke/tests, it belongs to Issue #57; if it is only historical docs, archived PRDs, generated `.dist`, templates/reference materials, or non-default mocked/e2e examples, it is tracked as Issue #59 cleanup debt.
 
 ## Dependency source
 

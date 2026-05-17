@@ -7,6 +7,20 @@ RUN_SDLC_TESTS = REPO_ROOT / "scripts" / "run_sdlc_tests.sh"
 ISSUE_57_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
 PRD_ISSUE_57 = REPO_ROOT / "docs" / "PRDs" / "PRD_Issue_57_Controlled_Python_Execution_and_Runtime_Contract.md"
 
+NONCRITICAL_PYTHON3_BUCKETS = {
+    "historical docs": [REPO_ROOT / "docs" / "PRDs" / "PRD_023_Triad_Phase2.md"],
+    "archived PRDs": [REPO_ROOT / "docs" / "PRs" / ".archive" / "PR_037_Micro_Slicing_Act.md"],
+    "templates/reference materials": [REPO_ROOT / "TEMPLATES" / "organization_governance.md"],
+    "non-default mocked/e2e examples": [REPO_ROOT / "scripts" / "e2e" / "mocked" / "e2e_test_preflight_guardrails.sh"],
+}
+CONTRACT_CRITICAL_ACTIVE_PATHS = [
+    DEV_PYTHON,
+    PREFLIGHT,
+    RUN_SDLC_TESTS,
+    REPO_ROOT / "deploy.sh",
+    REPO_ROOT / ".github" / "workflows" / "preflight.yml",
+]
+
 REQUIRED_CONTRACT_SURFACES = (
     "formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, "
     "and execution-contract-related smoke/tests"
@@ -70,6 +84,24 @@ def test_contract_critical_python_surfaces_are_documented_and_guarded():
     assert "contract-critical surfaces" in docs_and_guards
     assert "whole-repo" in docs_and_guards
     assert "historical" in docs_and_guards
+
+
+def test_noncritical_python3_scan_is_bucketed_not_global_text_purge():
+    issue_doc = _read(ISSUE_57_DOC)
+
+    assert "Issue #59" in issue_doc
+    assert "whole-repository text purge" in issue_doc or "whole-repository `python3` text purge" in issue_doc
+
+    for bucket, paths in NONCRITICAL_PYTHON3_BUCKETS.items():
+        assert bucket in issue_doc
+        assert any(path.exists() and "python3" in _read(path) for path in paths), bucket
+
+    for path in CONTRACT_CRITICAL_ACTIVE_PATHS:
+        if not path.exists():
+            continue
+        text = _read(path)
+        assert "python3 -m pytest" not in text, str(path)
+        assert "source .venv/bin/activate" not in text, str(path)
 
 
 def test_run_sdlc_tests_help_guides_formal_checks_to_controlled_entries():
