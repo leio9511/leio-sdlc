@@ -92,10 +92,12 @@ read the architecture references before answering.
 If you are unsure about the available parameters, inspect the installed entrypoint first:
 
 ```bash
-python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py --help
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
+  --help
 ```
 
-The pipeline is launched through `scripts/orchestrator.py`.
+The pipeline is launched through `scripts/orchestrator.py` using the controlled deployed runtime interpreter `${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python` or an equivalent documented runtime wrapper. This binds orchestrator commands to the deployed `leio-sdlc` skill root `.venv` instead of ambient system Python.
 
 Note: the shell command examples in this skill describe the orchestrator command shape only.
 Actual launch semantics must follow the platform-specific lifecycle rules in `## Execution rule`.
@@ -111,7 +113,8 @@ Actual launch semantics must follow the platform-specific lifecycle rules in `##
 ### Normal start
 
 ```bash
-python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py \
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
   --prd-file <path> \
   --workdir <path> \
   --force-replan true
@@ -120,7 +123,8 @@ python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestr
 ### Resume
 
 ```bash
-python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py \
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
   --prd-file <path> \
   --workdir <path> \
   --resume \
@@ -130,7 +134,8 @@ python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestr
 ### Withdraw
 
 ```bash
-python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/orchestrator.py \
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
   --prd-file <path> \
   --workdir <path> \
   --withdraw

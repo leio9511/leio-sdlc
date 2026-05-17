@@ -92,6 +92,53 @@ The framework uses a centralized configuration file located at `config/sdlc_conf
 ### Testing & Sandboxing
 The test suite utilizes a strict `test_tmp` isolation pattern. Tests explicitly pass a temporary path to `--global-dir` (e.g., `/tmp/mock_sdlc_global_$$`), ensuring mock artifacts never pollute production run records.
 
+### Python Execution Contract (Issue #57)
+
+The current official reference is `docs/Issue_57_Python_Execution_Contract.md`.
+
+Define a controlled, repeatable Python execution contract for local development, testing, deployed skill runtime, and GitHub CI without depending on unmanaged system Python state.
+
+Scope is limited to leio-sdlc local development, testing, deployed runtime execution, and GitHub CI only. It does not define ClawHub installation, public packaging/distribution contract, or cross-skill global runtime unification.
+
+#### Dependency source
+
+The single Python dependency source is requirements.txt at the repository root, currently serving runtime, development, and test dependencies together.
+
+Do not create or rely on parallel dependency entrypoints for runtime, local tests, or CI.
+
+#### Local development and testing
+
+Local development and testing use the repository-root .venv through explicit project entrypoints, not through ambient shell state or a manual activation contract.
+
+Use:
+
+```bash
+bash scripts/dev_python.sh -m pytest
+bash preflight.sh --report-all
+```
+
+`scripts/dev_python.sh` creates/uses the repository-root `.venv`, installs from repository-root `requirements.txt`, and runs the requested Python module or script inside that controlled environment. `preflight.sh` uses the same controlled model for the standard project gate.
+
+#### Deployed runtime
+
+Deployed `leio-sdlc` commands use the deployed leio-sdlc skill root .venv, rebuilt per release in staging before atomic swap.
+
+The deployed skill runtime is separate from the repository development/test `.venv`. Runtime launch examples must bind to the deployed skill interpreter, for example:
+
+```bash
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
+  --prd-file <Path_to_PRD.md> \
+  --workdir . \
+  --channel <your_channel>
+```
+
+#### Official smoke path
+
+`scripts/runtime_smoke.py` is the official minimal no-side-effect smoke path shared by deploy/runtime and CI.
+
+Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation.
+
 ### Installation & Usage
 
 #### 1. Installation
@@ -107,21 +154,32 @@ To use the SDLC engine, you **MUST** follow this strict linear process. You cann
 **Step 1: PRD Authoring (`pm-skill`)**
 Use `pm-skill` to safely scaffold and write the PRD template.
 ```bash
-python3 ~/.openclaw/skills/pm-skill/scripts/init_prd.py --project <YourProject> --title "<Feature_Title>"
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/pm-skill/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/pm-skill/scripts/init_prd.py" \
+  --project <YourProject> \
+  --title "<Feature_Title>"
 ```
 *Fill in the generated template with strict BDD acceptance criteria.*
 
 **Step 2: Technical Audit (`Auditor`)**
 Before any code is generated, the PRD must pass the architectural and structural audit.
 ```bash
-python3 ~/.openclaw/skills/leio-sdlc/scripts/spawn_auditor.py --prd-file <Path_to_PRD.md> --workdir . --channel <your_channel>
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/spawn_auditor.py" \
+  --prd-file <Path_to_PRD.md> \
+  --workdir . \
+  --channel <your_channel>
 ```
 *(You must resolve any `ACTION_REQUIRED` rejections until the Auditor returns `APPROVED`.)*
 
 **Step 3: Engine Ignition (`Orchestrator`)**
 Once approved by the Auditor, start the multi-agent pipeline:
 ```bash
-python3 ~/.openclaw/skills/leio-sdlc/scripts/orchestrator.py --prd-file <Path_to_PRD.md> --workdir . --channel <your_channel>
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
+  --prd-file <Path_to_PRD.md> \
+  --workdir . \
+  --channel <your_channel>
 ```
 *(Ensure your `GLOBAL_RUN_DIR` is configured in `sdlc_config.json` or pass `--global-dir` explicitly.)*
 
