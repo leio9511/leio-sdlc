@@ -10,6 +10,7 @@ PRD_ISSUE_57 = REPO_ROOT / "docs" / "PRDs" / "PRD_Issue_57_Controlled_Python_Exe
 NONCRITICAL_PYTHON3_BUCKETS = {
     "historical docs": [REPO_ROOT / "docs" / "PRDs" / "PRD_023_Triad_Phase2.md"],
     "archived PRDs": [REPO_ROOT / "docs" / "PRs" / ".archive" / "PR_037_Micro_Slicing_Act.md"],
+    "generated `.dist`": [REPO_ROOT / ".dist" / "TEMPLATES" / "organization_governance.md"],
     "templates/reference materials": [REPO_ROOT / "TEMPLATES" / "organization_governance.md"],
     "non-default mocked/e2e examples": [REPO_ROOT / "scripts" / "e2e" / "mocked" / "e2e_test_preflight_guardrails.sh"],
 }
