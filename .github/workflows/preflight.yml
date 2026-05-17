@@ -32,4 +32,9 @@ jobs:
       - name: Run preflight
         id: run-preflight
         run: |
-          PATH="${PWD}/.venv/bin:${PATH}" bash preflight.sh --report-all
+          bash preflight.sh --report-all
+
+      - name: Run runtime smoke
+        id: run-runtime-smoke
+        run: |
+          bash scripts/dev_python.sh scripts/runtime_smoke.py --expected-runtime-python "${PWD}/.venv/bin/python"

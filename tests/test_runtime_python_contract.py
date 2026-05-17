@@ -5,6 +5,7 @@ import venv
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
 SMOKE_SCRIPT = REPO_ROOT / "scripts" / "runtime_smoke.py"
 SMOKE_POLICY = "Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation."
 
@@ -68,6 +69,30 @@ def _copy_minimal_smoke_skill(source_root, target_root):
             (source_root / "scripts" / filename).read_text(encoding="utf-8"),
             encoding="utf-8",
         )
+
+
+def _workflow_text():
+    return WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def _ci_runtime_smoke_command():
+    workflow_text = _workflow_text()
+    for block in workflow_text.split("\n\n"):
+        if "id: run-runtime-smoke" in block:
+            return block
+    raise AssertionError("Expected preflight workflow to define run-runtime-smoke step.")
+
+
+def test_ci_smoke_command_matches_official_runtime_smoke_entrypoint():
+    command = _ci_runtime_smoke_command()
+
+    assert "scripts/runtime_smoke.py" in command
+    assert SMOKE_SCRIPT.name in command
+    assert "scripts/dev_python.sh" in command or ".venv/bin/python" in command
+    assert "--expected-runtime-python" in command
+    assert "ci_runtime_smoke" not in command
+    assert "ci-smoke" not in command
+    assert "python3 scripts/runtime_smoke.py" not in command
 
 
 def test_runtime_smoke_requires_expected_runtime_venv_interpreter(tmp_path):

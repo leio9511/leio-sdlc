@@ -14,8 +14,9 @@ DEV_WRAPPER_PATH = REPO_ROOT / "scripts" / "dev_python.sh"
 REQUIREMENTS_PATH = REPO_ROOT / "requirements.txt"
 REQUIRED_WORKFLOW_NAME = "Preflight"
 DEFAULT_PREFLIGHT_COMMAND = "bash preflight.sh"
-REPORT_ALL_PREFLIGHT_COMMAND = "PATH=\"${PWD}/.venv/bin:${PATH}\" bash preflight.sh --report-all"
-LEGACY_REPORT_ALL_PREFLIGHT_COMMAND = "bash preflight.sh --report-all"
+REPORT_ALL_PREFLIGHT_COMMAND = "bash preflight.sh --report-all"
+LEGACY_REPORT_ALL_PREFLIGHT_COMMAND = "PATH=\"${PWD}/.venv/bin:${PATH}\" bash preflight.sh --report-all"
+RUNTIME_SMOKE_SCRIPT = "scripts/runtime_smoke.py"
 REQUIRED_TRIGGER_KEYS = {"push", "pull_request"}
 REQUIRED_STEP_IDS = {
     "checkout",
@@ -23,7 +24,15 @@ REQUIRED_STEP_IDS = {
     "node-runtime-setup",
     "minimal-bootstrap",
     "run-preflight",
+    "run-runtime-smoke",
 }
+CONTROLLED_INTERPRETER_MARKERS = ("scripts/dev_python.sh", ".venv/bin/python")
+PREFLIGHT_CONTRACT_CRITICAL_DESCRIPTIONS = (
+    "ignore-manifest parsing",
+    "pytest execution",
+    "script-level Python tests",
+    "syntax checks",
+)
 
 
 DEPENDENCY_LIST_MARKERS = (
@@ -93,6 +102,37 @@ def _wrapper_text():
     return DEV_WRAPPER_PATH.read_text(encoding="utf-8")
 
 
+def _preflight_text():
+    return (REPO_ROOT / "preflight.sh").read_text(encoding="utf-8")
+
+
+def _assert_required_runtime_smoke_command(run_command):
+    assert RUNTIME_SMOKE_SCRIPT in run_command
+    assert "--expected-runtime-python" in run_command
+    assert any(marker in run_command for marker in CONTROLLED_INTERPRETER_MARKERS)
+    assert "python3 scripts/runtime_smoke.py" not in run_command
+
+
+def _assert_contract_critical_preflight_paths_use_controlled_interpreter(preflight_text):
+    assert "DEV_PYTHON=\"$PROJECT_DIR/scripts/dev_python.sh\"" in preflight_text
+    assert 'PYTHON_CMD=("$DEV_PYTHON")' in preflight_text
+    assert '"${PYTHON_CMD[@]}" - "$IGNORE_MANIFEST"' in preflight_text
+    assert '"${PYTHON_CMD[@]}" -m pytest tests/test_template_compliance.py' in preflight_text
+    assert '"${PYTHON_CMD[@]}" -m pytest tests/' in preflight_text
+    assert '"${PYTHON_CMD[@]}" "$f"' in preflight_text
+    assert '"${PYTHON_CMD[@]}" -m py_compile scripts/agent_driver.py' in preflight_text
+
+    forbidden_contract_critical_invocations = (
+        "python3 - \"$IGNORE_MANIFEST\"",
+        "run_test \"pytest tests/test_template_compliance.py\"",
+        "run_test_argv \"Pytest functional & unittest suite\" pytest tests/",
+        "run_test \"python3 $f\"",
+        "python3 -m py_compile scripts/agent_driver.py",
+    )
+    for invocation in forbidden_contract_critical_invocations:
+        assert invocation not in preflight_text
+
+
 def test_preflight_workflow_exists_at_required_path():
     assert WORKFLOW_PATH.is_file(), (
         "Expected repository workflow at .github/workflows/preflight.yml."
@@ -116,6 +156,36 @@ def test_preflight_workflow_declares_required_triggers_and_step_inventory():
 def test_preflight_workflow_uses_report_all_gate_command():
     run_preflight_step = _get_steps_by_id()["run-preflight"]
     assert run_preflight_step.get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
+
+
+def test_github_preflight_runs_standard_preflight_after_controlled_bootstrap():
+    steps_by_id = _get_steps_by_id()
+    bootstrap_run = steps_by_id["minimal-bootstrap"].get("run", "")
+    preflight_run = steps_by_id["run-preflight"].get("run", "").strip()
+
+    assert "scripts/dev_python.sh" in bootstrap_run
+    assert preflight_run == REPORT_ALL_PREFLIGHT_COMMAND
+    assert LEGACY_REPORT_ALL_PREFLIGHT_COMMAND != preflight_run
+
+
+def test_github_preflight_runs_official_runtime_smoke_with_controlled_interpreter():
+    runtime_smoke_step = _get_steps_by_id()["run-runtime-smoke"]
+    _assert_required_runtime_smoke_command(runtime_smoke_step.get("run", ""))
+
+
+def test_preflight_contract_critical_python_paths_use_controlled_interpreter():
+    preflight_text = _preflight_text()
+    for description in PREFLIGHT_CONTRACT_CRITICAL_DESCRIPTIONS:
+        assert description
+    _assert_contract_critical_preflight_paths_use_controlled_interpreter(preflight_text)
+
+
+def test_runtime_smoke_step_preserves_truthful_failure_semantics():
+    preflight_job = _get_preflight_job()
+    runtime_smoke_step = _get_steps_by_id()["run-runtime-smoke"]
+    _assert_no_continue_on_error(preflight_job)
+    assert "|| true" not in runtime_smoke_step.get("run", "")
+    _assert_required_runtime_smoke_command(runtime_smoke_step.get("run", ""))
 
 
 def test_preflight_workflow_preserves_truthful_failure_semantics_in_report_all_mode():
@@ -149,6 +219,7 @@ def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(
     assert REQUIRED_TRIGGER_KEYS.issubset(workflow["on"].keys())
     assert REQUIRED_STEP_IDS.issubset(steps_by_id.keys())
     assert steps_by_id["run-preflight"]["run"].strip() == REPORT_ALL_PREFLIGHT_COMMAND
+    _assert_required_runtime_smoke_command(steps_by_id["run-runtime-smoke"].get("run", ""))
 
 
 def test_github_preflight_bootstraps_python_from_requirements_via_dev_wrapper():
@@ -192,8 +263,8 @@ def test_ci_contract_does_not_require_manual_venv_activation():
 
     assert ".venv/bin/python" in combined_contract_text
     assert "scripts/dev_python.sh" in workflow_text
-    assert "${PWD}/.venv/bin:${PATH}" in _get_steps_by_id()["run-preflight"].get("run", "")
     assert LEGACY_REPORT_ALL_PREFLIGHT_COMMAND != _get_steps_by_id()["run-preflight"].get("run", "").strip()
+    assert _get_steps_by_id()["run-preflight"].get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
 
 
 def test_github_preflight_bootstrap_has_truthful_failure_semantics():

@@ -5,6 +5,11 @@
 # Rule: Token-Optimized CI (Silent on Success, Verbose on Failure)
 
 PROJECT_DIR=$(cd "$(dirname "$0")" && pwd)
+DEV_PYTHON="$PROJECT_DIR/scripts/dev_python.sh"
+PYTHON_CMD=("$DEV_PYTHON")
+if [[ ! -x "$DEV_PYTHON" && "${SDLC_TEST_MODE:-}" == "true" ]]; then
+    PYTHON_CMD=("python3")
+fi
 TMP_TEST_LOG=$(mktemp)
 TMP_BASH_IGNORE=$(mktemp)
 TMP_PYTEST_IGNORE=$(mktemp)
@@ -60,7 +65,7 @@ load_ignore_manifest() {
         fail_ignore_manifest
     fi
 
-    if ! python3 - "$IGNORE_MANIFEST" "$TMP_BASH_IGNORE" "$TMP_PYTEST_IGNORE" <<'PY'
+    if ! "${PYTHON_CMD[@]}" - "$IGNORE_MANIFEST" "$TMP_BASH_IGNORE" "$TMP_PYTEST_IGNORE" <<'PY'
 import json
 import sys
 
@@ -229,7 +234,7 @@ rm -rf tests/planner_sandbox_* tests/manager_sandbox_* 2>/dev/null || true
 shopt -s nullglob
 
 # 0. Structural Gates
-if ! run_test "pytest tests/test_template_compliance.py" "Template Compliance Gate"; then
+if ! run_test_argv "Template Compliance Gate" "${PYTHON_CMD[@]}" -m pytest tests/test_template_compliance.py; then
     TEMPLATE_COMPLIANCE_FAILED=1
 fi
 
@@ -246,12 +251,12 @@ if [ -d "tests" ]; then
     if [[ "$MODE" == "$REPORT_ALL_MODE_NAME" && $TEMPLATE_COMPLIANCE_FAILED -eq 1 ]]; then
         mark_test_blocked "Pytest functional & unittest suite" "Template Compliance Gate failed earlier; broader pytest suite would only duplicate non-actionable structural failures"
     else
-        run_test_argv "Pytest functional & unittest suite" pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"
+        run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"
     fi
 fi
 
 for f in scripts/test_*.py; do
-    run_test "python3 $f" "Python Test: $f"
+    run_test_argv "Python Test: $f" "${PYTHON_CMD[@]}" "$f"
 done
 
 # 3. Node.js Tests Discovery
@@ -280,7 +285,7 @@ fi
 
 # Offline Syntax Checks
 if [ -f "scripts/agent_driver.py" ]; then
-    run_test "python3 -m py_compile scripts/agent_driver.py" "Syntax Check: agent_driver.py"
+    run_test_argv "Syntax Check: agent_driver.py" "${PYTHON_CMD[@]}" -m py_compile scripts/agent_driver.py
 fi
 
 finalize_preflight
