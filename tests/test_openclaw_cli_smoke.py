@@ -75,11 +75,16 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         if not self.openclaw_path:
             pytest.skip("openclaw binary not found in PATH")
 
-        # Confirm `agents show` fails as expected
-        # Current CLI says: error: too many arguments for 'agents'. Expected 0 arguments but got 2.
+        # Confirm `agents show` fails as expected. Different OpenClaw CLI versions
+        # phrase unsupported subcommands either as an explicit error or as a
+        # command-shape rejection with a help hint.
         result = run_openclaw_cli_or_skip([self.openclaw_path, "agents", "show", "main"])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("error", (result.stdout + result.stderr).lower())
+        output = (result.stdout + result.stderr).lower()
+        self.assertTrue(
+            "error" in output or "too many arguments" in output,
+            f"Expected unsupported command diagnostic, got: {output}",
+        )
 
     def test_command_surface_inventory(self):
         """Test Case 4: Command Surface Inventory"""
