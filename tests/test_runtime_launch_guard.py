@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 
 import pytest
@@ -11,6 +12,7 @@ from runtime_launch_guard import (
     is_authorized_runtime_launch,
     resolve_allowed_runtime_roots,
     resolve_expected_runtime_python,
+    runtime_python_for_skill_root,
     validate_runtime_interpreter,
 )
 
@@ -31,6 +33,16 @@ def test_expected_runtime_python_defaults_to_skill_root_venv_bin_python(tmp_path
     assert resolved == _canonicalize(skill_root / ".venv" / "bin" / "python")
     assert "/home/openclaw/projects/leio-sdlc" not in resolved
     assert "/.openclaw/skills/leio-sdlc" not in resolved
+
+
+def test_runtime_python_for_skill_root_canonicalizes_controlled_runtime_interpreter(tmp_path):
+    skill_root = tmp_path / "portable-skill-root"
+    relative_skill_root = os.path.relpath(skill_root, start=Path.cwd())
+
+    resolved = runtime_python_for_skill_root(relative_skill_root)
+
+    assert resolved == _canonicalize(skill_root / ".venv" / "bin" / "python")
+    assert resolved == resolve_expected_runtime_python(skill_root=relative_skill_root, env={})
 
 
 def test_runtime_interpreter_validation_accepts_canonical_matching_interpreter(tmp_path, monkeypatch):

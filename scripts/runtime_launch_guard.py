@@ -37,6 +37,11 @@ def resolve_runtime_skill_root(skill_root=None, script_path=None, env=None):
     return _canonicalize_path(os.path.dirname(scripts_dir))
 
 
+def runtime_python_for_skill_root(skill_root):
+    """Return the controlled runtime interpreter path for a deployed skill root."""
+    return _canonicalize_path(os.path.join(skill_root, ".venv", "bin", "python"))
+
+
 def resolve_expected_runtime_python(
     skill_root=None,
     expected_python=None,
@@ -56,7 +61,7 @@ def resolve_expected_runtime_python(
         script_path=script_path,
         env=env,
     )
-    return _canonicalize_path(os.path.join(resolved_skill_root, ".venv", "bin", "python"))
+    return runtime_python_for_skill_root(resolved_skill_root)
 
 
 def validate_runtime_interpreter(
