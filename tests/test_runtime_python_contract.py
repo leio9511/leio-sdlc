@@ -26,9 +26,9 @@ def _make_runtime_venv(skill_root):
     return python
 
 
-def _run_smoke(python, *args, cwd=None):
+def _run_smoke(python, *args, cwd=None, smoke_script=SMOKE_SCRIPT):
     return subprocess.run(
-        [str(python), str(SMOKE_SCRIPT), *map(str, args)],
+        [str(python), str(smoke_script), *map(str, args)],
         cwd=str(cwd or REPO_ROOT),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -38,12 +38,36 @@ def _run_smoke(python, *args, cwd=None):
 
 def _snapshot_tree(root):
     if not root.exists():
-        return set()
-    return {
-        path.relative_to(root).as_posix()
-        for path in root.rglob("*")
-        if ".venv" not in path.relative_to(root).parts
-    }
+        return {}
+    snapshot = {}
+    for path in root.rglob("*"):
+        relative_parts = path.relative_to(root).parts
+        if ".venv" in relative_parts:
+            continue
+        relative_path = path.relative_to(root).as_posix()
+        if path.is_file():
+            stat = path.stat()
+            snapshot[relative_path] = ("file", stat.st_size, stat.st_mtime_ns)
+        elif path.is_dir():
+            snapshot[relative_path] = ("dir",)
+        else:
+            snapshot[relative_path] = ("other",)
+    return snapshot
+
+
+def _copy_minimal_smoke_skill(source_root, target_root):
+    scripts_dir = target_root / "scripts"
+    scripts_dir.mkdir(parents=True)
+    for filename in (
+        "runtime_smoke.py",
+        "runtime_launch_guard.py",
+        "config.py",
+        "utils_json.py",
+    ):
+        (scripts_dir / filename).write_text(
+            (source_root / "scripts" / filename).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
 
 
 def test_runtime_smoke_requires_expected_runtime_venv_interpreter(tmp_path):
@@ -80,9 +104,10 @@ def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_depe
 
 
 def test_runtime_smoke_is_side_effect_free(tmp_path):
-    skill_root = tmp_path / "skill-root"
-    skill_root.mkdir()
+    skill_root = tmp_path / "isolated-skill-root"
+    _copy_minimal_smoke_skill(REPO_ROOT, skill_root)
     runtime_python = _make_runtime_venv(skill_root)
+    smoke_script = skill_root / "scripts" / "runtime_smoke.py"
     forbidden_names = {
         ".sdlc_runs",
         "job_dir",
@@ -91,15 +116,25 @@ def test_runtime_smoke_is_side_effect_free(tmp_path):
         ".sdlc.lock",
         "spawned_agents",
         "auditor_debug",
+        "__pycache__",
     }
 
-    before = _snapshot_tree(skill_root)
-    result = _run_smoke(runtime_python, "--skill-root", skill_root, cwd=skill_root)
-    after = _snapshot_tree(skill_root)
+    before_skill = _snapshot_tree(skill_root)
+    before_repo_scripts = _snapshot_tree(REPO_ROOT / "scripts")
+    result = _run_smoke(
+        runtime_python,
+        "--skill-root",
+        skill_root,
+        cwd=skill_root,
+        smoke_script=smoke_script,
+    )
+    after_skill = _snapshot_tree(skill_root)
+    after_repo_scripts = _snapshot_tree(REPO_ROOT / "scripts")
 
     assert result.returncode == 0, result.stderr
-    assert after == before
-    assert forbidden_names.isdisjoint(after)
+    assert after_skill == before_skill
+    assert after_repo_scripts == before_repo_scripts
+    assert all(name not in path.split("/") for path in after_skill for name in forbidden_names)
 
 
 def test_runtime_smoke_help_documents_official_no_side_effect_policy():
