@@ -3,7 +3,7 @@ import os
 import subprocess
 import unittest
 
-from deploy_test_support import isolated_repo_env
+from deploy_test_support import install_fake_python_toolchain, isolated_repo_env
 
 
 class TestDeployBackup(unittest.TestCase):
@@ -23,6 +23,7 @@ class TestDeployBackup(unittest.TestCase):
 
             deploy_script = os.path.join(repo_root, "deploy.sh")
             prod_dir = os.path.join(mock_home, ".openclaw", "skills", "leio-sdlc")
+            install_fake_python_toolchain(repo_root, env)
 
             res1 = subprocess.run(
                 ["bash", deploy_script, "--no-restart"],

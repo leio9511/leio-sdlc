@@ -2,7 +2,7 @@ import os
 import subprocess
 import unittest
 
-from deploy_test_support import isolated_repo_env
+from deploy_test_support import install_fake_python_toolchain, isolated_repo_env
 
 
 class TestDeployExcludes(unittest.TestCase):
@@ -16,6 +16,7 @@ class TestDeployExcludes(unittest.TestCase):
             env = isolated["env"]
 
             deploy_script = os.path.join(repo_root, "deploy.sh")
+            install_fake_python_toolchain(repo_root, env)
             res = subprocess.run(
                 ["bash", deploy_script, "--no-restart"],
                 env=env,
@@ -47,6 +48,7 @@ class TestDeployExcludes(unittest.TestCase):
             os.makedirs(os.path.join(repo_root, ".sdlc_runs"), exist_ok=True)
 
             deploy_script = os.path.join(repo_root, "deploy.sh")
+            install_fake_python_toolchain(repo_root, env)
             res = subprocess.run(
                 ["bash", deploy_script, "--no-restart"],
                 env=env,

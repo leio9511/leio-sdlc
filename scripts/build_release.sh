@@ -20,6 +20,8 @@ tests/
 *.diff
 .review_count
 memory/
+.venv/
+fake-bin/
 EOF
 fi
 
