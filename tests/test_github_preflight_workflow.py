@@ -10,6 +10,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "preflight.yml"
+DEV_WRAPPER_PATH = REPO_ROOT / "scripts" / "dev_python.sh"
+REQUIREMENTS_PATH = REPO_ROOT / "requirements.txt"
 REQUIRED_WORKFLOW_NAME = "Preflight"
 DEFAULT_PREFLIGHT_COMMAND = "bash preflight.sh"
 REPORT_ALL_PREFLIGHT_COMMAND = "bash preflight.sh --report-all"
@@ -21,6 +23,20 @@ REQUIRED_STEP_IDS = {
     "minimal-bootstrap",
     "run-preflight",
 }
+
+
+DEPENDENCY_LIST_MARKERS = (
+    "pip install pytest PyYAML",
+    "pip install PyYAML pytest",
+    "python -m pip install pytest PyYAML",
+    "python -m pip install PyYAML pytest",
+)
+FAILURE_MASKING_MARKERS = ("|| true", "continue-on-error")
+MANUAL_ACTIVATION_MARKERS = (
+    "source .venv/bin/activate",
+    ". .venv/bin/activate",
+    "source ${REPO_ROOT}/.venv/bin/activate",
+)
 
 
 def _load_workflow():
@@ -65,6 +81,15 @@ def _assert_no_continue_on_error(value):
     elif isinstance(value, list):
         for nested_value in value:
             _assert_no_continue_on_error(nested_value)
+
+
+def _workflow_text():
+    return WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def _wrapper_text():
+    assert DEV_WRAPPER_PATH.is_file(), "Expected scripts/dev_python.sh to exist."
+    return DEV_WRAPPER_PATH.read_text(encoding="utf-8")
 
 
 def test_preflight_workflow_exists_at_required_path():
@@ -123,3 +148,56 @@ def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(
     assert REQUIRED_TRIGGER_KEYS.issubset(workflow["on"].keys())
     assert REQUIRED_STEP_IDS.issubset(steps_by_id.keys())
     assert steps_by_id["run-preflight"]["run"].strip() == REPORT_ALL_PREFLIGHT_COMMAND
+
+
+def test_github_preflight_bootstraps_python_from_requirements_via_dev_wrapper():
+    assert REQUIREMENTS_PATH.is_file(), "Root requirements.txt must be the dependency entry."
+    workflow_text = _workflow_text()
+    wrapper_text = _wrapper_text()
+    bootstrap_run = _get_steps_by_id()["minimal-bootstrap"].get("run", "")
+
+    assert "scripts/dev_python.sh" in bootstrap_run
+    assert "requirements.txt" not in workflow_text, (
+        "The workflow should delegate dependency sync details to the dev wrapper."
+    )
+    assert "requirements.txt" in wrapper_text
+    assert "pip install -r" in wrapper_text
+    assert ".venv" in wrapper_text
+    assert ".venv/bin/python" in wrapper_text
+
+    combined_contract_text = workflow_text + "\n" + wrapper_text
+    for marker in DEPENDENCY_LIST_MARKERS:
+        assert marker not in combined_contract_text
+
+
+def test_github_preflight_keeps_required_runtime_setup_and_triggers():
+    workflow = _load_workflow()
+    steps_by_id = _get_steps_by_id()
+
+    assert workflow["name"] == REQUIRED_WORKFLOW_NAME
+    assert REQUIRED_TRIGGER_KEYS.issubset(workflow["on"].keys())
+    assert steps_by_id["checkout"].get("uses") == "actions/checkout@v4"
+    assert steps_by_id["python-runtime-setup"].get("uses") == "actions/setup-python@v5"
+    assert steps_by_id["node-runtime-setup"].get("uses") == "actions/setup-node@v4"
+    assert "scripts/dev_python.sh" in steps_by_id["minimal-bootstrap"].get("run", "")
+
+
+def test_ci_contract_does_not_require_manual_venv_activation():
+    combined_contract_text = _workflow_text() + "\n" + _wrapper_text()
+
+    for marker in MANUAL_ACTIVATION_MARKERS:
+        assert marker not in combined_contract_text
+
+    assert ".venv/bin/python" in combined_contract_text
+    assert "scripts/dev_python.sh" in _workflow_text()
+
+
+def test_github_preflight_bootstrap_has_truthful_failure_semantics():
+    workflow_text = _workflow_text()
+    wrapper_text = _wrapper_text()
+    preflight_job = _get_preflight_job()
+
+    _assert_no_continue_on_error(preflight_job)
+    for marker in FAILURE_MASKING_MARKERS:
+        assert marker not in workflow_text
+        assert marker not in wrapper_text

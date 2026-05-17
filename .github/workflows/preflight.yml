@@ -27,8 +27,7 @@ jobs:
       - name: Minimal bootstrap
         id: minimal-bootstrap
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest PyYAML
+          bash scripts/dev_python.sh -m pip check
 
       - name: Run preflight
         id: run-preflight
