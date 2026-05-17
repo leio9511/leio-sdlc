@@ -1,10 +1,12 @@
 from pathlib import Path
+import json
 import re
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ISSUE_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
 README = REPO_ROOT / "README.md"
 SKILL = REPO_ROOT / "SKILL.md"
+PROMPTS = REPO_ROOT / "config" / "prompts.json"
 
 REQUIRED_DEPENDENCY_ENTRY = (
     "requirements.txt at the repository root, currently serving runtime, "
@@ -28,6 +30,62 @@ REQUIRED_CORE_GOAL = (
 
 def _read(path):
     return path.read_text(encoding="utf-8")
+
+
+def _active_prompts():
+    return json.loads(_read(PROMPTS))
+
+
+def test_active_handoff_prompts_use_deployed_runtime_interpreter_for_orchestrator_commands():
+    prompts = _active_prompts()
+    runtime_python = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+    installed_orchestrator = "{SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py"
+    active_handoff_keys = [
+        "handoff_git_checkout_error",
+        "handoff_fatal_crash",
+        "handoff_startup_validation_failed",
+    ]
+
+    for key in active_handoff_keys:
+        prompt = prompts[key]
+        assert runtime_python in prompt
+        assert installed_orchestrator in prompt
+        assert f"python3 {installed_orchestrator}" not in prompt
+        assert f"python3 `{installed_orchestrator}" not in prompt
+        assert "python3 ${SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py" not in prompt
+        assert "python3 {SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py" not in prompt
+
+
+def test_active_handoff_prompt_updates_preserve_manager_failure_semantics():
+    prompts = _active_prompts()
+    git_checkout = prompts["handoff_git_checkout_error"]
+    fatal_crash = prompts["handoff_fatal_crash"]
+    startup_validation = prompts["handoff_startup_validation_failed"]
+    updated_prompts = "\n".join([git_checkout, fatal_crash, startup_validation])
+
+    assert "[FATAL_GIT]" in git_checkout
+    assert "Git checkout failed. Workspace preserved." in git_checkout
+    assert "--cleanup" in git_checkout
+    assert "quarantine the branch" in git_checkout
+
+    assert "[FATAL_CRASH]" in fatal_crash
+    assert "Orchestrator crashed. Process groups reaped. Workspace preserved." in fatal_crash
+    assert "read the traceback in logs" in fatal_crash
+    assert "--cleanup" in fatal_crash
+    assert "quarantine the branch" in fatal_crash
+
+    assert "[FATAL_STARTUP]" in startup_validation
+    assert "Startup validation failed (likely executing from the wrong directory)." in startup_validation
+    assert "absolute installed path" in startup_validation
+    assert "--enable-exec-from-workspace" in startup_validation
+    assert "if testing locally" in startup_validation
+
+    assert "|| true" not in updated_prompts
+    assert "continue-on-error" not in updated_prompts
+    assert "--no-verify" not in updated_prompts
+    assert "ignore cleanup" not in updated_prompts.lower()
+    assert "ignore startup" not in updated_prompts.lower()
+    assert "ignore failed cleanup" not in updated_prompts.lower()
 
 
 def test_official_issue_57_doc_states_unique_dependency_and_scope():
