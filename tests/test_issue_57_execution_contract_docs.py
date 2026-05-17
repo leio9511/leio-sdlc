@@ -7,6 +7,10 @@ ISSUE_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
 README = REPO_ROOT / "README.md"
 SKILL = REPO_ROOT / "SKILL.md"
 PROMPTS = REPO_ROOT / "config" / "prompts.json"
+PRE_COMMIT_HOOK = REPO_ROOT / ".sdlc_hooks" / "pre-commit"
+INSTALL_HOOK = REPO_ROOT / "scripts" / "install_hook.sh"
+RUNTIME_PYTHON = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+INSTALLED_COMMIT_STATE = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/commit_state.py"
 
 REQUIRED_DEPENDENCY_ENTRY = (
     "requirements.txt at the repository root, currently serving runtime, "
@@ -34,6 +38,31 @@ def _read(path):
 
 def _active_prompts():
     return json.loads(_read(PROMPTS))
+
+
+def test_pre_commit_hook_jit_guidance_uses_controlled_commit_state_command():
+    hook = _read(PRE_COMMIT_HOOK)
+
+    assert RUNTIME_PYTHON in hook
+    assert INSTALLED_COMMIT_STATE in hook
+    assert f"{RUNTIME_PYTHON} {INSTALLED_COMMIT_STATE} --files <path_to_files>" in hook
+    assert "commit_state.py --files <path_to_files>" in hook
+    assert "python3 ${SDLC_SKILLS_ROOT" not in hook
+    assert "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py" not in hook
+    assert "python3 $HOME/.openclaw/skills/leio-sdlc/scripts/commit_state.py" not in hook
+
+
+def test_install_hook_surface_remains_managed_and_not_manual_activation_based():
+    installer = _read(INSTALL_HOOK)
+
+    assert '.sdlc_hooks/pre-commit' in installer or '.sdlc_hooks"/pre-commit' in installer
+    assert "SDLC_MANAGED_HOOK=leio-sdlc" in installer
+    assert "SDLC_HOOK_SCHEMA_VERSION" in installer
+    assert "cp \"$HOOK_SOURCE\" \"$TARGET_DIR/hooks/pre-commit\"" in installer
+    assert "chmod +x \"$TARGET_DIR/hooks/pre-commit\"" in installer
+    assert "source .venv/bin/activate" not in installer
+    assert "python3" not in installer
+    assert "pip install" not in installer
 
 
 def test_active_handoff_prompts_use_deployed_runtime_interpreter_for_orchestrator_commands():

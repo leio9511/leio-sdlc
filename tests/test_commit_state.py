@@ -110,7 +110,13 @@ def test_pre_commit_hook_output(tmp_path, git_test_sandbox):
     result = subprocess.run(["git", "commit", "-m", "test"], capture_output=True, text=True, env=env)
 
     assert result.returncode == 1
-    assert f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stdout or f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py --files <path_to_files>" in result.stderr
+    controlled_commit_state_command = (
+        "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python "
+        "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/commit_state.py --files <path_to_files>"
+    )
+    assert controlled_commit_state_command in result.stdout or controlled_commit_state_command in result.stderr
+    assert "python3" not in result.stdout
+    assert "python3" not in result.stderr
 
     # Verify runtime administrative commit succeeds through the role-aware policy
     with open("test2.txt", "w") as f:

@@ -6,6 +6,8 @@ echo "=== Testing Pre-Commit Hook Integration ==="
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$WORKSPACE_ROOT/scripts/e2e/setup_sandbox.sh"
 
+CONTROLLED_COMMIT_STATE_COMMAND='${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python ${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/commit_state.py --files <path_to_files>'
+
 # 1. Setup Sandbox
 SANDBOX_DIR="$(mktemp -d)"
 HOME_DIR="$(mktemp -d)"
@@ -43,8 +45,12 @@ if ! grep -q "GIT COMMIT REJECTED" commit.log; then
     echo "❌ FAILED: Rejection message not found."
     exit 1
 fi
-if ! grep -q "python3 ~/.openclaw/skills/leio-sdlc/scripts/commit_state.py" commit.log; then
-    echo "❌ FAILED: Missing commit_state.py instruction in pre-commit hook output."
+if ! grep -Fq "$CONTROLLED_COMMIT_STATE_COMMAND" commit.log; then
+    echo "❌ FAILED: Missing controlled commit_state.py instruction in pre-commit hook output."
+    exit 1
+fi
+if grep -Eq "python3 .*commit_state\.py" commit.log; then
+    echo "❌ FAILED: Pre-commit hook output still teaches ambient python3 for commit_state.py."
     exit 1
 fi
 echo "✅ PASSED: Raw commit rejected as expected."
@@ -86,19 +92,26 @@ if ! grep -q "❌ Commit rejected: SDLC runtime role 'verifier' is not authorize
 fi
 echo "✅ PASSED: Unauthorized runtime role rejected."
 
-# 7. Test: Authorized runtime role should succeed
-echo "Test 5: Expecting success with authorized runtime role..."
-git -c sdlc.runtime=1 -c sdlc.role=coder commit --allow-empty -m "runtime commit coder"
-echo "✅ PASSED: Authorized runtime role works as expected."
+# 7. Test: Authorized runtime roles should succeed
+AUTHORIZED_ROLES=(coder orchestrator merge_code commit_state)
+TEST_NUMBER=5
+for ROLE in "${AUTHORIZED_ROLES[@]}"; do
+    echo "Test $TEST_NUMBER: Expecting success with authorized runtime role '$ROLE'..."
+    git -c sdlc.runtime=1 -c sdlc.role="$ROLE" commit --allow-empty -m "runtime commit $ROLE"
+    echo "✅ PASSED: Authorized runtime role '$ROLE' works as expected."
+    TEST_NUMBER=$((TEST_NUMBER + 1))
+done
 
 # 8. Test: Commit on feature branch should succeed
-echo "Test 6: Expecting success on feature branch..."
+echo "Test $TEST_NUMBER: Expecting success on feature branch..."
 git checkout -b feature/test > /dev/null
 git commit --allow-empty -m "feature commit"
 echo "✅ PASSED: Commit on feature branch allowed."
 
+TEST_NUMBER=$((TEST_NUMBER + 1))
+
 # 9. Test: No guardrail file should succeed
-echo "Test 7: Expecting success without .sdlc_guardrail..."
+echo "Test $TEST_NUMBER: Expecting success without .sdlc_guardrail..."
 git checkout master > /dev/null
 rm .sdlc_guardrail
 git commit --allow-empty -m "no guardrail commit"
