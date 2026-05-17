@@ -152,12 +152,9 @@ Deploy both `leio-sdlc` and `pm-skill` locally using the kit installer:
 To use the SDLC engine, you **MUST** follow this strict linear process. You cannot manually write a PRD and feed it to the orchestrator directly.
 
 **Step 1: PRD Authoring (`pm-skill`)**
-Use `pm-skill` to safely scaffold and write the PRD template.
+Use `pm-skill` to safely scaffold and write the PRD template. This step belongs to `pm-skill`; Issue #57 does not define or change the `pm-skill` runtime contract.
 ```bash
-"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/pm-skill/.venv/bin/python" \
-  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/pm-skill/scripts/init_prd.py" \
-  --project <YourProject> \
-  --title "<Feature_Title>"
+python3 ~/.openclaw/skills/pm-skill/scripts/init_prd.py --project <YourProject> --title "<Feature_Title>"
 ```
 *Fill in the generated template with strict BDD acceptance criteria.*
 
