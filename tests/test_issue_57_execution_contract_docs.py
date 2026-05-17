@@ -40,6 +40,39 @@ def _active_prompts():
     return json.loads(_read(PROMPTS))
 
 
+def test_test_runner_help_points_to_controlled_dev_execution_entries():
+    runner = _read(REPO_ROOT / "scripts" / "run_sdlc_tests.sh")
+
+    assert "bash scripts/dev_python.sh -m pytest" in runner
+    assert "bash preflight.sh --report-all" in runner
+    assert "--all" in runner
+    assert "--cuj <N>" in runner
+    assert "-h, --help" in runner
+    assert "scripts/test_cuj_${cuj_num}_mock.sh" in runner
+    assert "source .venv/bin/activate" not in runner
+    assert "python3 -m pytest" not in runner
+
+
+def test_install_hook_and_test_runner_help_do_not_require_manual_activation_or_ambient_python_for_formal_checks():
+    surfaces = {
+        "install_hook": _read(INSTALL_HOOK),
+        "run_sdlc_tests": _read(REPO_ROOT / "scripts" / "run_sdlc_tests.sh"),
+        "dev_python": _read(REPO_ROOT / "scripts" / "dev_python.sh"),
+        "preflight": _read(REPO_ROOT / "preflight.sh"),
+    }
+
+    for name, text in surfaces.items():
+        assert "source .venv/bin/activate" not in text, name
+        assert "python3 -m pytest" not in text, name
+
+    preflight = surfaces["preflight"]
+    fallback_index = preflight.find('PYTHON_CMD=("python3")')
+    assert fallback_index != -1
+    fallback_context = preflight[max(0, fallback_index - 240): fallback_index + 180]
+    assert "SDLC_TEST_MODE" in fallback_context
+    assert "test-only fallback" in fallback_context.lower()
+
+
 def test_pre_commit_hook_jit_guidance_uses_controlled_commit_state_command():
     hook = _read(PRE_COMMIT_HOOK)
 
