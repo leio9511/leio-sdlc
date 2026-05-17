@@ -14,7 +14,8 @@ DEV_WRAPPER_PATH = REPO_ROOT / "scripts" / "dev_python.sh"
 REQUIREMENTS_PATH = REPO_ROOT / "requirements.txt"
 REQUIRED_WORKFLOW_NAME = "Preflight"
 DEFAULT_PREFLIGHT_COMMAND = "bash preflight.sh"
-REPORT_ALL_PREFLIGHT_COMMAND = "bash preflight.sh --report-all"
+REPORT_ALL_PREFLIGHT_COMMAND = "PATH=\"${PWD}/.venv/bin:${PATH}\" bash preflight.sh --report-all"
+LEGACY_REPORT_ALL_PREFLIGHT_COMMAND = "bash preflight.sh --report-all"
 REQUIRED_TRIGGER_KEYS = {"push", "pull_request"}
 REQUIRED_STEP_IDS = {
     "checkout",
@@ -183,13 +184,16 @@ def test_github_preflight_keeps_required_runtime_setup_and_triggers():
 
 
 def test_ci_contract_does_not_require_manual_venv_activation():
-    combined_contract_text = _workflow_text() + "\n" + _wrapper_text()
+    workflow_text = _workflow_text()
+    combined_contract_text = workflow_text + "\n" + _wrapper_text()
 
     for marker in MANUAL_ACTIVATION_MARKERS:
         assert marker not in combined_contract_text
 
     assert ".venv/bin/python" in combined_contract_text
-    assert "scripts/dev_python.sh" in _workflow_text()
+    assert "scripts/dev_python.sh" in workflow_text
+    assert "${PWD}/.venv/bin:${PATH}" in _get_steps_by_id()["run-preflight"].get("run", "")
+    assert LEGACY_REPORT_ALL_PREFLIGHT_COMMAND != _get_steps_by_id()["run-preflight"].get("run", "").strip()
 
 
 def test_github_preflight_bootstrap_has_truthful_failure_semantics():

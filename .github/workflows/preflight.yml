@@ -32,4 +32,4 @@ jobs:
       - name: Run preflight
         id: run-preflight
         run: |
-          bash preflight.sh --report-all
+          PATH="${PWD}/.venv/bin:${PATH}" bash preflight.sh --report-all
