@@ -64,6 +64,23 @@ def resolve_expected_runtime_python(
     return runtime_python_for_skill_root(resolved_skill_root)
 
 
+def resolve_skill_root_for_runtime_smoke(skill_root=None, expected_python=None, script_path=None, env=None):
+    """Resolve the skill root reported by the runtime smoke contract."""
+    if skill_root:
+        return resolve_runtime_skill_root(skill_root=skill_root, script_path=script_path, env=env)
+
+    resolved_expected = resolve_expected_runtime_python(
+        expected_python=expected_python,
+        script_path=script_path,
+        env=env,
+    )
+    expected_parts = resolved_expected.split(os.sep)
+    if len(expected_parts) >= 4 and expected_parts[-3:] == [".venv", "bin", "python"]:
+        return os.sep.join(expected_parts[:-3]) or os.sep
+
+    return resolve_runtime_skill_root(script_path=script_path, env=env)
+
+
 def validate_runtime_interpreter(
     actual_python=None,
     expected_python=None,

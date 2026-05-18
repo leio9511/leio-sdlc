@@ -78,10 +78,16 @@ def main(argv=None):
         return 1
 
     imported = _import_key_dependencies()
+    runtime_skill_root = runtime_launch_guard.resolve_skill_root_for_runtime_smoke(
+        skill_root=args.skill_root,
+        expected_python=args.expected_runtime_python,
+        script_path=__file__,
+    )
     print(
         "runtime smoke ok: "
         f"python={runtime_launch_guard._canonicalize_path(sys.executable)}; "
         f"expected={expected_python}; "
+        f"skill_root={runtime_skill_root}; "
         f"startup_path={runtime_launch_guard._canonicalize_path(SCRIPT_DIR)}; "
         f"imports={', '.join(imported)}"
     )

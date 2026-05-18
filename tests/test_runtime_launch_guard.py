@@ -12,6 +12,7 @@ from runtime_launch_guard import (
     is_authorized_runtime_launch,
     resolve_allowed_runtime_roots,
     resolve_expected_runtime_python,
+    resolve_skill_root_for_runtime_smoke,
     runtime_python_for_skill_root,
     validate_runtime_interpreter,
 )
@@ -43,6 +44,29 @@ def test_runtime_python_for_skill_root_canonicalizes_controlled_runtime_interpre
 
     assert resolved == _canonicalize(skill_root / ".venv" / "bin" / "python")
     assert resolved == resolve_expected_runtime_python(skill_root=relative_skill_root, env={})
+
+
+def test_runtime_smoke_skill_root_resolver_derives_root_from_explicit_venv_python(tmp_path):
+    skill_root = tmp_path / "skill-root"
+    expected_python = skill_root / ".venv" / "bin" / "python"
+
+    resolved = resolve_skill_root_for_runtime_smoke(expected_python=str(expected_python), env={})
+
+    assert resolved == _canonicalize(skill_root)
+
+
+def test_runtime_smoke_skill_root_resolver_prefers_explicit_skill_root_over_python_shape(tmp_path):
+    skill_root = tmp_path / "skill-root"
+    explicit_root = tmp_path / "explicit-root"
+    expected_python = skill_root / ".venv" / "bin" / "python"
+
+    resolved = resolve_skill_root_for_runtime_smoke(
+        skill_root=str(explicit_root),
+        expected_python=str(expected_python),
+        env={},
+    )
+
+    assert resolved == _canonicalize(explicit_root)
 
 
 def test_runtime_interpreter_validation_accepts_canonical_matching_interpreter(tmp_path, monkeypatch):

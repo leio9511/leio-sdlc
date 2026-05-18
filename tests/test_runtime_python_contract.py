@@ -122,6 +122,7 @@ def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_depe
     assert result.returncode == 0, result.stderr
     assert "runtime smoke ok" in result.stdout
     assert f"expected={os.path.realpath(runtime_python)}" in result.stdout
+    assert f"skill_root={os.path.realpath(skill_root)}" in result.stdout
     assert f"startup_path={os.path.realpath(SMOKE_SCRIPT.parent)}" in result.stdout
     assert "yaml:" in result.stdout
     assert "config" in result.stdout
@@ -158,6 +159,7 @@ def test_runtime_smoke_is_side_effect_free(tmp_path):
     after_repo_scripts = _snapshot_tree(REPO_ROOT / "scripts")
 
     assert result.returncode == 0, result.stderr
+    assert f"skill_root={os.path.realpath(skill_root)}" in result.stdout
     assert f"startup_path={os.path.realpath(smoke_script.parent)}" in result.stdout
     assert after_skill == before_skill
     assert after_repo_scripts == before_repo_scripts
