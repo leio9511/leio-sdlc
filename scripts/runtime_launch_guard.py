@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Import-safe runtime launch guard primitives for the leio-sdlc skill.
+
+This module deliberately exposes only low-level path resolution and validation
+helpers. Importing it must not launch orchestration or mutate runtime state.
+"""
+
 import os
 import sys
 
@@ -19,6 +25,13 @@ def _canonicalize_path(path):
     return os.path.realpath(os.path.abspath(os.path.expanduser(os.fspath(path))))
 
 
+def _configured_path(explicit_value, env, env_var_name):
+    """Return explicit value first, then environment value, ignoring unset/empty values."""
+    if explicit_value:
+        return explicit_value
+    return env.get(env_var_name)
+
+
 def resolve_runtime_skill_root(skill_root=None, script_path=None, env=None):
     """Resolve the deployed skill root used for runtime interpreter binding.
 
@@ -28,7 +41,7 @@ def resolve_runtime_skill_root(skill_root=None, script_path=None, env=None):
     if env is None:
         env = os.environ
 
-    configured_skill_root = skill_root or env.get(SKILL_ROOT_ENV_VAR)
+    configured_skill_root = _configured_path(skill_root, env, SKILL_ROOT_ENV_VAR)
     if configured_skill_root:
         return _canonicalize_path(configured_skill_root)
 
@@ -52,7 +65,11 @@ def resolve_expected_runtime_python(
     if env is None:
         env = os.environ
 
-    configured_expected_python = expected_python or env.get(EXPECTED_RUNTIME_PYTHON_ENV_VAR)
+    configured_expected_python = _configured_path(
+        expected_python,
+        env,
+        EXPECTED_RUNTIME_PYTHON_ENV_VAR,
+    )
     if configured_expected_python:
         return _canonicalize_path(configured_expected_python)
 
