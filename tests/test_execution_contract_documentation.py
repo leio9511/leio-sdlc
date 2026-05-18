@@ -78,7 +78,10 @@ CONTROLLED_ORCHESTRATOR = (
 LEGACY_ORCHESTRATOR_PLACEHOLDER = "{SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py"
 BARE_ORCHESTRATOR_LAUNCH = "python3 scripts/orchestrator.py"
 BARE_RUNTIME_GIT_IDENTITY_LAUNCH = re.compile(r"python3\s+scripts/runtime_git_identity\.py")
-BARE_FORMAL_PYTEST = re.compile(r"(?<![-\w./])pytest(?:\s|$)")
+BARE_FORMAL_PYTEST = re.compile(
+    r"(?:`pytest(?=$|[\s`'\";,.)])|\b(?:run|execute|use|commands?:)\s+`?pytest(?=$|[\s`'\";,.)]))",
+    re.IGNORECASE,
+)
 BARE_INSTALLED_ORCHESTRATOR_LAUNCH = re.compile(
     r"python3\s+(?:`)?(?:\$\{SDLC_SKILLS_ROOT\}|\{SDLC_SKILLS_ROOT\}|\$HOME/\.openclaw/skills|~/\.openclaw/skills)"
     r"/leio-sdlc/scripts/orchestrator\.py"
@@ -126,6 +129,26 @@ def _has_controlled_orchestrator_launch_example(text: str) -> bool:
         if CONTROLLED_RUNTIME_PYTHON in normalized and CONTROLLED_ORCHESTRATOR in normalized:
             return True
     return False
+
+
+def test_bare_formal_pytest_pattern_catches_markdown_command_examples():
+    violations = (
+        "Run `pytest` before finishing.",
+        "Run pytest before finishing.",
+        "Run `pytest tests/test_example.py` before finishing.",
+        "Commands: pytest, ./preflight.sh",
+    )
+    allowed = (
+        "The pytest dependency is installed by scripts/dev_python.sh.",
+        "Run ./scripts/dev_python.sh -m pytest tests/test_example.py.",
+        "The package name is pytest-cov.",
+    )
+
+    for text in violations:
+        assert BARE_FORMAL_PYTEST.search(text), text
+
+    for text in allowed:
+        assert BARE_FORMAL_PYTEST.search(text) is None, text
 
 
 def test_active_playbooks_use_controlled_dev_or_runtime_entrypoints():
