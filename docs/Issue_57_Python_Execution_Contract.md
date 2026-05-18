@@ -57,7 +57,9 @@ This is not a global shared Python environment for other skills. Other skills mu
 
 Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation.
 
-The smoke path exists to prove that the selected interpreter is the expected runtime interpreter, key imports are available, and startup-path initialization works. It must not create SDLC runs, invoke the auditor, invoke the orchestrator, or perform long-running business execution as the default validation path.
+The smoke path exists to prove that the selected interpreter is the expected runtime interpreter, the resolved skill root is reviewable, key imports are available, and startup-path initialization works. It must not create SDLC runs, invoke the auditor, invoke the orchestrator, or perform long-running business execution as the default validation path.
+
+For reviewability, successful smoke output includes the active interpreter, expected interpreter, resolved skill root, startup path, and key imports. `--skill-root` is authoritative when provided; otherwise the smoke may derive the skill root from an expected `<skill-root>/.venv/bin/python` path or from the script path when no explicit runtime interpreter shape is available.
 
 ## CI alignment
 
