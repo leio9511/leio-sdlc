@@ -31,6 +31,16 @@ REQUIRED_FATAL_RECOVERY_MARKERS = (
 
 ACTIVE_DOCS = (README, SKILL, ISSUE_DOC)
 RUNTIME_LAUNCH_DOCS = (README, SKILL)
+ACTIVE_PLAYBOOKS = (
+    REPO_ROOT / "playbooks" / "coder_playbook.md",
+    REPO_ROOT / "playbooks" / "planner_playbook.md",
+    REPO_ROOT / "playbooks" / "reviewer_playbook.md",
+    REPO_ROOT / "playbooks" / "verifier_playbook.md",
+)
+CODER_PLAYBOOKS = (
+    REPO_ROOT / "playbooks" / "coder_playbook.md",
+    REPO_ROOT / "playbooks" / "coder_playbook_v2.md",
+)
 
 REQUIRED_DEPENDENCY_ENTRY = (
     "requirements.txt at the repository root, currently serving runtime, "
@@ -50,6 +60,12 @@ REQUIRED_SMOKE_POLICY = (
     "execution as default smoke validation."
 )
 CONTROLLED_RUNTIME_PYTHON = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+CONTROLLED_DEV_WRAPPER = "./scripts/dev_python.sh"
+CONTROLLED_DEV_WRAPPER_ALT = "scripts/dev_python.sh"
+CONTROLLED_RUNTIME_GIT_IDENTITY = "scripts/runtime_git_identity.py"
+CONTROLLED_RUNTIME_GIT_IDENTITY_COMMAND = (
+    f'{CONTROLLED_DEV_WRAPPER} {CONTROLLED_RUNTIME_GIT_IDENTITY} --role coder -- commit -m "feat/fix: <description>"'
+)
 CONTROLLED_COMMIT_STATE = (
     "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/commit_state.py"
 )
@@ -61,6 +77,8 @@ CONTROLLED_ORCHESTRATOR = (
 )
 LEGACY_ORCHESTRATOR_PLACEHOLDER = "{SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py"
 BARE_ORCHESTRATOR_LAUNCH = "python3 scripts/orchestrator.py"
+BARE_RUNTIME_GIT_IDENTITY_LAUNCH = re.compile(r"python3\s+scripts/runtime_git_identity\.py")
+BARE_FORMAL_PYTEST = re.compile(r"(?<![-\w./])pytest(?:\s|$)")
 BARE_INSTALLED_ORCHESTRATOR_LAUNCH = re.compile(
     r"python3\s+(?:`)?(?:\$\{SDLC_SKILLS_ROOT\}|\{SDLC_SKILLS_ROOT\}|\$HOME/\.openclaw/skills|~/\.openclaw/skills)"
     r"/leio-sdlc/scripts/orchestrator\.py"
@@ -108,6 +126,42 @@ def _has_controlled_orchestrator_launch_example(text: str) -> bool:
         if CONTROLLED_RUNTIME_PYTHON in normalized and CONTROLLED_ORCHESTRATOR in normalized:
             return True
     return False
+
+
+def test_active_playbooks_use_controlled_dev_or_runtime_entrypoints():
+    for path in ACTIVE_PLAYBOOKS:
+        text = _read(path)
+
+        assert BARE_FORMAL_PYTEST.search(text) is None, path
+        assert BARE_RUNTIME_GIT_IDENTITY_LAUNCH.search(text) is None, path
+        assert BARE_ORCHESTRATOR_LAUNCH not in text, path
+
+    combined = "\n".join(_read(path) for path in ACTIVE_PLAYBOOKS)
+    assert "./preflight.sh" in combined
+    assert CONTROLLED_DEV_WRAPPER_ALT in combined or CONTROLLED_RUNTIME_PYTHON in combined
+
+
+def test_coder_playbook_runtime_git_identity_uses_controlled_dev_entrypoint():
+    for path in CODER_PLAYBOOKS:
+        text = _read(path)
+
+        assert CONTROLLED_RUNTIME_GIT_IDENTITY in text, path
+        assert CONTROLLED_RUNTIME_GIT_IDENTITY_COMMAND in text, path
+        assert BARE_RUNTIME_GIT_IDENTITY_LAUNCH.search(text) is None, path
+
+
+def test_playbook_updates_preserve_role_methodology_sections():
+    planner = _read(REPO_ROOT / "playbooks" / "planner_playbook.md")
+    reviewer = _read(REPO_ROOT / "playbooks" / "reviewer_playbook.md")
+    verifier = _read(REPO_ROOT / "playbooks" / "verifier_playbook.md")
+
+    assert "Functional Sequence Slicing" in planner
+    assert "Convergence-Oriented Slicing Standard" in planner
+    assert "KEY FOCUS AREAS" in reviewer
+    assert "Plan Alignment Violation" in reviewer
+    assert "Read-Only" in verifier
+    assert "Strict Adherence" in verifier
+
 
 
 def test_active_docs_state_single_dependency_and_dual_venv_contract():
