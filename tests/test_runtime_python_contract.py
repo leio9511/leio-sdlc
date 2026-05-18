@@ -122,6 +122,7 @@ def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_depe
     assert result.returncode == 0, result.stderr
     assert "runtime smoke ok" in result.stdout
     assert f"expected={os.path.realpath(runtime_python)}" in result.stdout
+    assert f"startup_path={os.path.realpath(SMOKE_SCRIPT.parent)}" in result.stdout
     assert "yaml:" in result.stdout
     assert "config" in result.stdout
     assert "utils_json" in result.stdout

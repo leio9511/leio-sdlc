@@ -81,7 +81,9 @@ def main(argv=None):
     print(
         "runtime smoke ok: "
         f"python={runtime_launch_guard._canonicalize_path(sys.executable)}; "
-        f"expected={expected_python}; imports={', '.join(imported)}"
+        f"expected={expected_python}; "
+        f"startup_path={runtime_launch_guard._canonicalize_path(SCRIPT_DIR)}; "
+        f"imports={', '.join(imported)}"
     )
     return 0
 
