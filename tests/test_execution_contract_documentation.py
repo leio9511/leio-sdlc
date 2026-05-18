@@ -314,6 +314,18 @@ def test_prompt_and_hook_updates_do_not_claim_cross_skill_runtime_control():
         assert "all skill" not in text, path
         assert "cross-skill" not in text, path
 
+    for path in ACTIVE_PLAYBOOKS:
+        text = _read(path).lower()
+
+        assert "pm-skill" not in text, path
+        assert "other skill" not in text, path
+        assert "other-skill" not in text, path
+        assert "all skill" not in text, path
+        assert "all-skill" not in text, path
+        assert "cross-skill" not in text, path
+        assert "other skills' python runtimes" not in text, path
+        assert "other skills' python runtime" not in text, path
+
 
 def test_active_prompts_preserve_required_handoff_tokens_and_placeholders():
     prompts = _active_prompts()
