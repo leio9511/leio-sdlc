@@ -180,8 +180,10 @@ def test_ci_smoke_command_matches_official_runtime_smoke_entrypoint():
 
     assert "scripts/runtime_smoke.py" in command
     assert SMOKE_SCRIPT.name in command
-    assert "scripts/dev_python.sh" in command or ".venv/bin/python" in command
-    assert "--expected-runtime-python" in command
+    assert "scripts/runtime_python.sh" in command
+    assert ".venv/bin/python" in command
+    assert "RUNNER_TEMP" in command
+    assert "--expected-runtime-python" not in command
     assert "ci_runtime_smoke" not in command
     assert "ci-smoke" not in command
     assert "python3 scripts/runtime_smoke.py" not in command

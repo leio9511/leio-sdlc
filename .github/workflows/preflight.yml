@@ -24,9 +24,12 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Minimal bootstrap
+      - name: Bootstrap controlled Python dependencies
         id: minimal-bootstrap
         run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r requirements.txt
           bash scripts/dev_python.sh -m pip check
 
       - name: Run preflight
@@ -37,4 +40,12 @@ jobs:
       - name: Run runtime smoke
         id: run-runtime-smoke
         run: |
-          bash scripts/dev_python.sh scripts/runtime_smoke.py --expected-runtime-python "${PWD}/.venv/bin/python"
+          RUNTIME_SMOKE_ROOT="${RUNNER_TEMP}/leio-sdlc-runtime-smoke"
+          rm -rf "${RUNTIME_SMOKE_ROOT}"
+          mkdir -p "${RUNTIME_SMOKE_ROOT}"
+          cp -a scripts "${RUNTIME_SMOKE_ROOT}/scripts"
+          cp requirements.txt "${RUNTIME_SMOKE_ROOT}/requirements.txt"
+          python -m venv "${RUNTIME_SMOKE_ROOT}/.venv"
+          "${RUNTIME_SMOKE_ROOT}/.venv/bin/python" -m pip install --upgrade pip
+          "${RUNTIME_SMOKE_ROOT}/.venv/bin/python" -m pip install -r "${RUNTIME_SMOKE_ROOT}/requirements.txt"
+          bash "${RUNTIME_SMOKE_ROOT}/scripts/runtime_python.sh" "${RUNTIME_SMOKE_ROOT}/scripts/runtime_smoke.py"

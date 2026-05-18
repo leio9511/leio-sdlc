@@ -108,9 +108,12 @@ def _preflight_text():
 
 def _assert_required_runtime_smoke_command(run_command):
     assert RUNTIME_SMOKE_SCRIPT in run_command
-    assert "--expected-runtime-python" in run_command
+    assert "scripts/runtime_python.sh" in run_command
+    assert "RUNNER_TEMP" in run_command
+    assert "requirements.txt" in run_command
     assert any(marker in run_command for marker in CONTROLLED_INTERPRETER_MARKERS)
     assert "python3 scripts/runtime_smoke.py" not in run_command
+    assert "--expected-runtime-python" not in run_command
 
 
 def _assert_contract_critical_preflight_paths_use_controlled_interpreter(preflight_text):
@@ -229,9 +232,8 @@ def test_github_preflight_bootstraps_python_from_requirements_via_dev_wrapper():
     bootstrap_run = _get_steps_by_id()["minimal-bootstrap"].get("run", "")
 
     assert "scripts/dev_python.sh" in bootstrap_run
-    assert "requirements.txt" not in workflow_text, (
-        "The workflow should delegate dependency sync details to the dev wrapper."
-    )
+    assert "requirements.txt" in workflow_text
+    assert "pip install -r requirements.txt" in workflow_text
     assert "requirements.txt" in wrapper_text
     assert "pip install -r" in wrapper_text
     assert ".venv" in wrapper_text
