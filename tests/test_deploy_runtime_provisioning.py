@@ -35,7 +35,8 @@ def test_deploy_creates_runtime_venv_under_deployed_skill_root():
         prod_dir = Path(canonical_skill_dir(isolated["mock_home"], "leio-sdlc"))
         assert (prod_dir / ".venv" / "bin" / "python").exists()
         lines = _log_lines(log_path)
-        assert _line_index(lines, "venv:") < _line_index(lines, "runtime-smoke:")
+        assert _line_index(lines, "venv:") < _line_index(lines, "runtime-python-wrapper:")
+        assert _line_index(lines, "runtime-python-wrapper:") < _line_index(lines, "runtime-smoke:")
         assert result.stdout.index("🐍 Provisioning runtime Python in staging release") < result.stdout.index(
             "🔄 Performing atomic directory swap"
         )
@@ -75,8 +76,11 @@ def test_deploy_runs_runtime_smoke_before_atomic_swap():
         assert result.returncode == 0, result.stderr + result.stdout
         lines = _log_lines(log_path)
         import_index = _line_index(lines, "import-smoke:")
+        wrapper_index = _line_index(lines, "runtime-python-wrapper:")
         smoke_index = _line_index(lines, "runtime-smoke:")
-        assert import_index < smoke_index
+        assert import_index < wrapper_index < smoke_index
+        assert "scripts/runtime_python.sh" in lines[wrapper_index]
+        assert "scripts/runtime_smoke.py" in lines[wrapper_index]
         assert "scripts/runtime_smoke.py" in lines[smoke_index]
         assert str(Path(isolated["mock_home"]) / ".openclaw" / "skills" / ".tmp_leio-sdlc") in lines[smoke_index]
         assert result.stdout.index("Running minimal import smoke") < result.stdout.index("🔄 Performing atomic directory swap")

@@ -11,6 +11,7 @@ RUNTIME_VENV="${STAGING_ROOT}/.venv"
 RUNTIME_PYTHON="${RUNTIME_VENV}/bin/python"
 REQUIREMENTS_FILE="${STAGING_ROOT}/requirements.txt"
 RUNTIME_SMOKE="${STAGING_ROOT}/scripts/runtime_smoke.py"
+RUNTIME_PYTHON_WRAPPER="${STAGING_ROOT}/scripts/runtime_python.sh"
 
 if [[ ! -d "${STAGING_ROOT}" ]]; then
   echo "❌ Runtime provisioning failed: staging skill root does not exist: ${STAGING_ROOT}" >&2
@@ -27,6 +28,11 @@ if [[ ! -f "${RUNTIME_SMOKE}" ]]; then
   exit 1
 fi
 
+if [[ ! -x "${RUNTIME_PYTHON_WRAPPER}" ]]; then
+  echo "❌ Runtime provisioning failed: staged scripts/runtime_python.sh is missing or not executable." >&2
+  exit 1
+fi
+
 rm -rf "${RUNTIME_VENV}"
 python3 -m venv "${RUNTIME_VENV}"
 "${RUNTIME_PYTHON}" -m pip install --upgrade -r "${REQUIREMENTS_FILE}"
@@ -35,4 +41,4 @@ echo "🐍 Running minimal import smoke..."
 "${RUNTIME_PYTHON}" -c "import sys; from pathlib import Path; scripts_dir = Path(${STAGING_ROOT@Q}) / 'scripts'; sys.path.insert(0, str(scripts_dir)); import yaml; import config; import utils_json; import runtime_launch_guard"
 
 echo "🐍 Running official runtime smoke..."
-"${RUNTIME_PYTHON}" "${RUNTIME_SMOKE}" --skill-root "${STAGING_ROOT}"
+"${RUNTIME_PYTHON_WRAPPER}" "${RUNTIME_SMOKE}" --skill-root "${STAGING_ROOT}"

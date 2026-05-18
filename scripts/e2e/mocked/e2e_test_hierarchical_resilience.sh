@@ -193,6 +193,13 @@ cat > .dist/scripts/runtime_smoke.py <<'PY'
 #!/usr/bin/env python3
 print("runtime smoke ok")
 PY
+cat > .dist/scripts/runtime_python.sh <<'SH'
+#!/bin/sh
+set -eu
+SKILL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RUNTIME_PYTHON="$SKILL_ROOT/.venv/bin/python"
+exec "$RUNTIME_PYTHON" "$@"
+SH
 cat > .dist/scripts/provision_runtime.sh <<'SH'
 #!/bin/sh
 set -eu
@@ -202,9 +209,9 @@ python3 -m venv "$RUNTIME_VENV"
 echo "🐍 Running minimal import smoke..."
 "$RUNTIME_VENV/bin/python" -c "import sys; from pathlib import Path; sys.path.insert(0, str(Path('$STAGING_ROOT') / 'scripts')); import yaml"
 echo "🐍 Running official runtime smoke..."
-"$RUNTIME_VENV/bin/python" "$STAGING_ROOT/scripts/runtime_smoke.py" --skill-root "$STAGING_ROOT"
+"$STAGING_ROOT/scripts/runtime_python.sh" "$STAGING_ROOT/scripts/runtime_smoke.py" --skill-root "$STAGING_ROOT"
 SH
-chmod +x .dist/scripts/runtime_smoke.py .dist/scripts/provision_runtime.sh
+chmod +x .dist/scripts/runtime_smoke.py .dist/scripts/runtime_python.sh .dist/scripts/provision_runtime.sh
 INNER_EOF
     chmod +x scripts/*.sh
     
