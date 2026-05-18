@@ -104,7 +104,6 @@ create_mock_repo() {
     cp "$REPO_ROOT/scripts/rollback.sh" "$repo_dir/scripts/rollback.sh"
     cp "$REPO_ROOT/scripts/build_release.sh" "$repo_dir/scripts/build_release.sh"
     cp "$REPO_ROOT/scripts/provision_runtime.sh" "$repo_dir/scripts/provision_runtime.sh"
-    cp "$REPO_ROOT/scripts/runtime_python.sh" "$repo_dir/scripts/runtime_python.sh"
     cp "$REPO_ROOT/scripts/agent_driver.py" "$repo_dir/scripts/agent_driver.py"
     cp "$REPO_ROOT/scripts/utils_notification.py" "$repo_dir/scripts/utils_notification.py"
     cp "$REPO_ROOT/skills/pm-skill/deploy.sh" "$repo_dir/skills/pm-skill/deploy.sh"
@@ -144,7 +143,7 @@ EOF
 #!/bin/bash
 echo hook-from-source
 EOF
-    chmod +x "$repo_dir/deploy.sh" "$repo_dir/kit-deploy.sh" "$repo_dir/scripts/rollback.sh" "$repo_dir/scripts/build_release.sh" "$repo_dir/scripts/provision_runtime.sh" "$repo_dir/scripts/runtime_python.sh" "$repo_dir/skills/pm-skill/deploy.sh" "$repo_dir/.sdlc_hooks/pre-commit"
+    chmod +x "$repo_dir/deploy.sh" "$repo_dir/kit-deploy.sh" "$repo_dir/scripts/rollback.sh" "$repo_dir/scripts/build_release.sh" "$repo_dir/scripts/provision_runtime.sh" "$repo_dir/skills/pm-skill/deploy.sh" "$repo_dir/.sdlc_hooks/pre-commit"
 
     cat > "$repo_dir/skills/pm-skill/SKILL.md" <<'EOF'
 # PM Skill Fixture
