@@ -25,7 +25,7 @@ def _line_index(lines, prefix):
     return next(index for index, line in enumerate(lines) if line.startswith(prefix))
 
 
-def test_deploy_creates_runtime_venv_in_staging_before_atomic_swap():
+def test_deploy_creates_runtime_venv_under_deployed_skill_root():
     with isolated_repo_env(REPO_ROOT) as isolated:
         log_path = install_fake_python_toolchain(isolated["repo_root"], isolated["env"])
 
@@ -44,7 +44,7 @@ def test_deploy_creates_runtime_venv_in_staging_before_atomic_swap():
         )
 
 
-def test_deploy_installs_dependencies_from_unique_requirements_entry():
+def test_runtime_dependencies_are_installed_from_single_requirements_entry():
     with isolated_repo_env(REPO_ROOT) as isolated:
         repo_root = Path(isolated["repo_root"])
         (repo_root / "requirements-dev.txt").write_text("dev-only\n", encoding="utf-8")
@@ -55,6 +55,8 @@ def test_deploy_installs_dependencies_from_unique_requirements_entry():
         result = _run_deploy(repo_root, isolated["env"])
 
         assert result.returncode == 0, result.stderr + result.stdout
+        prod_dir = Path(canonical_skill_dir(isolated["mock_home"], "leio-sdlc"))
+        assert (prod_dir / ".venv" / "bin" / "python").exists()
         lines = _log_lines(log_path)
         pip_lines = [line for line in lines if line.startswith("pip:")]
         assert len(pip_lines) == 1
@@ -64,7 +66,7 @@ def test_deploy_installs_dependencies_from_unique_requirements_entry():
         assert "pyproject.toml" not in pip_lines[0]
 
 
-def test_deploy_runs_import_and_official_runtime_smoke_before_swap():
+def test_deploy_runs_runtime_smoke_before_atomic_swap():
     with isolated_repo_env(REPO_ROOT) as isolated:
         log_path = install_fake_python_toolchain(isolated["repo_root"], isolated["env"])
 
@@ -99,7 +101,7 @@ def test_deploy_fail_fast_prevents_atomic_swap_when_runtime_provisioning_fails()
             assert not (prod_dir / "scripts" / "runtime_smoke.py").exists(), fail_step
 
 
-def test_runtime_venv_is_rebuilt_per_release_and_not_reused_from_prod():
+def test_deploy_rebuilds_runtime_venv_per_release():
     with isolated_repo_env(REPO_ROOT) as isolated:
         repo_root = Path(isolated["repo_root"])
         install_fake_python_toolchain(repo_root, isolated["env"])
@@ -116,7 +118,7 @@ def test_runtime_venv_is_rebuilt_per_release_and_not_reused_from_prod():
         assert (prod_dir / ".venv" / "bin" / "python").exists()
 
 
-def test_deploy_runtime_contract_does_not_affect_other_skills():
+def test_deploy_does_not_provision_or_mutate_other_skills():
     with isolated_repo_env(REPO_ROOT) as isolated:
         pm_skill = Path(canonical_skill_dir(isolated["mock_home"], "pm-skill"))
         pm_skill.mkdir(parents=True)

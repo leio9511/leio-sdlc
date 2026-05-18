@@ -60,9 +60,11 @@ def test_build_release_packages_runtime_smoke_and_guard_support_files(tmp_path):
     runtime_guard = dist / "scripts" / "runtime_launch_guard.py"
     assert runtime_smoke.exists()
     assert runtime_guard.exists()
-    assert (dist / "scripts" / "config.py").exists()
-    assert (dist / "scripts" / "utils_json.py").exists()
+    assert (dist / "scripts" / "runtime_python.sh").exists()
+    assert (dist / "scripts" / "provision_runtime.sh").exists()
+    assert (dist / "requirements.txt").exists()
     assert not (dist / "tests").exists()
+    assert not (dist / ".venv").exists()
 
     help_result = subprocess.run(
         [sys.executable, str(runtime_smoke), "--help"],
