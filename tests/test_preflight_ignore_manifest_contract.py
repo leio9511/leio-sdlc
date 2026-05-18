@@ -81,6 +81,14 @@ def _create_fixture_repo(tmp_path: Path) -> Path:
         "    assert True\n",
     )
 
+    _write(
+        repo / "scripts" / "dev_python.sh",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "exec python3 \"$@\"\n",
+        executable=True,
+    )
+
     return repo
 
 

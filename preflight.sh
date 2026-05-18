@@ -6,13 +6,12 @@
 
 PROJECT_DIR=$(cd "$(dirname "$0")" && pwd)
 DEV_PYTHON="$PROJECT_DIR/scripts/dev_python.sh"
-PYTHON_CMD=("$DEV_PYTHON")
-if [[ ! -x "$DEV_PYTHON" && "${SDLC_TEST_MODE:-}" == "true" ]]; then
-    # Test-only fallback for SDLC_TEST_MODE isolated preflight harnesses that
-    # intentionally do not install the repository wrapper; normal formal checks
-    # run through DEV_PYTHON.
-    PYTHON_CMD=("python3")
+if [[ ! -x "$DEV_PYTHON" ]]; then
+    echo "❌ PREFLIGHT FAILED: Missing executable controlled Python wrapper: $DEV_PYTHON"
+    echo "Formal Python preflight checks must run through the repository-root .venv wrapper."
+    exit 1
 fi
+PYTHON_CMD=("$DEV_PYTHON")
 TMP_TEST_LOG=$(mktemp)
 TMP_BASH_IGNORE=$(mktemp)
 TMP_PYTEST_IGNORE=$(mktemp)

@@ -23,6 +23,12 @@ create_preflight_fixture() {
     mkdir -p "$sandbox_dir/scripts" "$sandbox_dir/tests"
     cp "$PROJECT_ROOT/preflight.sh" "$sandbox_dir/preflight.sh"
     chmod +x "$sandbox_dir/preflight.sh"
+    cat > "$sandbox_dir/scripts/dev_python.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+exec python3 "$@"
+SH
+    chmod +x "$sandbox_dir/scripts/dev_python.sh"
     cat > "$sandbox_dir/tests/test_template_compliance.py" <<'PY'
 def test_template_compliance_placeholder():
     assert True

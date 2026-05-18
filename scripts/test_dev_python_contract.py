@@ -82,15 +82,11 @@ def test_preflight_routes_ignore_manifest_python_through_dev_wrapper():
     assert 'DEV_PYTHON="$PROJECT_DIR/scripts/dev_python.sh"' in preflight
     assert 'PYTHON_CMD=("$DEV_PYTHON")' in preflight
     assert 'if ! "${PYTHON_CMD[@]}" - "$IGNORE_MANIFEST" "$TMP_BASH_IGNORE" "$TMP_PYTEST_IGNORE"' in load_ignore_manifest
+    assert 'if [[ ! -x "$DEV_PYTHON" ]]; then' in preflight
+    assert 'Missing executable controlled Python wrapper' in preflight
+    assert 'PYTHON_CMD=("python3")' not in preflight
     assert "python3 -" not in load_ignore_manifest
     assert "python -" not in load_ignore_manifest
-
-    fallback_index = preflight.find('PYTHON_CMD=("python3")')
-    assert fallback_index != -1
-    fallback_context = preflight[max(0, fallback_index - 260): fallback_index + 180]
-    assert "SDLC_TEST_MODE" in fallback_context
-    assert "Test-only fallback" in fallback_context
-    assert "normal formal checks" in fallback_context
 
 
 def test_preflight_routes_pytest_through_dev_wrapper():

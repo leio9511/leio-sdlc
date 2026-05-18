@@ -13,7 +13,11 @@ if [[ ! -f "${REQUIREMENTS_FILE}" ]]; then
 fi
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
-  python3 -m venv "${VENV_DIR}"
+  if [[ -n "${PYTHON_BOOTSTRAP:-}" ]]; then
+    "${PYTHON_BOOTSTRAP}" -m venv "${VENV_DIR}"
+  else
+    python3 -m venv "${VENV_DIR}"
+  fi
 fi
 
 "${PYTHON_BIN}" -m pip install --upgrade pip

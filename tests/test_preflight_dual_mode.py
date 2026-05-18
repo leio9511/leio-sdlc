@@ -44,6 +44,14 @@ def _create_fixture_repo(tmp_path: Path, *, bash_scripts: list[tuple[str, str]],
         "    assert True\n",
     )
 
+    _write(
+        repo / "scripts" / "dev_python.sh",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "exec python3 \"$@\"\n",
+        executable=True,
+    )
+
     for relative_path, content in bash_scripts:
         _write(repo / relative_path, content, executable=True)
 

@@ -81,11 +81,10 @@ def test_install_hook_and_test_runner_help_do_not_require_manual_activation_or_a
         assert "python3 -m pytest" not in text, name
 
     preflight = surfaces["preflight"]
-    fallback_index = preflight.find('PYTHON_CMD=("python3")')
-    assert fallback_index != -1
-    fallback_context = preflight[max(0, fallback_index - 240): fallback_index + 180]
-    assert "SDLC_TEST_MODE" in fallback_context
-    assert "test-only fallback" in fallback_context.lower()
+    assert 'DEV_PYTHON="$PROJECT_DIR/scripts/dev_python.sh"' in preflight
+    assert 'PYTHON_CMD=("$DEV_PYTHON")' in preflight
+    assert 'Missing executable controlled Python wrapper' in preflight
+    assert 'PYTHON_CMD=("python3")' not in preflight
 
 
 def test_pre_commit_hook_jit_guidance_uses_controlled_commit_state_command():
