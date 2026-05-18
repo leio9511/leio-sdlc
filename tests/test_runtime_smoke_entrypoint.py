@@ -1,9 +1,10 @@
-import hashlib
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,19 @@ def _create_runtime_venv(skill_root):
     return runtime_python
 
 
+@pytest.fixture(scope="module")
+def provisioned_runtime_python(tmp_path_factory):
+    skill_root = tmp_path_factory.mktemp("provisioned-runtime")
+    return _create_runtime_venv(skill_root)
+
+
+def _copy_runtime_venv(source_python, skill_root):
+    source_venv = source_python.parents[1]
+    target_venv = skill_root / ".venv"
+    shutil.copytree(source_venv, target_venv, symlinks=True)
+    return target_venv / "bin" / "python"
+
+
 def _run_smoke(python, smoke_path, *args, cwd=None):
     return subprocess.run(
         [str(python), str(smoke_path), *map(str, args)],
@@ -54,8 +68,8 @@ def _snapshot(root):
         if path.is_dir():
             entries.append((str(relative), "dir", None, None))
         else:
-            data = path.read_bytes()
-            entries.append((str(relative), "file", len(data), hashlib.sha256(data).hexdigest()))
+            stat = path.stat()
+            entries.append((str(relative), "file", stat.st_size, stat.st_mtime_ns))
     return entries
 
 
@@ -73,10 +87,13 @@ def test_runtime_smoke_requires_expected_runtime_venv_interpreter(tmp_path):
     assert str(skill_root / ".venv" / "bin" / "python") in result.stderr
 
 
-def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_dependencies(tmp_path):
+def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_dependencies(
+    tmp_path,
+    provisioned_runtime_python,
+):
     skill_root = tmp_path / "runtime-skill"
     smoke_path = _copy_minimal_skill_root(skill_root)
-    runtime_python = _create_runtime_venv(skill_root)
+    runtime_python = _copy_runtime_venv(provisioned_runtime_python, skill_root)
 
     result = _run_smoke(
         runtime_python,
@@ -99,10 +116,10 @@ def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_depe
     assert "startup_path=" in result.stdout
 
 
-def test_runtime_smoke_is_side_effect_free(tmp_path):
+def test_runtime_smoke_is_side_effect_free(tmp_path, provisioned_runtime_python):
     skill_root = tmp_path / "isolated-skill"
     smoke_path = _copy_minimal_skill_root(skill_root)
-    runtime_python = _create_runtime_venv(skill_root)
+    runtime_python = _copy_runtime_venv(provisioned_runtime_python, skill_root)
     before = _snapshot(skill_root)
 
     result = _run_smoke(
@@ -139,10 +156,13 @@ def test_runtime_smoke_help_documents_official_no_side_effect_policy():
     assert "full auditor/orchestrator/long-running business execution as default smoke" in result.stdout
 
 
-def test_runtime_smoke_startup_path_initialization_does_not_launch_orchestrator(tmp_path):
+def test_runtime_smoke_startup_path_initialization_does_not_launch_orchestrator(
+    tmp_path,
+    provisioned_runtime_python,
+):
     skill_root = tmp_path / "startup-skill"
     smoke_path = _copy_minimal_skill_root(skill_root)
-    runtime_python = _create_runtime_venv(skill_root)
+    runtime_python = _copy_runtime_venv(provisioned_runtime_python, skill_root)
 
     result = _run_smoke(
         runtime_python,

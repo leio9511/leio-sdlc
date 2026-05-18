@@ -16,10 +16,14 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import runtime_launch_guard
 
+OFFICIAL_STARTUP_IMPORTS = ("yaml", "config", "utils_json", "runtime_launch_guard")
+
+
 SMOKE_POLICY = "Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation."
 
 
 def _import_key_dependencies():
+    """Import the official startup dependency set without launching business logic."""
     imported = []
 
     import yaml  # PyYAML
@@ -35,6 +39,31 @@ def _import_key_dependencies():
     imported.append("utils_json")
     imported.append("runtime_launch_guard")
     return imported
+
+
+def _validate_runtime_binding(args):
+    """Use PR-002_1 guard primitives for interpreter binding validation."""
+    return runtime_launch_guard.validate_runtime_interpreter(
+        skill_root=args.skill_root,
+        expected_python=args.expected_runtime_python,
+        script_path=__file__,
+    )
+
+
+def _format_success_line(args, expected_python, imported):
+    runtime_skill_root = runtime_launch_guard.resolve_skill_root_for_runtime_smoke(
+        skill_root=args.skill_root,
+        expected_python=args.expected_runtime_python,
+        script_path=__file__,
+    )
+    return (
+        "runtime smoke ok: "
+        f"python={runtime_launch_guard._canonicalize_path(sys.executable)}; "
+        f"expected={expected_python}; "
+        f"skill_root={runtime_skill_root}; "
+        f"startup_path={runtime_launch_guard._canonicalize_path(SCRIPT_DIR)}; "
+        f"imports={', '.join(imported)}"
+    )
 
 
 def _build_parser():
@@ -68,29 +97,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     try:
-        expected_python = runtime_launch_guard.validate_runtime_interpreter(
-            skill_root=args.skill_root,
-            expected_python=args.expected_runtime_python,
-            script_path=__file__,
-        )
+        expected_python = _validate_runtime_binding(args)
     except runtime_launch_guard.RuntimeInterpreterMismatch as exc:
         print(f"runtime smoke failed: {exc}", file=sys.stderr)
         return 1
 
     imported = _import_key_dependencies()
-    runtime_skill_root = runtime_launch_guard.resolve_skill_root_for_runtime_smoke(
-        skill_root=args.skill_root,
-        expected_python=args.expected_runtime_python,
-        script_path=__file__,
-    )
-    print(
-        "runtime smoke ok: "
-        f"python={runtime_launch_guard._canonicalize_path(sys.executable)}; "
-        f"expected={expected_python}; "
-        f"skill_root={runtime_skill_root}; "
-        f"startup_path={runtime_launch_guard._canonicalize_path(SCRIPT_DIR)}; "
-        f"imports={', '.join(imported)}"
-    )
+    print(_format_success_line(args, expected_python, imported))
     return 0
 
 
