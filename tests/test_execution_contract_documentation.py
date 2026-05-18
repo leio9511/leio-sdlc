@@ -1,10 +1,33 @@
 from pathlib import Path
+import json
 import re
+import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
 SKILL = REPO_ROOT / "SKILL.md"
 ISSUE_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
+PROMPTS = REPO_ROOT / "config" / "prompts.json"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+ACTIVE_FATAL_RECOVERY_PROMPT_KEYS = (
+    "handoff_git_checkout_error",
+    "handoff_fatal_crash",
+    "handoff_startup_validation_failed",
+)
+FATAL_RECOVERY_CONDITIONS = (
+    "git_checkout_error",
+    "fatal_crash",
+    "startup_validation_failed",
+)
+REQUIRED_FATAL_RECOVERY_MARKERS = (
+    "[FATAL_GIT]",
+    "[FATAL_CRASH]",
+    "[FATAL_STARTUP]",
+    "[ACTION REQUIRED FOR MANAGER]",
+)
 
 ACTIVE_DOCS = (README, SKILL, ISSUE_DOC)
 RUNTIME_LAUNCH_DOCS = (README, SKILL)
@@ -36,12 +59,21 @@ CONTROLLED_COMMIT_STATE_GUIDANCE = (
 CONTROLLED_ORCHESTRATOR = (
     "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py"
 )
+LEGACY_ORCHESTRATOR_PLACEHOLDER = "{SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py"
 BARE_ORCHESTRATOR_LAUNCH = "python3 scripts/orchestrator.py"
+BARE_INSTALLED_ORCHESTRATOR_LAUNCH = re.compile(
+    r"python3\s+(?:`)?(?:\$\{SDLC_SKILLS_ROOT\}|\{SDLC_SKILLS_ROOT\}|\$HOME/\.openclaw/skills|~/\.openclaw/skills)"
+    r"/leio-sdlc/scripts/orchestrator\.py"
+)
 MANUAL_ACTIVATION = "source .venv/bin/activate"
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _active_prompts() -> dict[str, str]:
+    return json.loads(_read(PROMPTS))
 
 
 def _without_fenced_blocks(text: str) -> str:
@@ -141,6 +173,64 @@ def test_active_hook_guidance_payload_matches_installed_hook_source():
     assert CONTROLLED_COMMIT_STATE_GUIDANCE in installed_hook_guidance
     assert CONTROLLED_COMMIT_STATE_GUIDANCE in payload_guidance
     assert installed_hook_guidance == payload_guidance
+
+
+def test_active_prompts_use_runtime_interpreter_for_orchestrator_recovery_examples():
+    prompts = _active_prompts()
+
+    for key in ACTIVE_FATAL_RECOVERY_PROMPT_KEYS:
+        prompt = prompts[key]
+
+        assert CONTROLLED_RUNTIME_PYTHON in prompt, key
+        assert LEGACY_ORCHESTRATOR_PLACEHOLDER in prompt, key
+        assert f"{CONTROLLED_RUNTIME_PYTHON} {LEGACY_ORCHESTRATOR_PLACEHOLDER}" in prompt, key
+        assert BARE_INSTALLED_ORCHESTRATOR_LAUNCH.search(prompt) is None, key
+
+
+def test_active_prompts_preserve_required_fatal_recovery_tokens():
+    prompts = _active_prompts()
+    combined_prompts = "\n".join(prompts[key] for key in ACTIVE_FATAL_RECOVERY_PROMPT_KEYS)
+
+    for marker in REQUIRED_FATAL_RECOVERY_MARKERS:
+        assert marker in combined_prompts
+
+    assert "--cleanup" in prompts["handoff_git_checkout_error"]
+    assert "quarantine the branch" in prompts["handoff_git_checkout_error"]
+    assert "--cleanup" in prompts["handoff_fatal_crash"]
+    assert "quarantine the branch" in prompts["handoff_fatal_crash"]
+    assert "absolute installed path" in prompts["handoff_startup_validation_failed"]
+    assert "--enable-exec-from-workspace" in prompts["handoff_startup_validation_failed"]
+
+
+def test_active_prompts_preserve_recovery_placeholders_after_handoff_interpolation(monkeypatch):
+    import config
+    from handoff_prompter import HandoffPrompter
+
+    runtime_root = "/tmp/example-runtime-root"
+    monkeypatch.setattr(config, "SDLC_RUNTIME_DIR", runtime_root, raising=False)
+
+    for condition in FATAL_RECOVERY_CONDITIONS:
+        prompt = HandoffPrompter.get_prompt(condition)
+
+        assert "{SDLC_SKILLS_ROOT}" not in prompt, condition
+        assert f"{runtime_root}/leio-sdlc/scripts/orchestrator.py" in prompt, condition
+        assert CONTROLLED_RUNTIME_PYTHON in prompt, condition
+
+
+def test_active_prompts_preserve_recovery_placeholders_after_handoff_interpolation_legacy_fallback(
+    monkeypatch,
+):
+    import config
+    from handoff_prompter import HandoffPrompter
+
+    monkeypatch.delattr(config, "SDLC_RUNTIME_DIR", raising=False)
+
+    for condition in FATAL_RECOVERY_CONDITIONS:
+        prompt = HandoffPrompter.get_prompt(condition)
+
+        assert "{SDLC_SKILLS_ROOT}" not in prompt, condition
+        assert f"{config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/orchestrator.py" in prompt, condition
+        assert CONTROLLED_RUNTIME_PYTHON in prompt, condition
 
 
 def test_prompt_and_hook_updates_do_not_claim_cross_skill_runtime_control():
