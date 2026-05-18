@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -41,9 +42,17 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_dev_python_wrapper_uses_repo_venv_and_root_requirements_without_manual_activation():
+def _function_body(text: str, name: str) -> str:
+    start = text.index(f"{name}() {{")
+    next_function = text.find("\n}\n\n", start)
+    assert next_function != -1
+    return text[start: next_function + 3]
+
+
+def test_dev_python_wrapper_targets_repo_root_venv_without_activation():
     wrapper = _read(DEV_PYTHON)
 
+    assert 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' in wrapper
     assert 'REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"' in wrapper
     assert 'VENV_DIR="${REPO_ROOT}/.venv"' in wrapper
     assert 'PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"' in wrapper
@@ -53,22 +62,75 @@ def test_dev_python_wrapper_uses_repo_venv_and_root_requirements_without_manual_
     assert 'exec "${PYTHON_BIN}" "$@"' in wrapper
     assert "source .venv/bin/activate" not in wrapper
 
+    result = subprocess.run(
+        ["bash", str(DEV_PYTHON), "-c", "import sys; print(sys.executable)"],
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
 
-def test_preflight_routes_python_checks_through_dev_wrapper_under_normal_operation():
+    executable = Path(result.stdout.strip().splitlines()[-1]).resolve()
+    assert executable == (REPO_ROOT / ".venv" / "bin" / "python").resolve()
+
+
+def test_preflight_routes_ignore_manifest_python_through_dev_wrapper():
     preflight = _read(PREFLIGHT)
+    load_ignore_manifest = _function_body(preflight, "load_ignore_manifest")
 
     assert 'DEV_PYTHON="$PROJECT_DIR/scripts/dev_python.sh"' in preflight
     assert 'PYTHON_CMD=("$DEV_PYTHON")' in preflight
-    assert 'run_test_argv "Template Compliance Gate" "${PYTHON_CMD[@]}" -m pytest' in preflight
-    assert 'run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest tests/' in preflight
-    assert 'run_test_argv "Python Test: $f" "${PYTHON_CMD[@]}" "$f"' in preflight
-    assert 'run_test_argv "Syntax Check: agent_driver.py" "${PYTHON_CMD[@]}" -m py_compile scripts/agent_driver.py' in preflight
+    assert 'if ! "${PYTHON_CMD[@]}" - "$IGNORE_MANIFEST" "$TMP_BASH_IGNORE" "$TMP_PYTEST_IGNORE"' in load_ignore_manifest
+    assert "python3 -" not in load_ignore_manifest
+    assert "python -" not in load_ignore_manifest
 
     fallback_index = preflight.find('PYTHON_CMD=("python3")')
     assert fallback_index != -1
-    fallback_context = preflight[max(0, fallback_index - 240): fallback_index + 160]
-    assert 'SDLC_TEST_MODE' in fallback_context
-    assert 'test-only fallback' in fallback_context.lower()
+    fallback_context = preflight[max(0, fallback_index - 260): fallback_index + 180]
+    assert "SDLC_TEST_MODE" in fallback_context
+    assert "Test-only fallback" in fallback_context
+    assert "normal formal checks" in fallback_context
+
+
+def test_preflight_routes_pytest_through_dev_wrapper():
+    preflight = _read(PREFLIGHT)
+
+    assert 'run_test_argv "Template Compliance Gate" "${PYTHON_CMD[@]}" -m pytest tests/test_template_compliance.py' in preflight
+    assert 'run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"' in preflight
+    assert "python3 -m pytest" not in preflight
+    assert "python -m pytest" not in preflight
+    commandish_preflight = preflight.replace("-m pytest", "-m_pytest")
+    assert " pytest tests" not in commandish_preflight
+    assert " pytest scripts" not in commandish_preflight
+
+
+def test_preflight_routes_python_script_and_py_compile_checks_through_dev_wrapper():
+    preflight = _read(PREFLIGHT)
+
+    assert 'run_test_argv "Python Test: $f" "${PYTHON_CMD[@]}" "$f"' in preflight
+    assert 'run_test_argv "Syntax Check: agent_driver.py" "${PYTHON_CMD[@]}" -m py_compile scripts/agent_driver.py' in preflight
+    assert "python3 $f" not in preflight
+    assert "python $f" not in preflight
+    assert "python3 -m py_compile" not in preflight
+    assert "python -m py_compile" not in preflight
+
+
+def test_preflight_report_all_and_fail_fast_modes_are_preserved_under_wrapper_routing():
+    preflight = _read(PREFLIGHT)
+
+    assert 'FAIL_FAST_MODE_NAME="fail-fast"' in preflight
+    assert 'REPORT_ALL_MODE_NAME="report-all"' in preflight
+    assert '--report-all)' in preflight
+    assert 'MODE="$REPORT_ALL_MODE_NAME"' in preflight
+    assert 'if [[ "$MODE" == "$FAIL_FAST_MODE_NAME" ]]; then' in preflight
+    assert 'FAILED_CHECKS+=("$desc")' in preflight
+    assert 'BLOCKED_CHECKS+=("$desc :: $reason")' in preflight
+    assert 'fail_ignore_manifest' in preflight
+    assert 'If ignore_tests.json is missing or malformed, preflight must fail closed.' in preflight
+    assert 'A non-empty ignore list may produce debt-quarantine green, which is distinct from true full green.' in preflight
+    assert 'run_test_argv "Template Compliance Gate" "${PYTHON_CMD[@]}" -m pytest' in preflight
+    assert 'run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest tests/' in preflight
 
 
 def test_contract_critical_python_surfaces_are_documented_and_guarded():
