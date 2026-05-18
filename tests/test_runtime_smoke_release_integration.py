@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -111,6 +112,25 @@ def test_skill_test_runner_runtime_smoke_mode_uses_skill_venv_python_not_ambient
     assert str(runtime_python) in invocation
     assert "python3" not in invocation
     assert "ambient python3" not in result.stdout
+
+
+def test_skill_markdown_uses_controlled_runtime_interpreter_for_active_launch_examples():
+    skill = (REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    active_skill = re.sub(r"```.*?```", "", skill, flags=re.DOTALL)
+
+    controlled_python = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+    assert controlled_python in skill
+    assert "scripts/orchestrator.py" in skill
+    assert "scripts/runtime_smoke.py" in skill
+    assert SMOKE_POLICY in skill
+    assert "background: true" in skill
+    assert "timeout: 0" in skill
+    assert "python3" not in active_skill
+
+    for block in re.findall(r"```bash\n(.*?)```", skill, flags=re.DOTALL):
+        if "scripts/orchestrator.py" in block:
+            assert controlled_python in block
+            assert "python3" not in block
 
 
 def test_skill_test_runner_existing_agent_protocol_remains_backward_compatible(tmp_path):

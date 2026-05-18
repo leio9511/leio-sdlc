@@ -10,30 +10,21 @@ usage() {
     cat <<'EOF'
 Usage:
   scripts/skill_test_runner.sh <SKILL_PATH> [TEST_PROMPT]
-  scripts/skill_test_runner.sh --runtime-smoke [--runtime-python PYTHON] <SKILL_PATH>
+  scripts/skill_test_runner.sh --runtime-smoke <SKILL_PATH>
 
 Runtime smoke policy:
   Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation.
+  Runtime smoke mode resolves <SKILL_PATH>/.venv/bin/python explicitly and will not use ambient python3.
 EOF
 }
 
 MODE="agent"
-RUNTIME_PYTHON_OVERRIDE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --runtime-smoke)
             MODE="runtime-smoke"
             shift
-            ;;
-        --runtime-python)
-            if [ -z "${2:-}" ]; then
-                echo "[skill_test_runner] ❌ Missing value for --runtime-python" >&2
-                usage >&2
-                exit 2
-            fi
-            RUNTIME_PYTHON_OVERRIDE="$2"
-            shift 2
             ;;
         --help|-h)
             usage
@@ -63,17 +54,13 @@ if [ -z "$SKILL_PATH" ]; then
 fi
 
 if [ "$MODE" = "runtime-smoke" ]; then
-    if [ -n "$RUNTIME_PYTHON_OVERRIDE" ]; then
-        RUNTIME_PYTHON="$RUNTIME_PYTHON_OVERRIDE"
-    else
-        RUNTIME_PYTHON="$SKILL_PATH/.venv/bin/python"
-    fi
-
+    RUNTIME_PYTHON="$SKILL_PATH/.venv/bin/python"
     SMOKE_SCRIPT="$SKILL_PATH/scripts/runtime_smoke.py"
 
     if [ ! -x "$RUNTIME_PYTHON" ]; then
         echo "[skill_test_runner] ❌ Missing explicit runtime interpreter: $RUNTIME_PYTHON" >&2
-        echo "[skill_test_runner] Runtime smoke mode requires <SKILL_PATH>/.venv/bin/python or --runtime-python PYTHON; it will not use ambient python3 or create the runtime .venv." >&2
+        echo "[skill_test_runner] Runtime smoke mode requires <SKILL_PATH>/.venv/bin/python; it will not use ambient python3." >&2
+        echo "[skill_test_runner] Provisioning must create the runtime .venv before runtime smoke is run." >&2
         exit 1
     fi
 

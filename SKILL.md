@@ -162,6 +162,21 @@ Why this matters:
 - A host-level default timeout can terminate the orchestrator in the middle of a valid run and leave the workflow in a partial state.
 - Therefore, long-running `leio-sdlc` launches must always use a host execution path that preserves lifecycle tracking without imposing a finite default process timeout.
 
+## Runtime smoke guidance
+
+Operators can verify a deployed release with the official no-side-effect smoke path:
+
+```bash
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/runtime_smoke.py" \
+  --skill-root "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc" \
+  --expected-runtime-python "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+```
+
+Smoke policy: Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation.
+
+Do not create or repair the runtime `.venv` from this skill. Runtime `.venv` provisioning belongs to deploy/release provisioning before active launch.
+
 ## After launch
 
 When the orchestrator completes, inspect the completion output.
