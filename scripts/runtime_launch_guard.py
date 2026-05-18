@@ -64,19 +64,31 @@ def resolve_expected_runtime_python(
     return runtime_python_for_skill_root(resolved_skill_root)
 
 
+def _derive_skill_root_from_venv_python_shape(python_path):
+    """Return skill root when python_path text has <root>/.venv/bin/python shape."""
+    if not python_path:
+        return None
+
+    absolute_path = os.path.abspath(os.path.expanduser(os.fspath(python_path)))
+    path_parts = absolute_path.split(os.sep)
+    if len(path_parts) >= 4 and path_parts[-3:] == [".venv", "bin", "python"]:
+        return _canonicalize_path(os.sep.join(path_parts[:-3]) or os.sep)
+
+    return None
+
+
 def resolve_skill_root_for_runtime_smoke(skill_root=None, expected_python=None, script_path=None, env=None):
     """Resolve the skill root reported by the runtime smoke contract."""
+    if env is None:
+        env = os.environ
+
     if skill_root:
         return resolve_runtime_skill_root(skill_root=skill_root, script_path=script_path, env=env)
 
-    resolved_expected = resolve_expected_runtime_python(
-        expected_python=expected_python,
-        script_path=script_path,
-        env=env,
-    )
-    expected_parts = resolved_expected.split(os.sep)
-    if len(expected_parts) >= 4 and expected_parts[-3:] == [".venv", "bin", "python"]:
-        return os.sep.join(expected_parts[:-3]) or os.sep
+    configured_expected_python = expected_python or env.get(EXPECTED_RUNTIME_PYTHON_ENV_VAR)
+    derived_root = _derive_skill_root_from_venv_python_shape(configured_expected_python)
+    if derived_root:
+        return derived_root
 
     return resolve_runtime_skill_root(script_path=script_path, env=env)
 

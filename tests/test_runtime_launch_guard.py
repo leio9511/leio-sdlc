@@ -55,6 +55,22 @@ def test_runtime_smoke_skill_root_resolver_derives_root_from_explicit_venv_pytho
     assert resolved == _canonicalize(skill_root)
 
 
+def test_runtime_smoke_skill_root_resolver_derives_root_before_symlink_realpath_canonicalization(tmp_path):
+    skill_root = tmp_path / "skill-root"
+    expected_python = skill_root / ".venv" / "bin" / "python"
+    base_python = tmp_path / "base" / "bin" / "python"
+    expected_python.parent.mkdir(parents=True)
+    base_python.parent.mkdir(parents=True)
+    base_python.write_text("#!/bin/sh\n", encoding="utf-8")
+    expected_python.symlink_to(base_python)
+
+    resolved = resolve_skill_root_for_runtime_smoke(expected_python=str(expected_python), env={})
+
+    assert os.path.realpath(expected_python) == _canonicalize(base_python)
+    assert resolved == _canonicalize(skill_root)
+    assert resolved != _canonicalize(base_python.parent.parent)
+
+
 def test_runtime_smoke_skill_root_resolver_prefers_explicit_skill_root_over_python_shape(tmp_path):
     skill_root = tmp_path / "skill-root"
     explicit_root = tmp_path / "explicit-root"
