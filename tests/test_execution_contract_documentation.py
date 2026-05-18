@@ -27,6 +27,12 @@ REQUIRED_SMOKE_POLICY = (
     "execution as default smoke validation."
 )
 CONTROLLED_RUNTIME_PYTHON = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+CONTROLLED_COMMIT_STATE = (
+    "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/commit_state.py"
+)
+CONTROLLED_COMMIT_STATE_GUIDANCE = (
+    f"{CONTROLLED_RUNTIME_PYTHON} {CONTROLLED_COMMIT_STATE} --files <path_to_files>"
+)
 CONTROLLED_ORCHESTRATOR = (
     "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py"
 )
@@ -44,6 +50,19 @@ def _without_fenced_blocks(text: str) -> str:
 
 def _fenced_blocks(text: str) -> list[str]:
     return re.findall(r"```(?:bash|shell)?\n(.*?)```", text, flags=re.DOTALL)
+
+
+def _normalize_echoed_guidance(text: str) -> set[str]:
+    commands = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("echo ") or "commit_state.py" not in stripped:
+            continue
+        guidance = stripped.removeprefix("echo ").strip()
+        if len(guidance) >= 2 and guidance[0] == guidance[-1] and guidance[0] in {'"', "'"}:
+            guidance = guidance[1:-1]
+        commands.add(guidance)
+    return commands
 
 
 def _has_controlled_orchestrator_launch_example(text: str) -> bool:
@@ -90,3 +109,40 @@ def test_official_runtime_smoke_policy_is_documented():
         assert "scripts/runtime_smoke.py" in text, path
         assert "no-side-effect" in text, path
         assert REQUIRED_SMOKE_POLICY in text, path
+
+
+def test_active_hooks_use_runtime_interpreter_for_commit_state_guidance():
+    for path in (REPO_ROOT / ".sdlc_hooks" / "pre-commit", REPO_ROOT / "scripts" / "pre-commit-payload.sh"):
+        guidance = _normalize_echoed_guidance(_read(path))
+
+        assert CONTROLLED_COMMIT_STATE_GUIDANCE in guidance, path
+
+
+def test_active_hooks_do_not_use_bare_python3_for_commit_state_guidance():
+    bare_commit_state_launch = re.compile(r"python3\s+[^\n;]*commit_state\.py")
+
+    for path in (REPO_ROOT / ".sdlc_hooks" / "pre-commit", REPO_ROOT / "scripts" / "pre-commit-payload.sh"):
+        text = _read(path)
+
+        assert "python3 ${SDLC_SKILLS_ROOT" not in text, path
+        assert "python3 ~/.openclaw/skills" not in text, path
+        assert bare_commit_state_launch.search(text) is None, path
+
+
+def test_active_hook_guidance_payload_matches_installed_hook_source():
+    installed_hook_guidance = _normalize_echoed_guidance(_read(REPO_ROOT / ".sdlc_hooks" / "pre-commit"))
+    payload_guidance = _normalize_echoed_guidance(_read(REPO_ROOT / "scripts" / "pre-commit-payload.sh"))
+
+    assert CONTROLLED_COMMIT_STATE_GUIDANCE in installed_hook_guidance
+    assert CONTROLLED_COMMIT_STATE_GUIDANCE in payload_guidance
+    assert installed_hook_guidance == payload_guidance
+
+
+def test_prompt_and_hook_updates_do_not_claim_cross_skill_runtime_control():
+    for path in (REPO_ROOT / ".sdlc_hooks" / "pre-commit", REPO_ROOT / "scripts" / "pre-commit-payload.sh"):
+        text = _read(path).lower()
+
+        assert "pm-skill" not in text, path
+        assert "other skill" not in text, path
+        assert "all skill" not in text, path
+        assert "cross-skill" not in text, path
