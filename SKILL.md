@@ -49,6 +49,20 @@ Before using this skill, all of the following should already be true:
 
 If these conditions are not met, do not launch SDLC yet.
 
+## Python execution contract (Issue #57)
+
+Define a controlled, repeatable Python execution contract for local development, testing, deployed skill runtime, and GitHub CI without depending on unmanaged system Python state.
+
+The single Python dependency entry is requirements.txt at the repository root, currently serving runtime, development, and test dependencies together.
+
+Local development and testing use the repository-root .venv through explicit project entrypoints such as `scripts/dev_python.sh` and `preflight.sh`; the formal contract is not ambient shell state or manual activation memory.
+
+Deployed runtime commands use the deployed leio-sdlc skill root .venv, rebuilt per release in staging before atomic swap. Runtime launch examples in this skill bind to `${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python` or an equivalent documented runtime wrapper rather than ambient system Python.
+
+`scripts/runtime_smoke.py` is the official minimal no-side-effect smoke path shared by deploy/runtime and CI.
+
+Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation.
+
 ## Relationship to the upstream lifecycle
 
 This skill is part of a larger human-agent software delivery protocol.

@@ -1,0 +1,80 @@
+from pathlib import Path
+import re
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+README = REPO_ROOT / "README.md"
+SKILL = REPO_ROOT / "SKILL.md"
+ISSUE_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
+
+ACTIVE_DOCS = (README, SKILL, ISSUE_DOC)
+RUNTIME_LAUNCH_DOCS = (README, SKILL)
+
+REQUIRED_DEPENDENCY_ENTRY = (
+    "requirements.txt at the repository root, currently serving runtime, "
+    "development, and test dependencies together"
+)
+REQUIRED_DEV_CONTEXT = "repository-root .venv"
+REQUIRED_RUNTIME_CONTEXT = (
+    "deployed leio-sdlc skill root .venv, rebuilt per release in staging before atomic swap"
+)
+REQUIRED_CORE_GOAL = (
+    "Define a controlled, repeatable Python execution contract for local development, testing, "
+    "deployed skill runtime, and GitHub CI without depending on unmanaged system Python state."
+)
+REQUIRED_SMOKE_POLICY = (
+    "Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, "
+    "and startup-path initialization. Do not use full auditor/orchestrator/long-running business "
+    "execution as default smoke validation."
+)
+CONTROLLED_RUNTIME_PYTHON = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+BARE_ORCHESTRATOR_LAUNCH = "python3 scripts/orchestrator.py"
+MANUAL_ACTIVATION = "source .venv/bin/activate"
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _without_fenced_blocks(text: str) -> str:
+    return re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+
+
+def test_active_docs_state_single_dependency_and_dual_venv_contract():
+    for path in ACTIVE_DOCS:
+        text = _read(path)
+
+        assert REQUIRED_CORE_GOAL in text, path
+        assert REQUIRED_DEPENDENCY_ENTRY in text, path
+        assert REQUIRED_DEV_CONTEXT in text, path
+        assert REQUIRED_RUNTIME_CONTEXT in text, path
+        assert "staging before atomic swap" in text, path
+
+
+def test_active_runtime_launch_docs_use_controlled_runtime_interpreter():
+    for path in RUNTIME_LAUNCH_DOCS:
+        text = _read(path)
+
+        assert CONTROLLED_RUNTIME_PYTHON in text, path
+        assert "scripts/orchestrator.py" in text, path
+        assert "deployed" in text.lower(), path
+        assert ".venv/bin/python" in text, path
+        assert BARE_ORCHESTRATOR_LAUNCH not in text, path
+
+
+def test_active_dev_docs_use_dev_wrapper_not_manual_activation_as_contract():
+    for path in ACTIVE_DOCS:
+        text = _read(path)
+        active_text = _without_fenced_blocks(text)
+
+        assert "scripts/dev_python.sh" in text or "preflight.sh" in text, path
+        assert REQUIRED_DEV_CONTEXT in text, path
+        assert MANUAL_ACTIVATION not in active_text, path
+
+
+def test_official_runtime_smoke_policy_is_documented():
+    for path in ACTIVE_DOCS:
+        text = _read(path)
+
+        assert "scripts/runtime_smoke.py" in text, path
+        assert "no-side-effect" in text, path
+        assert REQUIRED_SMOKE_POLICY in text, path
