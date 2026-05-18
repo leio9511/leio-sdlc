@@ -54,14 +54,19 @@ def _fenced_blocks(text: str) -> list[str]:
 
 def _normalize_echoed_guidance(text: str) -> set[str]:
     commands = set()
+    guidance_emitters = ("echo ", "printf '%s\\n' ")
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped.startswith("echo ") or "commit_state.py" not in stripped:
+        if "commit_state.py" not in stripped:
             continue
-        guidance = stripped.removeprefix("echo ").strip()
-        if len(guidance) >= 2 and guidance[0] == guidance[-1] and guidance[0] in {'"', "'"}:
-            guidance = guidance[1:-1]
-        commands.add(guidance)
+        for emitter in guidance_emitters:
+            if not stripped.startswith(emitter):
+                continue
+            guidance = stripped.removeprefix(emitter).strip()
+            if len(guidance) >= 2 and guidance[0] == guidance[-1] and guidance[0] in {'"', "'"}:
+                guidance = guidance[1:-1]
+            commands.add(guidance)
+            break
     return commands
 
 
