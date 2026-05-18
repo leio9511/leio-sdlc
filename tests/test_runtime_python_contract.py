@@ -158,6 +158,7 @@ def test_runtime_smoke_is_side_effect_free(tmp_path):
     after_repo_scripts = _snapshot_tree(REPO_ROOT / "scripts")
 
     assert result.returncode == 0, result.stderr
+    assert f"startup_path={os.path.realpath(smoke_script.parent)}" in result.stdout
     assert after_skill == before_skill
     assert after_repo_scripts == before_repo_scripts
     assert all(name not in path.split("/") for path in after_skill for name in forbidden_names)
