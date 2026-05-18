@@ -175,7 +175,7 @@ def test_active_hook_guidance_payload_matches_installed_hook_source():
     assert installed_hook_guidance == payload_guidance
 
 
-def test_active_prompts_use_runtime_interpreter_for_orchestrator_recovery_examples():
+def test_active_prompts_do_not_reintroduce_contract_critical_bare_python3():
     prompts = _active_prompts()
 
     for key in ACTIVE_FATAL_RECOVERY_PROMPT_KEYS:
@@ -185,6 +185,15 @@ def test_active_prompts_use_runtime_interpreter_for_orchestrator_recovery_exampl
         assert LEGACY_ORCHESTRATOR_PLACEHOLDER in prompt, key
         assert f"{CONTROLLED_RUNTIME_PYTHON} {LEGACY_ORCHESTRATOR_PLACEHOLDER}" in prompt, key
         assert BARE_INSTALLED_ORCHESTRATOR_LAUNCH.search(prompt) is None, key
+
+    happy_path = prompts["handoff_happy_path"]
+    assert "issue_tracker/scripts/issues.py" in happy_path
+    assert "outside the leio-sdlc runtime contract" in happy_path
+    assert f"{CONTROLLED_RUNTIME_PYTHON} {{SDLC_SKILLS_ROOT}}/issue_tracker/scripts/issues.py" not in happy_path
+
+
+def test_active_prompts_use_runtime_interpreter_for_orchestrator_recovery_examples():
+    test_active_prompts_do_not_reintroduce_contract_critical_bare_python3()
 
 
 def test_active_prompts_preserve_required_fatal_recovery_tokens():
@@ -234,6 +243,15 @@ def test_active_prompts_preserve_recovery_placeholders_after_handoff_interpolati
 
 
 def test_prompt_and_hook_updates_do_not_claim_cross_skill_runtime_control():
+    prompts = _active_prompts()
+    happy_path = prompts["handoff_happy_path"]
+
+    assert "issue_tracker/scripts/issues.py" in happy_path
+    assert "outside the leio-sdlc runtime contract" in happy_path
+    assert "issue_tracker skill command" in happy_path
+    assert "controlled runtime" not in happy_path.lower()
+    assert "leio-sdlc/.venv/bin/python {SDLC_SKILLS_ROOT}/issue_tracker" not in happy_path
+
     for path in (REPO_ROOT / ".sdlc_hooks" / "pre-commit", REPO_ROOT / "scripts" / "pre-commit-payload.sh"):
         text = _read(path).lower()
 
@@ -241,3 +259,25 @@ def test_prompt_and_hook_updates_do_not_claim_cross_skill_runtime_control():
         assert "other skill" not in text, path
         assert "all skill" not in text, path
         assert "cross-skill" not in text, path
+
+
+def test_active_prompts_preserve_required_handoff_tokens_and_placeholders():
+    prompts = _active_prompts()
+    json.dumps(prompts)
+
+    required_by_key = {
+        "handoff_happy_path": ("[SUCCESS_HANDOFF]", "[ACTION REQUIRED FOR MANAGER]", "{SDLC_SKILLS_ROOT}"),
+        "handoff_git_checkout_error": ("[FATAL_GIT]", "[ACTION REQUIRED FOR MANAGER]", "{SDLC_SKILLS_ROOT}"),
+        "handoff_fatal_crash": ("[FATAL_CRASH]", "[ACTION REQUIRED FOR MANAGER]", "{SDLC_SKILLS_ROOT}"),
+        "handoff_startup_validation_failed": ("[FATAL_STARTUP]", "[ACTION REQUIRED FOR MANAGER]", "{SDLC_SKILLS_ROOT}"),
+    }
+
+    for key, required_tokens in required_by_key.items():
+        prompt = prompts[key]
+        for token in required_tokens:
+            assert token in prompt, (key, token)
+
+    assert "<ISSUE-ID>" in prompts["handoff_happy_path"]
+    assert "--cleanup" in prompts["handoff_git_checkout_error"]
+    assert "--cleanup" in prompts["handoff_fatal_crash"]
+    assert "--enable-exec-from-workspace" in prompts["handoff_startup_validation_failed"]

@@ -6,6 +6,17 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from handoff_prompter import HandoffPrompter
 
 class TestHandoffPrompter(unittest.TestCase):
+    def test_happy_path_preserves_issue_tracker_boundary(self):
+        import config
+        prompt = HandoffPrompter.get_prompt("happy_path")
+        self.assertIn("[SUCCESS_HANDOFF]", prompt)
+        self.assertIn("[ACTION REQUIRED FOR MANAGER]", prompt)
+        self.assertIn("The pipeline has finished. You must now: 1. Update PRD status.", prompt)
+        self.assertIn("issue_tracker/scripts/issues.py", prompt)
+        self.assertIn(f"python3 {config.SDLC_SKILLS_ROOT}/issue_tracker/scripts/issues.py", prompt)
+        self.assertIn("outside the leio-sdlc runtime contract", prompt)
+        self.assertNotIn("leio-sdlc/.venv/bin/python", prompt)
+
     def test_happy_path(self):
         prompt = HandoffPrompter.get_prompt("happy_path")
         self.assertIn("[SUCCESS_HANDOFF]", prompt)

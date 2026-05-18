@@ -23,6 +23,8 @@ def test_prompts():
     assert "[SUCCESS_HANDOFF]" in happy
     assert "1. Update PRD status" in happy
     assert f"python3 {config.SDLC_SKILLS_ROOT}/issue_tracker/scripts/issues.py" in happy
+    assert "outside the leio-sdlc runtime contract" in happy
+    assert "leio-sdlc/.venv/bin/python" not in happy
     print("✅ happy_path prompt verified.")
 
     # Acceptance Criteria 3: New prompts
