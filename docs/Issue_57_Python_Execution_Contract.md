@@ -20,9 +20,9 @@ Those contract-critical surfaces must not keep ambient bare `python3` execution 
 
 ## Noncritical `python3` residual debt
 
-Residual `python3` references in historical docs, archived PRDs, generated `.dist`, templates/reference materials, and non-default mocked/e2e examples are nonblocking follow-up debt for Issue #59.
+Residual `python3` references in historical docs, archived PRDs, generated `.dist`, templates/reference materials, non-default mocked/e2e examples, templates, and reference material are nonblocking follow-up debt for Issue #59.
 
-This bucket is intentionally narrow. It exists to avoid turning Issue #57 into a brittle whole-repository text purge while keeping the active contract-critical surfaces controlled. Reviewers should classify residual references by surface: if a reference is part of formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, or execution-contract-related smoke/tests, it belongs to Issue #57; if it is only historical docs, archived PRDs, generated `.dist`, templates/reference materials, or non-default mocked/e2e examples, it is tracked as Issue #59 cleanup debt.
+This bucket is intentionally narrow. It exists to avoid turning Issue #57 into a brittle whole-repository text purge while keeping the active contract-critical surfaces controlled. Reviewers should classify residual references by surface: if a reference is part of formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, or execution-contract-related smoke/tests, it belongs to Issue #57; if it is only historical docs, archived PRDs, generated `.dist`, templates/reference materials, non-default mocked/e2e examples, templates, or reference material, it is tracked as Issue #59 cleanup debt.
 
 ## Dependency source
 

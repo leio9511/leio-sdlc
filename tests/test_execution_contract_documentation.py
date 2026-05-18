@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
 SKILL = REPO_ROOT / "SKILL.md"
 ISSUE_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
+ISSUE_59_DEBT = REPO_ROOT / "docs" / "Issues" / "ISSUE_59_Noncritical_Python3_Reference_Cleanup.md"
 PROMPTS = REPO_ROOT / "config" / "prompts.json"
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -53,6 +54,25 @@ REQUIRED_RUNTIME_CONTEXT = (
 REQUIRED_CORE_GOAL = (
     "Define a controlled, repeatable Python execution contract for local development, testing, "
     "deployed skill runtime, and GitHub CI without depending on unmanaged system Python state."
+)
+REQUIRED_PROJECT_SCOPE = "leio-sdlc local development, testing, deployed runtime execution, and GitHub CI only"
+REQUIRED_DISTRIBUTION_NONGOAL = (
+    "ClawHub installation, public packaging/distribution contract, and cross-skill global runtime unification"
+)
+REQUIRED_ISSUE_59 = "Issue #59"
+NONCRITICAL_PYTHON3_DEBT_SURFACES = (
+    "historical docs",
+    "archived PRDs",
+    "generated `.dist`",
+    "non-default mocked/e2e examples",
+    "templates",
+    "reference material",
+)
+CONTRACT_CRITICAL_SURFACES = (
+    "formal development/test entrypoints",
+    "deploy/runtime launch paths",
+    "GitHub CI default paths",
+    "execution-contract-related smoke/tests",
 )
 REQUIRED_SMOKE_POLICY = (
     "Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, "
@@ -223,6 +243,49 @@ def test_official_runtime_smoke_policy_is_documented():
         assert "scripts/runtime_smoke.py" in text, path
         assert "no-side-effect" in text, path
         assert REQUIRED_SMOKE_POLICY in text, path
+
+
+def test_noncritical_python3_references_are_tracked_as_issue_59_debt():
+    assert ISSUE_59_DEBT.exists()
+    text = _read(ISSUE_59_DEBT)
+    combined_active_docs = "\n".join(_read(path) for path in ACTIVE_DOCS)
+
+    assert REQUIRED_ISSUE_59 in text
+    assert REQUIRED_ISSUE_59 in combined_active_docs
+    assert "follow-up" in text.lower()
+    assert "not a blocker for Issue #57" in text
+
+    for surface in NONCRITICAL_PYTHON3_DEBT_SURFACES:
+        assert surface in text, surface
+
+
+def test_issue_59_debt_boundary_does_not_exempt_contract_critical_surfaces():
+    text = _read(ISSUE_59_DEBT)
+
+    assert "does not authorize" in text or "does not exempt" in text
+    assert "uncontrolled bare `python3`" in text or "ambient bare `python3`" in text
+    assert "Issue #57 blocker" in text
+
+    for surface in CONTRACT_CRITICAL_SURFACES:
+        assert surface in text, surface
+
+
+def test_distribution_scope_is_not_claimed_solved():
+    combined = "\n".join(_read(path) for path in (*ACTIVE_DOCS, ISSUE_59_DEBT))
+
+    assert REQUIRED_DISTRIBUTION_NONGOAL in combined
+    assert "does not solve " + REQUIRED_DISTRIBUTION_NONGOAL in combined
+    assert "not the final install or distribution solution" in combined
+    assert "solves " + REQUIRED_DISTRIBUTION_NONGOAL not in combined
+
+
+def test_other_skills_are_not_bound_to_leio_sdlc_runtime_venv():
+    combined = "\n".join(_read(path) for path in (*ACTIVE_DOCS, ISSUE_59_DEBT))
+
+    assert "pm-skill" in combined
+    assert "other skills" in combined
+    assert "does not force `pm-skill` or other skills to inherit, share, or switch" in combined
+    assert "isolated to `leio-sdlc`" in combined
 
 
 def test_active_hooks_use_runtime_interpreter_for_commit_state_guidance():

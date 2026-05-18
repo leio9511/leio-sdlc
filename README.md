@@ -98,11 +98,11 @@ The current official reference is `docs/Issue_57_Python_Execution_Contract.md`. 
 
 Define a controlled, repeatable Python execution contract for local development, testing, deployed skill runtime, and GitHub CI without depending on unmanaged system Python state.
 
-Scope is limited to leio-sdlc local development, testing, deployed runtime execution, and GitHub CI only. It does not define ClawHub installation, public packaging/distribution contract, or cross-skill global runtime unification. Issue #57 is not the final install or distribution solution.
+Scope is limited to leio-sdlc local development, testing, deployed runtime execution, and GitHub CI only. It does not define ClawHub installation, public packaging/distribution contract, and cross-skill global runtime unification. Issue #57 is not the final install or distribution solution.
 
 The Issue #57 contract-critical surfaces are formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, and execution-contract-related smoke/tests. These official surfaces must use the controlled development/test `.venv`, deployed runtime `.venv`, or an explicit wrapper that resolves to the appropriate interpreter.
 
-Residual `python3` references in historical docs, archived PRDs, generated `.dist`, templates/reference materials, and non-default mocked/e2e examples are nonblocking follow-up debt for Issue #59. This is a bucketed debt boundary, not a whole-repository `python3` text purge and not an exemption for contract-critical surfaces.
+Residual `python3` references in historical docs, archived PRDs, generated `.dist`, templates/reference materials, non-default mocked/e2e examples, templates, and reference material are nonblocking follow-up debt for Issue #59. This is a bucketed debt boundary, not a whole-repository `python3` text purge and not an exemption for contract-critical surfaces.
 
 #### Dependency source
 
@@ -156,7 +156,7 @@ Deploy both `leio-sdlc` and `pm-skill` locally using the kit installer:
 To use the SDLC engine, you **MUST** follow this strict linear process. You cannot manually write a PRD and feed it to the orchestrator directly.
 
 **Step 1: PRD Authoring (`pm-skill`)**
-Use `pm-skill` to safely scaffold and write the PRD template. This step belongs to `pm-skill`; Issue #57 does not define or change the `pm-skill` runtime contract.
+Use `pm-skill` to safely scaffold and write the PRD template. This step belongs to `pm-skill`; Issue #57 does not define or change the `pm-skill` runtime contract. The deployed `leio-sdlc` runtime `.venv` is isolated to `leio-sdlc` and does not force `pm-skill` or other skills to inherit, share, or switch to that runtime `.venv`.
 ```bash
 python3 ~/.openclaw/skills/pm-skill/scripts/init_prd.py --project <YourProject> --title "<Feature_Title>"
 ```
