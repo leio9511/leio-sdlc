@@ -1,3 +1,4 @@
+import hashlib
 import os
 import shutil
 import subprocess
@@ -8,6 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 RUNTIME_SMOKE = SCRIPTS_DIR / "runtime_smoke.py"
+REQUIREMENTS = REPO_ROOT / "requirements.txt"
 SMOKE_POLICY = "Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation."
 
 
@@ -19,10 +21,17 @@ def _copy_minimal_skill_root(target_root):
     return scripts_dir / "runtime_smoke.py"
 
 
-def _make_runtime_python(skill_root):
-    runtime_python = skill_root / ".venv" / "bin" / "python"
-    runtime_python.parent.mkdir(parents=True)
-    runtime_python.symlink_to(sys.executable)
+def _create_runtime_venv(skill_root):
+    venv_dir = skill_root / ".venv"
+    subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+    runtime_python = venv_dir / "bin" / "python"
+    subprocess.run(
+        [str(runtime_python), "-m", "pip", "install", "-r", str(REQUIREMENTS)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
     return runtime_python
 
 
@@ -42,7 +51,11 @@ def _snapshot(root):
         relative = path.relative_to(root)
         if ".venv" in relative.parts:
             continue
-        entries.append((str(relative), "dir" if path.is_dir() else "file"))
+        if path.is_dir():
+            entries.append((str(relative), "dir", None, None))
+        else:
+            data = path.read_bytes()
+            entries.append((str(relative), "file", len(data), hashlib.sha256(data).hexdigest()))
     return entries
 
 
@@ -63,7 +76,7 @@ def test_runtime_smoke_requires_expected_runtime_venv_interpreter(tmp_path):
 def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_dependencies(tmp_path):
     skill_root = tmp_path / "runtime-skill"
     smoke_path = _copy_minimal_skill_root(skill_root)
-    runtime_python = _make_runtime_python(skill_root)
+    runtime_python = _create_runtime_venv(skill_root)
 
     result = _run_smoke(
         runtime_python,
@@ -89,7 +102,7 @@ def test_runtime_smoke_accepts_explicit_runtime_venv_python_and_imports_key_depe
 def test_runtime_smoke_is_side_effect_free(tmp_path):
     skill_root = tmp_path / "isolated-skill"
     smoke_path = _copy_minimal_skill_root(skill_root)
-    runtime_python = _make_runtime_python(skill_root)
+    runtime_python = _create_runtime_venv(skill_root)
     before = _snapshot(skill_root)
 
     result = _run_smoke(
@@ -106,7 +119,10 @@ def test_runtime_smoke_is_side_effect_free(tmp_path):
     assert _snapshot(skill_root) == before
     forbidden = (".sdlc_runs", "jobs", "state", "auditor_debug", "__pycache__")
     for name in forbidden:
-        assert not any(path.name == name for path in skill_root.rglob("*")), name
+        assert not any(
+            path.name == name and ".venv" not in path.relative_to(skill_root).parts
+            for path in skill_root.rglob("*")
+        ), name
 
 
 def test_runtime_smoke_help_documents_official_no_side_effect_policy():
@@ -126,7 +142,7 @@ def test_runtime_smoke_help_documents_official_no_side_effect_policy():
 def test_runtime_smoke_startup_path_initialization_does_not_launch_orchestrator(tmp_path):
     skill_root = tmp_path / "startup-skill"
     smoke_path = _copy_minimal_skill_root(skill_root)
-    runtime_python = _make_runtime_python(skill_root)
+    runtime_python = _create_runtime_venv(skill_root)
 
     result = _run_smoke(
         runtime_python,
@@ -138,9 +154,26 @@ def test_runtime_smoke_startup_path_initialization_does_not_launch_orchestrator(
         cwd=skill_root,
     )
 
+    smoke_source = smoke_path.read_text(encoding="utf-8")
+    forbidden_launch_markers = (
+        "import orchestrator",
+        "from orchestrator",
+        "import subprocess",
+        "subprocess.",
+        "Popen(",
+        "sessions_spawn",
+        "spawn_coder",
+        "spawn_reviewer",
+        "spawn_auditor",
+        "spawn_verifier",
+        "invoke_agent",
+    )
+
     assert result.returncode == 0, result.stderr
     assert "startup_path=" in result.stdout
     assert "runtime smoke ok:" in result.stdout
+    for marker in forbidden_launch_markers:
+        assert marker not in smoke_source
     assert not (skill_root / ".sdlc_runs").exists()
     assert not (skill_root / ".coder_session").exists()
     assert not (skill_root / "orchestrator.log").exists()
