@@ -38,7 +38,7 @@ def resolve_runtime_skill_root(skill_root=None, script_path=None, env=None):
 
 
 def runtime_python_for_skill_root(skill_root):
-    """Return the controlled runtime interpreter path for a deployed skill root."""
+    """Return canonical ``<skill-root>/.venv/bin/python`` for a deployed skill root."""
     return _canonicalize_path(os.path.join(skill_root, ".venv", "bin", "python"))
 
 
