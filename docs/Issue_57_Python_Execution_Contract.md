@@ -1,6 +1,6 @@
 # Issue 57 Python Execution Contract
 
-This document is the current official operator/developer reference for Issue #57: Controlled Python Execution and Runtime Contract.
+This document is the current official operator/developer reference for Issue #57: Controlled Python Execution and Runtime Contract. It intentionally mirrors the active README.md and SKILL.md execution-model language so all official entry documents converge on the same dependency, development `.venv`, deployed runtime `.venv`, launch, and smoke contract.
 
 ## Core goal
 
@@ -47,7 +47,17 @@ The formal contract is not manual shell activation. Operators and agents should 
 
 The deployed runtime execution context is the deployed leio-sdlc skill root .venv, rebuilt per release in staging before atomic swap.
 
-Deployed skill commands must use the deployed skill runtime interpreter (for example `${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python`) or an equivalent documented wrapper that resolves to that interpreter. The deployed runtime `.venv` is separate from the repository development `.venv`; success in one environment must not be used as a substitute for validating the other.
+Deployed skill commands must use the deployed skill runtime interpreter (for example `${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python`) or an equivalent documented wrapper that resolves to that interpreter. Runtime launch examples must bind that deployed interpreter in the same command that launches the target runtime script, for example:
+
+```bash
+"${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \
+  "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py" \
+  --prd-file <Path_to_PRD.md> \
+  --workdir . \
+  --channel <your_channel>
+```
+
+The deployed runtime `.venv` is separate from the repository development `.venv`; success in one environment must not be used as a substitute for validating the other.
 
 This is not a global shared Python environment for other skills. Other skills must not be required to inherit, share, or switch to the leio-sdlc runtime `.venv` as a side effect of this contract.
 

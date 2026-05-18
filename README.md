@@ -94,7 +94,7 @@ The test suite utilizes a strict `test_tmp` isolation pattern. Tests explicitly 
 
 ### Python Execution Contract (Issue #57)
 
-The current official reference is `docs/Issue_57_Python_Execution_Contract.md`.
+The current official reference is `docs/Issue_57_Python_Execution_Contract.md`. This README intentionally repeats the same operator-facing contract so README.md, SKILL.md, and `docs/Issue_57_Python_Execution_Contract.md` stay aligned as active official entry documents.
 
 Define a controlled, repeatable Python execution contract for local development, testing, deployed skill runtime, and GitHub CI without depending on unmanaged system Python state.
 
@@ -127,7 +127,7 @@ bash preflight.sh --report-all
 
 Deployed `leio-sdlc` commands use the deployed leio-sdlc skill root .venv, rebuilt per release in staging before atomic swap.
 
-The deployed skill runtime is separate from the repository development/test `.venv`. Runtime launch examples must bind to the deployed skill interpreter, for example:
+The deployed skill runtime is separate from the repository development/test `.venv`. Runtime launch examples must bind to the deployed skill interpreter in the same command that launches the target script, for example:
 
 ```bash
 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python" \

@@ -27,6 +27,9 @@ REQUIRED_SMOKE_POLICY = (
     "execution as default smoke validation."
 )
 CONTROLLED_RUNTIME_PYTHON = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+CONTROLLED_ORCHESTRATOR = (
+    "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/scripts/orchestrator.py"
+)
 BARE_ORCHESTRATOR_LAUNCH = "python3 scripts/orchestrator.py"
 MANUAL_ACTIVATION = "source .venv/bin/activate"
 
@@ -37,6 +40,18 @@ def _read(path: Path) -> str:
 
 def _without_fenced_blocks(text: str) -> str:
     return re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+
+
+def _fenced_blocks(text: str) -> list[str]:
+    return re.findall(r"```(?:bash|shell)?\n(.*?)```", text, flags=re.DOTALL)
+
+
+def _has_controlled_orchestrator_launch_example(text: str) -> bool:
+    for block in _fenced_blocks(text):
+        normalized = " ".join(line.strip().rstrip("\\") for line in block.splitlines())
+        if CONTROLLED_RUNTIME_PYTHON in normalized and CONTROLLED_ORCHESTRATOR in normalized:
+            return True
+    return False
 
 
 def test_active_docs_state_single_dependency_and_dual_venv_contract():
@@ -54,10 +69,7 @@ def test_active_runtime_launch_docs_use_controlled_runtime_interpreter():
     for path in RUNTIME_LAUNCH_DOCS:
         text = _read(path)
 
-        assert CONTROLLED_RUNTIME_PYTHON in text, path
-        assert "scripts/orchestrator.py" in text, path
-        assert "deployed" in text.lower(), path
-        assert ".venv/bin/python" in text, path
+        assert _has_controlled_orchestrator_launch_example(text), path
         assert BARE_ORCHESTRATOR_LAUNCH not in text, path
 
 
