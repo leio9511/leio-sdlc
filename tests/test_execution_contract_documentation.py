@@ -315,6 +315,47 @@ def test_active_hook_guidance_payload_matches_installed_hook_source():
     assert installed_hook_guidance == payload_guidance
 
 
+def test_planner_slice_prompt_uses_controlled_dev_wrapper_for_contract_scaffolding():
+    prompt = _active_prompts()["planner_slice"]
+
+    assert "scripts/dev_python.sh" in prompt
+    assert "bash scripts/dev_python.sh {contract_script}" in prompt
+    assert "--only-scaffold" in prompt
+    assert "--workdir {workdir}" in prompt
+    assert "--job-dir {out_dir}{insert_after_flag}" in prompt
+    assert "{insert_after_flag}" in prompt
+    assert "--title <title>" in prompt
+    assert "python3 {contract_script}" not in prompt
+    assert re.search(r"python3\s+\{contract_script\}", prompt) is None
+
+
+def test_active_prompt_and_jit_surfaces_preserve_existing_semantics():
+    prompts = _active_prompts()
+    planner_slice = prompts["planner_slice"]
+    orchestrator = _read(REPO_ROOT / "scripts" / "orchestrator.py")
+    doctor = _read(REPO_ROOT / "scripts" / "doctor.py")
+
+    assert "failed multiple times" in planner_slice
+    assert "--insert-after" in planner_slice
+    assert "MANDATORY for sequential ordering" in planner_slice
+    assert "Use the EXACT same `--insert-after` value for EVERY slice" in planner_slice
+    assert "automatically handle the sequential numbering" in planner_slice
+    assert "TEMPLATE:" in planner_slice
+    assert "Do NOT alter the `status: open` YAML frontmatter" in planner_slice
+    assert "TDD GUARDRAIL" in planner_slice
+    assert "You are explicitly forbidden from manually editing the markdown file's status field" in planner_slice
+
+    assert "[FATAL] Workspace contains uncommitted state files" in orchestrator
+    assert "[JIT] To fix this, run:" in orchestrator
+    assert "--files" in orchestrator
+    assert "sys.exit(1)" in orchestrator
+
+    assert "[FATAL] Project is not SDLC compliant" in doctor
+    assert "[JIT] To fix: Execute" in doctor
+    assert "--fix" in doctor
+    assert "sys.exit(1)" in doctor
+
+
 def test_active_prompts_do_not_reintroduce_contract_critical_bare_python3():
     prompts = _active_prompts()
 

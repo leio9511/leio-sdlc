@@ -4,7 +4,9 @@ import tempfile
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
+sys.path.insert(0, str(SCRIPTS_DIR))
+sys.path.insert(1, str(Path(__file__).parent.parent))
 
 from scripts.doctor import (
     DOCTOR_GIT_USER_EMAIL,
@@ -122,7 +124,7 @@ def test_doctor_check_reports_runtime_aware_fix_path(tmp_path):
     )
     assert result.returncode == 1
     # Runtime-aware JIT fix path remains correct
-    assert f"[JIT] To fix: Execute `python3 {custom_root}/leio-sdlc/scripts/doctor.py --fix" in result.stdout
+    assert f"[JIT] To fix: Execute `${{SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}}/leio-sdlc/.venv/bin/python {custom_root}/leio-sdlc/scripts/doctor.py --fix" in result.stdout
     # Outdated-hook detection coexists with the JIT hint
     assert "Managed hook requires upgrade: .git/hooks/pre-commit" in result.stdout
 

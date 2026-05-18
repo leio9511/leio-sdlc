@@ -3,7 +3,7 @@ import subprocess
 import pytest
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
 import config
 
 def test_orchestrator_dynamic_strings(tmp_path, git_test_sandbox):
@@ -34,5 +34,5 @@ def test_orchestrator_dynamic_strings(tmp_path, git_test_sandbox):
     )
 
     assert result.returncode == 1
-    expected_error = f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {custom_root}/leio-sdlc/scripts/commit_state.py --files {os.path.abspath('PRD_uncommitted.md')}"
+    expected_error = f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: ${{SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}}/leio-sdlc/.venv/bin/python {custom_root}/leio-sdlc/scripts/commit_state.py --files {os.path.abspath('PRD_uncommitted.md')}"
     assert expected_error in result.stdout

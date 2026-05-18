@@ -101,6 +101,11 @@ def _managed_hook_needs_upgrade(src_hook, dest_hook):
     return expected_version is not None and actual_version != expected_version
 
 
+def _controlled_runtime_python_command(script_path, *args):
+    runtime_python = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+    return " ".join([runtime_python, script_path, *args])
+
+
 def main():
     parser = argparse.ArgumentParser(description="SDLC Doctor")
     parser.add_argument("target_dir", help="Target project directory")
@@ -159,8 +164,13 @@ def main():
         print('[FATAL] Project is not SDLC compliant.')
         for issue in issues:
             print(f'[ISSUE] {issue}')
-        # Provide runtime-aware compliance guidance using config.SDLC_RUNTIME_DIR
-        print(f'[JIT] To fix: Execute `python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix {target_dir}`')
+        # Provide runtime-aware compliance guidance using the deployed controlled runtime interpreter.
+        doctor_fix_command = _controlled_runtime_python_command(
+            f"{config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py",
+            "--fix",
+            target_dir,
+        )
+        print(f'[JIT] To fix: Execute `{doctor_fix_command}`')
         sys.exit(1)
         
 if __name__ == "__main__":

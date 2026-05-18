@@ -7,6 +7,9 @@ ISSUE_DOC = REPO_ROOT / "docs" / "Issue_57_Python_Execution_Contract.md"
 README = REPO_ROOT / "README.md"
 SKILL = REPO_ROOT / "SKILL.md"
 PROMPTS = REPO_ROOT / "config" / "prompts.json"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+ORCHESTRATOR = SCRIPTS_DIR / "orchestrator.py"
+DOCTOR = SCRIPTS_DIR / "doctor.py"
 PRE_COMMIT_HOOK = REPO_ROOT / ".sdlc_hooks" / "pre-commit"
 INSTALL_HOOK = REPO_ROOT / "scripts" / "install_hook.sh"
 RUNTIME_PYTHON = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
@@ -53,6 +56,26 @@ def _read(path):
 
 def _active_prompts():
     return json.loads(_read(PROMPTS))
+
+
+def test_orchestrator_uncommitted_prd_jit_uses_controlled_runtime_commit_state_command():
+    text = _read(ORCHESTRATOR)
+    bare_commit_state_guidance = re.compile(r"python3\s+[^\n;]*commit_state\.py")
+
+    assert RUNTIME_PYTHON in text
+    assert "commit_state.py" in text
+    assert "--files" in text
+    assert bare_commit_state_guidance.search(text) is None
+
+
+def test_doctor_jit_fix_guidance_uses_controlled_runtime_interpreter():
+    text = _read(DOCTOR)
+    bare_doctor_fix_guidance = re.compile(r"python3\s+[^\n;]*doctor\.py --fix")
+
+    assert RUNTIME_PYTHON in text
+    assert "doctor.py" in text
+    assert "--fix" in text
+    assert bare_doctor_fix_guidance.search(text) is None
 
 
 def test_test_runner_help_points_to_controlled_dev_execution_entries():

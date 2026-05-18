@@ -24,7 +24,7 @@ def build_planner_envelope(
         references["failed_pr_contract_path"] = failed_pr_contract_path
         
     contract_params = {
-        "scaffold_command": f"python3 {contract_script} --only-scaffold --workdir {workdir} --job-dir {out_dir} --title <title>"
+        "scaffold_command": f"bash scripts/dev_python.sh {contract_script} --only-scaffold --workdir {workdir} --job-dir {out_dir} --title <title>"
     }
     if failed_pr_id:
         contract_params["failed_pr_id"] = failed_pr_id

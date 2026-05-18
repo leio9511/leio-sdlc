@@ -210,20 +210,30 @@ def teardown_coder_session(workdir, run_dir="."):
         except OSError:
             pass # Reaper safety check: process already reaped or pgid not found
 
+def _controlled_runtime_python_command(script_path, *args):
+    runtime_python = "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python"
+    return " ".join([runtime_python, script_path, *args])
+
+
 def validate_prd_is_committed(prd_file, workdir):
     prd_path_abs = os.path.abspath(prd_file)
+    commit_state_command = _controlled_runtime_python_command(
+        f"{config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py",
+        "--files",
+        prd_path_abs,
+    )
     if os.path.exists(prd_path_abs):
         try:
             drun(["git", "ls-files", "--error-unmatch", prd_path_abs], check=True, capture_output=True, cwd=workdir)
         except subprocess.CalledProcessError:
-            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
-            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
+            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: {commit_state_command}")
+            print(f"[JIT] To fix this, run: {commit_state_command}")
             sys.exit(1)
 
         status_out = drun(["git", "status", "--porcelain", prd_path_abs], capture_output=True, text=True, cwd=workdir).stdout.strip()
         if status_out:
-            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
-            print(f"[JIT] To fix this, run: python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/commit_state.py --files {prd_path_abs}")
+            print(f"[FATAL] Workspace contains uncommitted state files. You MUST baseline your PRD and state using the official gateway: {commit_state_command}")
+            print(f"[JIT] To fix this, run: {commit_state_command}")
             sys.exit(1)
 
 from utils_json import extract_and_parse_json
@@ -551,7 +561,11 @@ def main():
         dlog("Running SDLC Doctor check...")
         res = drun([sys.executable, doctor_script, workdir, "--check"], capture_output=True, text=True)
         if res.returncode != 0:
-            print(f'[FATAL] Project is not SDLC compliant. Please run "python3 {config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py --fix" to apply the required infrastructure.')
+            doctor_fix_command = _controlled_runtime_python_command(
+                f"{config.SDLC_RUNTIME_DIR}/leio-sdlc/scripts/doctor.py",
+                "--fix",
+            )
+            print(f'[FATAL] Project is not SDLC compliant. Please run "{doctor_fix_command}" to apply the required infrastructure.')
             print(HandoffPrompter.get_prompt("startup_validation_failed"))
             sys.exit(1)
 

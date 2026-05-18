@@ -4,7 +4,7 @@ import pytest
 import sys
 from unittest.mock import patch
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
 import config
 import commit_state
 
@@ -40,7 +40,7 @@ def test_orchestrator_rejects_uncommitted_state(tmp_path, git_test_sandbox):
 
     assert result.returncode == 1
     assert "Workspace contains uncommitted state files." in result.stdout
-    assert f"python3 {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py" in result.stdout
+    assert f"${{SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}}/leio-sdlc/.venv/bin/python {config.SDLC_SKILLS_ROOT}/leio-sdlc/scripts/commit_state.py" in result.stdout
 
 
 def test_commit_state_success(tmp_path, git_test_sandbox):
