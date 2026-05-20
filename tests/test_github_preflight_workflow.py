@@ -47,6 +47,16 @@ MANUAL_ACTIVATION_MARKERS = (
     ". .venv/bin/activate",
     "source ${REPO_ROOT}/.venv/bin/activate",
 )
+TRAP_MODE_PREFLIGHT_COMMAND = "bash preflight.sh --trap-mode --report-all"
+TRAP_MODE_SOURCE_MARKERS = (
+    "--trap-mode",
+    "TRAP_MODE=0",
+    "activate_trap_mode",
+    'cat > "$TRAP_VENV_DIR/bin/pytest"',
+    'export PATH="$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"',
+    "TRAP REMEDIATION PENDING",
+    "TRAP MODE CLEAN",
+)
 
 
 def _load_workflow():
@@ -169,6 +179,16 @@ def test_github_preflight_runs_standard_preflight_after_controlled_bootstrap():
     assert "scripts/dev_python.sh" in bootstrap_run
     assert preflight_run == REPORT_ALL_PREFLIGHT_COMMAND
     assert LEGACY_REPORT_ALL_PREFLIGHT_COMMAND != preflight_run
+
+
+def test_github_preflight_trap_mode_is_available_but_not_the_default_ci_gate():
+    workflow_text = _workflow_text()
+    preflight_text = _preflight_text()
+
+    assert _get_steps_by_id()["run-preflight"].get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
+    assert TRAP_MODE_PREFLIGHT_COMMAND not in workflow_text
+    for marker in TRAP_MODE_SOURCE_MARKERS:
+        assert marker in preflight_text
 
 
 def test_github_preflight_runs_official_runtime_smoke_with_controlled_interpreter():

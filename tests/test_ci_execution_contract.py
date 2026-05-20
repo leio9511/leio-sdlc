@@ -31,6 +31,17 @@ ALLOWED_BASE_PYTHON_BOOTSTRAP_MARKERS = (
     'python -m venv "${RUNTIME_SMOKE_ROOT}/.venv"',
 )
 
+TRAP_MODE_PREFLIGHT_COMMAND = "bash preflight.sh --trap-mode --report-all"
+TRAP_REMEDIATION_BANNER = (
+    "TRAP REMEDIATION PENDING",
+    "This preflight run is green only under the temporary existing ignore-manifest rollout for trap-mode failures.",
+    "Remaining trap failures must be burned down to zero before this issue is complete.",
+)
+TRAP_CLEAN_BANNER = (
+    "TRAP MODE CLEAN",
+    "Trap-mode preflight passed with no remaining trap remediation entries.",
+)
+
 
 def _workflow_text():
     return WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -94,6 +105,26 @@ def test_workflow_uses_controlled_repo_venv_for_python_checks():
 
 
 def test_workflow_reuses_standard_preflight_entry():
+    assert _step_run("run-preflight").strip() == "bash preflight.sh --report-all"
+
+
+def test_preflight_source_encodes_trap_mode_execution_contract():
+    preflight_text = (REPO_ROOT / "preflight.sh").read_text(encoding="utf-8")
+
+    assert "--trap-mode" in preflight_text
+    assert "TRAP_MODE=0" in preflight_text
+    assert "activate_trap_mode" in preflight_text
+    assert "mktemp -d" in preflight_text
+    assert '"${PYTHON_CMD[@]}" -m venv "$TRAP_VENV_DIR"' in preflight_text
+    assert 'cat > "$TRAP_VENV_DIR/bin/pytest"' in preflight_text
+    assert 'export PATH="$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"' in preflight_text
+    assert "rm -rf \"$TRAP_VENV_DIR\"" in preflight_text
+
+    for line in TRAP_REMEDIATION_BANNER + TRAP_CLEAN_BANNER:
+        assert line in preflight_text
+
+    workflow_text = _workflow_text()
+    assert TRAP_MODE_PREFLIGHT_COMMAND not in workflow_text
     assert _step_run("run-preflight").strip() == "bash preflight.sh --report-all"
 
 
