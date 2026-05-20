@@ -21,7 +21,7 @@ CORE_BASH_TARGETS = (
 )
 
 AMBIENT_INVOCATION_RE = re.compile(
-    r"(^|[;&|(){}[:space:]])(?P<cmd>python3|python|pytest)(?=\s|$)"
+    r"(^|[;&|(){}]|\s)(?P<cmd>python3|python|pytest)(?=\s|$)"
 )
 ALLOWED_AMBIENT_SNIPPETS = (
     # scripts/dev_python.sh owns repo-venv creation; these target scripts must call that wrapper.
@@ -49,6 +49,26 @@ def _strip_single_quoted_heredocs(text: str) -> str:
             output.append(lines[index])
             index += 1
     return "\n".join(output) + "\n"
+
+
+def test_ambient_invocation_regex_detects_space_prefixed_commands():
+    detected = [
+        sample
+        for sample in (
+            "python3 scripts/orchestrator.py",
+            "timeout 15 python3 scripts/orchestrator.py",
+            "env FOO=1 pytest tests",
+            "if python -m pytest tests; then",
+        )
+        if AMBIENT_INVOCATION_RE.search(sample)
+    ]
+
+    assert detected == [
+        "python3 scripts/orchestrator.py",
+        "timeout 15 python3 scripts/orchestrator.py",
+        "env FOO=1 pytest tests",
+        "if python -m pytest tests; then",
+    ]
 
 
 def test_core_bash_targets_do_not_use_ambient_python_for_contract_critical_calls():
@@ -84,6 +104,27 @@ def test_core_bash_targets_removed_from_trap_manifest():
     still_ignored = sorted(set(CORE_BASH_TARGETS) & bash_ignored)
 
     assert not still_ignored, "Core bash targets still ignored: " + ", ".join(still_ignored)
+
+
+def test_trap_manifest_retains_only_mocked_e2e_bash_debt():
+    manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
+    bash_ignored = manifest.get("bash", [])
+
+    assert bash_ignored
+    assert all(path.startswith("scripts/e2e/mocked/") for path in bash_ignored)
+    assert all(path.endswith(".sh") for path in bash_ignored)
+    assert manifest.get("pytest") == []
+
+
+def test_preflight_entrypoints_are_real_validation_commands_and_not_quarantining_core_bash_targets():
+    preflight_text = (REPO_ROOT / "preflight.sh").read_text(encoding="utf-8")
+    manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
+
+    assert "--trap-mode" in preflight_text
+    assert 'run_test "bash $f" "Bash Test: $f"' in preflight_text
+    assert 'run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"' in preflight_text
+    assert not (set(CORE_BASH_TARGETS) & set(manifest.get("bash", [])))
+    assert manifest.get("pytest") == []
 
 
 def test_core_bash_targets_pass_with_clean_trap_ambient_python(tmp_path: Path):
