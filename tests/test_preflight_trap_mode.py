@@ -26,8 +26,17 @@ REPAIRED_ORCHESTRATOR_BASH_TARGETS = {
     "scripts/test_orchestrator_session_strategy.sh",
 }
 REMAINING_TRAP_BASH_TARGETS = [
-    "scripts/test_polyrepo_context.sh",
-    "scripts/test_pr_003.sh",
+    "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
+    "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
+    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
+    "scripts/e2e/mocked/e2e_test_git_boundary.sh",
+    "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
+    "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
+    "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
+    "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
+    "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
+    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
+    "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 ]
 
 
@@ -246,7 +255,7 @@ def test_slice_normal_preflight_stays_green_with_remaining_trap_debt_only(tmp_pa
 
     assert REPAIRED_ORCHESTRATOR_BASH_TARGETS.isdisjoint(bash_entries)
     assert set(REMAINING_TRAP_BASH_TARGETS).issubset(bash_entries)
-    assert len(manifest["bash"]) == 13
+    assert len(manifest["bash"]) == 11
 
     repo = _create_fixture_repo(
         tmp_path,

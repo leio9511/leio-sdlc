@@ -28,8 +28,6 @@ TARGETED_PYTEST_IGNORES = {
 }
 
 PRD_TRAP_BASH_IGNORES = {
-    "scripts/test_polyrepo_context.sh",
-    "scripts/test_pr_003.sh",
     "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
     "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
