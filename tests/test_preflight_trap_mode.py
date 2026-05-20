@@ -20,6 +20,15 @@ TRAP_CLEAN_BANNER = (
     "TRAP MODE CLEAN\n"
     "Trap-mode preflight passed with no remaining trap remediation entries."
 )
+REPAIRED_ORCHESTRATOR_BASH_TARGETS = {
+    "scripts/test_escalation_clean.sh",
+    "scripts/test_orchestrator_logs.sh",
+    "scripts/test_orchestrator_session_strategy.sh",
+}
+REMAINING_TRAP_BASH_TARGETS = [
+    "scripts/test_polyrepo_context.sh",
+    "scripts/test_pr_003.sh",
+]
 
 
 def _make_executable(path: Path) -> None:
@@ -99,7 +108,12 @@ def _create_fixture_repo(
     return repo
 
 
-def _run_preflight(repo: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_preflight(
+    repo: Path,
+    *args: str,
+    env: dict[str, str] | None = None,
+    timeout: int = 300,
+) -> subprocess.CompletedProcess[str]:
     run_env = os.environ.copy()
     run_env["SDLC_TEST_MODE"] = "true"
     if env:
@@ -110,6 +124,7 @@ def _run_preflight(repo: Path, *args: str, env: dict[str, str] | None = None) ->
         capture_output=True,
         text=True,
         env=run_env,
+        timeout=timeout,
         check=False,
     )
 
@@ -199,3 +214,48 @@ def test_trap_quarantine_banner_is_printed_for_non_empty_manifest(tmp_path: Path
     assert result.returncode == 0, result.stdout + result.stderr
     assert TRAP_BANNER in result.stdout
     assert "debt-quarantine green" not in result.stdout
+
+
+def test_slice_trap_preflight_stays_green_with_repaired_orchestrator_targets_removed(tmp_path: Path):
+    manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
+    bash_entries = set(manifest["bash"])
+
+    assert REPAIRED_ORCHESTRATOR_BASH_TARGETS.isdisjoint(bash_entries)
+
+    repo = _create_fixture_repo(
+        tmp_path,
+        bash_manifest=REMAINING_TRAP_BASH_TARGETS,
+        include_hostile_bash=False,
+    )
+    result = _run_preflight(repo, "--trap-mode", "--report-all")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert TRAP_BANNER in result.stdout
+    assert "✅" in result.stdout
+    assert "TRAP MODE CLEAN" not in result.stdout
+    assert f"{len(REMAINING_TRAP_BASH_TARGETS)} bash target(s)" not in result.stdout
+    assert "debt-quarantine green" not in result.stdout
+    assert "scripts/test_escalation_clean.sh" not in result.stdout
+    assert "scripts/test_orchestrator_logs.sh" not in result.stdout
+    assert "scripts/test_orchestrator_session_strategy.sh" not in result.stdout
+
+
+def test_slice_normal_preflight_stays_green_with_remaining_trap_debt_only(tmp_path: Path):
+    manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
+    bash_entries = set(manifest["bash"])
+
+    assert REPAIRED_ORCHESTRATOR_BASH_TARGETS.isdisjoint(bash_entries)
+    assert set(REMAINING_TRAP_BASH_TARGETS).issubset(bash_entries)
+    assert len(manifest["bash"]) == 13
+
+    repo = _create_fixture_repo(
+        tmp_path,
+        bash_manifest=REMAINING_TRAP_BASH_TARGETS,
+        include_hostile_bash=False,
+    )
+    result = _run_preflight(repo, "--report-all")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "debt-quarantine green" in result.stdout
+    assert f"{len(REMAINING_TRAP_BASH_TARGETS)} bash target(s)" in result.stdout
+    assert TRAP_BANNER not in result.stdout

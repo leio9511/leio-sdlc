@@ -110,6 +110,7 @@ def test_workflow_reuses_standard_preflight_entry():
 
 def test_preflight_source_encodes_trap_mode_execution_contract():
     preflight_text = (REPO_ROOT / "preflight.sh").read_text(encoding="utf-8")
+    manifest_text = (REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8")
 
     assert "--trap-mode" in preflight_text
     assert "TRAP_MODE=0" in preflight_text
@@ -126,6 +127,13 @@ def test_preflight_source_encodes_trap_mode_execution_contract():
     workflow_text = _workflow_text()
     assert TRAP_MODE_PREFLIGHT_COMMAND not in workflow_text
     assert _step_run("run-preflight").strip() == "bash preflight.sh --report-all"
+
+    for repaired_target in (
+        "scripts/test_escalation_clean.sh",
+        "scripts/test_orchestrator_logs.sh",
+        "scripts/test_orchestrator_session_strategy.sh",
+    ):
+        assert repaired_target not in manifest_text
 
 
 def test_workflow_runs_execution_contract_smoke():
