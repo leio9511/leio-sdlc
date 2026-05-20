@@ -70,6 +70,12 @@ trap cleanup EXIT
 activate_trap_mode() {
     TRAP_VENV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leio-preflight-trap-venv.XXXXXXXXXX")
     "${PYTHON_CMD[@]}" -m venv "$TRAP_VENV_DIR"
+    cat > "$TRAP_VENV_DIR/bin/pytest" <<'SH'
+#!/usr/bin/env bash
+echo "No module named 'pytest'" >&2
+exec "$(dirname "$0")/python" -m pytest "$@"
+SH
+    chmod +x "$TRAP_VENV_DIR/bin/pytest"
     if [[ -n "${PREFLIGHT_TRAP_VENV_MARKER_FILE:-}" ]]; then
         printf '%s\n' "$TRAP_VENV_DIR" > "$PREFLIGHT_TRAP_VENV_MARKER_FILE"
     fi
@@ -271,6 +277,11 @@ finalize_preflight() {
 
         echo "==============================================="
         exit 1
+    fi
+
+    if (( TRAP_MODE == 1 && BASH_IGNORE_COUNT + PYTEST_IGNORE_COUNT == 0 )); then
+        echo "TRAP MODE CLEAN"
+        echo "Trap-mode preflight passed with no remaining trap remediation entries."
     fi
 
     echo "✅ $TOTAL_PASSED tests/test-suites passed."

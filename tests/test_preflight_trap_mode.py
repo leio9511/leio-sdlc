@@ -16,6 +16,10 @@ TRAP_BANNER = (
     "rollout for trap-mode failures.\n"
     "Remaining trap failures must be burned down to zero before this issue is complete."
 )
+TRAP_CLEAN_BANNER = (
+    "TRAP MODE CLEAN\n"
+    "Trap-mode preflight passed with no remaining trap remediation entries."
+)
 
 
 def _make_executable(path: Path) -> None:
@@ -34,6 +38,7 @@ def _create_fixture_repo(
     *,
     bash_manifest: list[str] | None = None,
     include_hostile_bash: bool = True,
+    hostile_command: str = "python3 -c 'import yaml'",
 ) -> Path:
     repo = tmp_path / "fixture_repo"
     repo.mkdir(parents=True)
@@ -87,7 +92,7 @@ def _create_fixture_repo(
             repo / "scripts" / "test_ambient_yaml.sh",
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
-            "python3 -c 'import yaml'\n",
+            f"{hostile_command}\n",
             executable=True,
         )
 
@@ -128,6 +133,40 @@ def test_trap_mode_uses_clean_ambient_python_without_project_dependencies(tmp_pa
     assert result.returncode != 0
     assert "Bash Test: scripts/test_ambient_yaml.sh" in result.stdout
     assert "No module named yaml" in result.stdout or "No module named 'yaml'" in result.stdout
+
+
+def test_trap_mode_masks_host_pytest_with_hostile_trap_pytest(tmp_path: Path):
+    repo = _create_fixture_repo(tmp_path, hostile_command="pytest --version")
+    host_bin = tmp_path / "host_bin"
+    host_bin.mkdir()
+    _write(
+        host_bin / "pytest",
+        "#!/usr/bin/env bash\n"
+        "echo HOST PYTEST SHOULD NOT RUN\n"
+        "exit 0\n",
+        executable=True,
+    )
+
+    result = _run_preflight(
+        repo,
+        "--trap-mode",
+        "--report-all",
+        env={"PATH": f"{host_bin}{os.pathsep}{os.environ['PATH']}"},
+    )
+
+    assert result.returncode != 0
+    assert "Bash Test: scripts/test_ambient_yaml.sh" in result.stdout
+    assert "HOST PYTEST SHOULD NOT RUN" not in result.stdout
+
+
+def test_trap_mode_prints_clean_banner_when_manifest_empty(tmp_path: Path):
+    repo = _create_fixture_repo(tmp_path, include_hostile_bash=False)
+
+    result = _run_preflight(repo, "--trap-mode", "--report-all")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert TRAP_CLEAN_BANNER in result.stdout
+    assert TRAP_BANNER not in result.stdout
 
 
 def test_trap_mode_does_not_modify_repo_venv_and_cleans_temp_venv(tmp_path: Path):
