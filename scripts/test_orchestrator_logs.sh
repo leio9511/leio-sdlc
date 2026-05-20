@@ -4,7 +4,6 @@ set -euo pipefail
 echo "--- Running Orchestrator File Logging Test ---"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEV_PYTHON="$PROJECT_ROOT/scripts/dev_python.sh"
 SANDBOX_DIR=$(mktemp -d)
 GLOBAL_MOCK_DIR=$(mktemp -d)
 trap 'rm -rf "$SANDBOX_DIR" "$GLOBAL_MOCK_DIR"' EXIT
@@ -31,7 +30,7 @@ if [ "$(git config --local --get user.name)" != "SDLC Test Sandbox" ] || [ "$(gi
 fi
 
 # Apply SDLC infrastructure
-"$DEV_PYTHON" "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
+python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
 
 echo "test_output.log" >> .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
@@ -56,7 +55,7 @@ export SDLC_BYPASS_BRANCH_CHECK=1
 export SDLC_TEST_MODE=true
 set +e
 # Use timeout to avoid hang if it tries to spawn something
-timeout 15 "$DEV_PYTHON" "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "$GLOBAL_MOCK_DIR" > test_output.log 2>&1
+timeout 15 python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --force-replan false --channel "valid:id" --global-dir "$GLOBAL_MOCK_DIR" > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 
