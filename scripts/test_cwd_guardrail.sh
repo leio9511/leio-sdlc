@@ -6,6 +6,7 @@ set -euo pipefail
 # Ensures that SDLC scripts correctly enforce working directory boundaries.
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEV_PYTHON="$PROJECT_ROOT/scripts/dev_python.sh"
 source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 TEMP_DIR="$(mktemp -d)"
@@ -36,7 +37,7 @@ mkdir -p "$INNER_DIR"
 
 echo "--- Testing Boundary Violation Detection ---"
 cd "$PROJECT_ROOT"
-BOUNDARY_OUTPUT="$(python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "valid:id" --global-dir "$PROJECT_ROOT" 2>&1 || true)"
+BOUNDARY_OUTPUT="$("$DEV_PYTHON" scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "valid:id" --global-dir "$PROJECT_ROOT" 2>&1 || true)"
 if echo "$BOUNDARY_OUTPUT" | grep -qi "git boundary violation"; then
     echo "✅ Success: Boundary violation detected."
 else
@@ -54,7 +55,7 @@ git add prd.md
 git commit -m "init" > /dev/null
 
 cd "$PROJECT_ROOT"
-VALID_REPO_OUTPUT="$(python3 scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "valid:id" --global-dir "$PROJECT_ROOT" 2>&1 || true)"
+VALID_REPO_OUTPUT="$("$DEV_PYTHON" scripts/orchestrator.py --enable-exec-from-workspace --force-replan true --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$INNER_DIR" --prd-file "prd.md" --channel "valid:id" --global-dir "$PROJECT_ROOT" 2>&1 || true)"
 if echo "$VALID_REPO_OUTPUT" | grep -qi "git boundary violation"; then
     echo "❌ FAILED: Boundary violation detected on a valid git repo."
     echo "$VALID_REPO_OUTPUT"

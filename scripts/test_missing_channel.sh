@@ -4,6 +4,7 @@ set -e
 echo "--- Running Missing Channel Test ---"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEV_PYTHON="$PROJECT_ROOT/scripts/dev_python.sh"
 SANDBOX_DIR=$(mktemp -d)
 cd "$SANDBOX_DIR"
 
@@ -28,7 +29,7 @@ source "${PROJECT_ROOT}/scripts/e2e/setup_sandbox.sh"
 init_git_test_sandbox "$(pwd)"
 
 # Apply SDLC infrastructure
-python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
+"$DEV_PYTHON" "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
 
 echo "test_output.log" >> .gitignore
 echo ".sdlc_repo.lock" >> .gitignore
@@ -45,7 +46,7 @@ fi
 export PYTHONPATH="${PROJECT_ROOT}/scripts:$PYTHONPATH"
 export SDLC_BYPASS_BRANCH_CHECK=1
 set +e
-python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --coder-session-strategy always --force-replan true > test_output.log 2>&1
+env -u SDLC_TEST_MODE "$DEV_PYTHON" "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --max-prs-to-process 1 --coder-session-strategy always --force-replan true > test_output.log 2>&1
 EXIT_CODE=$?
 set -e
 

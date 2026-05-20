@@ -3,6 +3,7 @@ export SDLC_TEST_MODE=true
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEV_PYTHON="$PROJECT_ROOT/scripts/dev_python.sh"
 source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
 SANDBOX_DIR="$(mktemp -d)"
@@ -25,13 +26,13 @@ echo "Sandbox: $SANDBOX_DIR"
 
 cd "$SANDBOX_DIR"
 init_git_test_sandbox "$(pwd)"
-python3 "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
+"$DEV_PYTHON" "${PROJECT_ROOT}/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1
 git add .
 git commit -m "init" > /dev/null
 
 # Run orchestrator in a sub-process so we can kill it after checking the lock
 # We use --test-sleep to make it wait
-python3 "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --test-sleep --channel "valid:id" --global-dir "$(pwd)" &
+"$DEV_PYTHON" "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --test-sleep --channel "valid:id" --global-dir "$(pwd)" &
 PID=$!
 sleep 1
 
