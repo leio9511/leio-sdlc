@@ -28,9 +28,6 @@ TARGETED_PYTEST_IGNORES = {
 }
 
 PRD_TRAP_BASH_IGNORES = {
-    "scripts/test_escalation_clean.sh",
-    "scripts/test_orchestrator_logs.sh",
-    "scripts/test_orchestrator_session_strategy.sh",
     "scripts/test_polyrepo_context.sh",
     "scripts/test_pr_003.sh",
     "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
