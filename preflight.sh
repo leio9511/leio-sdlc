@@ -21,6 +21,10 @@ QUARANTINE_GREEN_STATEMENT="A non-empty ignore list may produce debt-quarantine 
 FAIL_FAST_MODE_NAME="fail-fast"
 REPORT_ALL_MODE_NAME="report-all"
 
+TRAP_MODE=0
+TRAP_VENV_DIR=""
+PREFLIGHT_BASE_PATH="$PATH"
+PREFLIGHT_BASE_VIRTUAL_ENV="${VIRTUAL_ENV:-}"
 MODE="$FAIL_FAST_MODE_NAME"
 RUN_LIVE_LLM=0
 for arg in "$@"; do
@@ -30,6 +34,9 @@ for arg in "$@"; do
             ;;
         --report-all)
             MODE="$REPORT_ALL_MODE_NAME"
+            ;;
+        --trap-mode)
+            TRAP_MODE=1
             ;;
         *)
             echo "❌ PREFLIGHT FAILED: Unknown argument: $arg"
@@ -54,8 +61,41 @@ export PYTHONPATH="$PROJECT_DIR:$PYTHONPATH"
 
 cleanup() {
     rm -f "$TMP_TEST_LOG" "$TMP_BASH_IGNORE" "$TMP_PYTEST_IGNORE"
+    if [[ -n "$TRAP_VENV_DIR" ]]; then
+        rm -rf "$TRAP_VENV_DIR"
+    fi
 }
 trap cleanup EXIT
+
+activate_trap_mode() {
+    TRAP_VENV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leio-preflight-trap-venv.XXXXXXXXXX")
+    "${PYTHON_CMD[@]}" -m venv "$TRAP_VENV_DIR"
+    if [[ -n "${PREFLIGHT_TRAP_VENV_MARKER_FILE:-}" ]]; then
+        printf '%s\n' "$TRAP_VENV_DIR" > "$PREFLIGHT_TRAP_VENV_MARKER_FILE"
+    fi
+}
+
+enter_trap_ambient() {
+    if (( TRAP_MODE == 1 )); then
+        export PATH="$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"
+        export VIRTUAL_ENV="$TRAP_VENV_DIR"
+    fi
+}
+
+leave_trap_ambient() {
+    if (( TRAP_MODE == 1 )); then
+        export PATH="$PREFLIGHT_BASE_PATH"
+        if [[ -n "$PREFLIGHT_BASE_VIRTUAL_ENV" ]]; then
+            export VIRTUAL_ENV="$PREFLIGHT_BASE_VIRTUAL_ENV"
+        else
+            unset VIRTUAL_ENV
+        fi
+    fi
+}
+
+if (( TRAP_MODE == 1 )); then
+    activate_trap_mode
+fi
 
 fail_ignore_manifest() {
     echo "❌ PREFLIGHT FAILED: $FAIL_CLOSED_STATEMENT"
@@ -162,10 +202,13 @@ run_test() {
     local cmd="$1"
     local desc="$2"
 
+    enter_trap_ambient
     if ! eval "$cmd" > "$TMP_TEST_LOG" 2>&1; then
+        leave_trap_ambient
         report_test_failure "$desc"
         return 1
     fi
+    leave_trap_ambient
     ((TOTAL_PASSED++))
     return 0
 }
@@ -198,8 +241,14 @@ run_live_llm_test() {
 
 finalize_preflight() {
     if (( BASH_IGNORE_COUNT + PYTEST_IGNORE_COUNT > 0 )); then
-        echo "⚠️ $QUARANTINE_GREEN_STATEMENT"
-        echo "⚠️ Debt quarantine ignored $BASH_IGNORE_COUNT bash target(s) and $PYTEST_IGNORE_COUNT pytest target(s)."
+        if (( TRAP_MODE == 1 )); then
+            echo "TRAP REMEDIATION PENDING"
+            echo "This preflight run is green only under the temporary existing ignore-manifest rollout for trap-mode failures."
+            echo "Remaining trap failures must be burned down to zero before this issue is complete."
+        else
+            echo "⚠️ $QUARANTINE_GREEN_STATEMENT"
+            echo "⚠️ Debt quarantine ignored $BASH_IGNORE_COUNT bash target(s) and $PYTEST_IGNORE_COUNT pytest target(s)."
+        fi
     fi
 
     if (( ${#FAILED_CHECKS[@]} > 0 )); then

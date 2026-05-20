@@ -27,10 +27,36 @@ TARGETED_PYTEST_IGNORES = {
     "tests/test_planner_envelope_forward_compatibility.py",
 }
 
-HANDOFF_PYTEST_IGNORES = {
-    "tests/test_handoff_integration.py",
-    "tests/test_orchestrator_handoff.py",
+PRD_TRAP_BASH_IGNORES = {
+    "scripts/test_cwd_guardrail.sh",
+    "scripts/test_escalation_clean.sh",
+    "scripts/test_missing_channel.sh",
+    "scripts/test_missing_force_replan.sh",
+    "scripts/test_orchestrator_logs.sh",
+    "scripts/test_orchestrator_session_strategy.sh",
+    "scripts/test_polyrepo_context.sh",
+    "scripts/test_pr_003.sh",
+    "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
+    "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
+    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
+    "scripts/e2e/mocked/e2e_test_git_boundary.sh",
+    "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
+    "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
+    "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
+    "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
+    "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
+    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
+    "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 }
+
+
+def test_ignore_manifest_initialized_only_with_prd_trap_targets():
+    manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
+
+    assert isinstance(manifest, dict)
+    assert set(manifest) == {"bash", "pytest"}
+    assert set(manifest["bash"]) == PRD_TRAP_BASH_IGNORES
+    assert manifest["pytest"] == []
 
 
 def _make_executable(path: Path) -> None:
@@ -122,7 +148,6 @@ def test_targeted_portability_pytests_are_not_quarantined():
     assert all(isinstance(item, str) for item in manifest["bash"])
     assert all(isinstance(item, str) for item in manifest["pytest"])
     assert TARGETED_PYTEST_IGNORES.isdisjoint(manifest["pytest"])
-    assert HANDOFF_PYTEST_IGNORES.isdisjoint(manifest["pytest"])
 
 
 def test_preflight_source_of_truth_still_consumes_repo_ignore_manifest(tmp_path: Path):
