@@ -29,16 +29,18 @@ REPAIRED_ORCHESTRATOR_BASH_TARGETS = {
 REMAINING_TRAP_BASH_TARGETS = [
     "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
-    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
-    "scripts/e2e/mocked/e2e_test_git_boundary.sh",
-    "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
-    "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
     "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
     "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
     "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 ]
 REPAIRED_PREFLIGHT_GUARDRAILS_TARGET = "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh"
+REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS = {
+    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
+    "scripts/e2e/mocked/e2e_test_git_boundary.sh",
+    "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
+    "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
+}
 
 
 def _make_executable(path: Path) -> None:
@@ -255,9 +257,10 @@ def test_slice_normal_preflight_stays_green_with_remaining_trap_debt_only(tmp_pa
     bash_entries = set(manifest["bash"])
 
     assert REPAIRED_ORCHESTRATOR_BASH_TARGETS.isdisjoint(bash_entries)
+    assert REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS.isdisjoint(bash_entries)
     assert set(REMAINING_TRAP_BASH_TARGETS).issubset(bash_entries)
     assert REPAIRED_PREFLIGHT_GUARDRAILS_TARGET not in bash_entries
-    assert len(manifest["bash"]) == 10
+    assert len(manifest["bash"]) == 6
 
     repo = _create_fixture_repo(
         tmp_path,

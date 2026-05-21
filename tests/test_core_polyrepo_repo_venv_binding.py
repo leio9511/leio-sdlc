@@ -14,10 +14,6 @@ POLYREPO_MANIFEST_ENTRY = "scripts/test_polyrepo_context.sh"
 UNRELATED_TRAP_MANIFEST_ENTRIES = {
     "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
-    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
-    "scripts/e2e/mocked/e2e_test_git_boundary.sh",
-    "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
-    "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
     "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
     "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",

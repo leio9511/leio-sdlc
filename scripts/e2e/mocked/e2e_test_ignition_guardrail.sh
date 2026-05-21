@@ -33,14 +33,20 @@ echo ".tmp/" >> .gitignore
 echo "scripts/__pycache__/" >> .gitignore
 git add .gitignore scripts
 git commit -m "add hermetic scripts" > /dev/null 2>&1
-python3 "$PROJECT_ROOT/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1 || true
+"$PROJECT_ROOT/scripts/dev_python.sh" "$PROJECT_ROOT/scripts/doctor.py" "$(pwd)" --fix > /dev/null 2>&1 || true
 git add -A
 git commit -m "doctor fix" > /dev/null 2>&1 || true
 git status
 
+SANDBOX_DEV_PYTHON="$TEST_DIR/scripts/dev_python.sh"
+
+run_sandbox_python() {
+    "$SANDBOX_DEV_PYTHON" "$@"
+}
+
 echo "Running Ignition Failure Test..."
 # Mock the orchestrator failure
-output=$(SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "invalid:id" --max-prs-to-process 1 --coder-session-strategy always 2>&1 || true)
+output=$(SDLC_TEST_MODE=true run_sandbox_python "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "invalid:id" --max-prs-to-process 1 --coder-session-strategy always 2>&1 || true)
 
 if ! echo "$output" | grep -i -q "Invalid notification channel format\|channel.*invalid"; then
     # It might be caught by argparse before or during execution. We check for an error condition.
@@ -57,7 +63,7 @@ echo "Running Ignition Success Test..."
 
 # We need a background process that we can kill after handshake because
 # if we run the orchestrator it will actually execute the PR logic.
-SDLC_TEST_MODE=true python3 "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "valid:id" --max-prs-to-process 1 --coder-session-strategy always > ../success_test.log 2>&1 &
+SDLC_TEST_MODE=true run_sandbox_python "$TEST_DIR/scripts/orchestrator.py" --enable-exec-from-workspace --force-replan false --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --channel "valid:id" --max-prs-to-process 1 --coder-session-strategy always > ../success_test.log 2>&1 &
 ORCH_PID=$!
 
 # Wait for handshake
