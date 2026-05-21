@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CORE_BASH_TARGETS = (
@@ -31,27 +33,27 @@ ALLOWED_AMBIENT_SNIPPETS = (
     # owns repo .venv bootstrap semantics outside this regression scope.
     "scripts/dev_python.sh",
 )
-FULL_PREFLIGHT_ACCEPTANCE_EVIDENCE = {
-    "trap_mode": {
-        "command": "bash preflight.sh --trap-mode --report-all",
-        "returncode": 0,
-        "observed_output": (
-            "TRAP REMEDIATION PENDING\n"
-            "This preflight run is green only under the temporary existing ignore-manifest rollout for trap-mode failures.\n"
-            "Remaining trap failures must be burned down to zero before this issue is complete.\n"
-            "✅ 30 tests/test-suites passed."
+PREFLIGHT_ACCEPTANCE_RECURSION_GUARD = "LEIO_FULL_PREFLIGHT_ACCEPTANCE_CHILD"
+PREFLIGHT_ACCEPTANCE_OPT_IN = "LEIO_RUN_FULL_PREFLIGHT_ACCEPTANCE"
+PREFLIGHT_ACCEPTANCE_COMMANDS = (
+    (
+        "trap-mode full preflight",
+        ["bash", "preflight.sh", "--trap-mode", "--report-all"],
+        (
+            "TRAP REMEDIATION PENDING",
+            "Remaining trap failures must be burned down to zero before this issue is complete.",
+            "✅ 30 tests/test-suites passed.",
         ),
-    },
-    "normal": {
-        "command": "bash preflight.sh --report-all",
-        "returncode": 0,
-        "observed_output": (
-            "⚠️ A non-empty ignore list may produce debt-quarantine green, which is distinct from true full green.\n"
-            "⚠️ Debt quarantine ignored 11 bash target(s) and 0 pytest target(s).\n"
-            "✅ 30 tests/test-suites passed."
+    ),
+    (
+        "normal full preflight",
+        ["bash", "preflight.sh", "--report-all"],
+        (
+            "Debt quarantine ignored 11 bash target(s) and 0 pytest target(s).",
+            "✅ 30 tests/test-suites passed.",
         ),
-    },
-}
+    ),
+)
 
 
 def _strip_single_quoted_heredocs(text: str) -> str:
@@ -118,36 +120,53 @@ def test_all_core_bash_targets_removed_from_trap_manifest():
     assert not still_ignored, "Core bash targets still ignored: " + ", ".join(still_ignored)
 
 
-def test_real_repository_full_preflight_acceptance_evidence_is_recorded():
-    """Reviewer-facing evidence for the contract's full preflight acceptance gates.
+def test_real_repository_full_preflight_acceptance_commands_pass():
+    """Run the contract's real full-preflight acceptance gates without recursion.
 
-    The PR contract requires the real repository commands below to pass. Running
-    those commands from inside this pytest module would recursively invoke the
-    full pytest suite through preflight, so this regression records the observed
-    real-repository validation output in the diff while the actual commands are
-    rerun by the coder before commit.
+    ``preflight.sh`` runs the full pytest suite, which includes this test. The
+    guard below lets the child preflight's pytest invocation skip only this
+    recursive acceptance test while still executing the repository preflight
+    commands and the rest of the suite.
     """
-    assert FULL_PREFLIGHT_ACCEPTANCE_EVIDENCE == {
-        "trap_mode": {
-            "command": "bash preflight.sh --trap-mode --report-all",
-            "returncode": 0,
-            "observed_output": (
-                "TRAP REMEDIATION PENDING\n"
-                "This preflight run is green only under the temporary existing ignore-manifest rollout for trap-mode failures.\n"
-                "Remaining trap failures must be burned down to zero before this issue is complete.\n"
-                "✅ 30 tests/test-suites passed."
-            ),
-        },
-        "normal": {
-            "command": "bash preflight.sh --report-all",
-            "returncode": 0,
-            "observed_output": (
-                "⚠️ A non-empty ignore list may produce debt-quarantine green, which is distinct from true full green.\n"
-                "⚠️ Debt quarantine ignored 11 bash target(s) and 0 pytest target(s).\n"
-                "✅ 30 tests/test-suites passed."
-            ),
-        },
+    if os.environ.get(PREFLIGHT_ACCEPTANCE_OPT_IN) != "1":
+        pytest.skip(
+            f"set {PREFLIGHT_ACCEPTANCE_OPT_IN}=1 to run full real-repository preflight acceptance gates"
+        )
+    if os.environ.get(PREFLIGHT_ACCEPTANCE_RECURSION_GUARD) == "1":
+        pytest.skip("recursive child preflight run")
+
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"HOME", "PATH", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", "TERM"}
     }
+    env[PREFLIGHT_ACCEPTANCE_RECURSION_GUARD] = "1"
+    env["PYTEST_ADDOPTS"] = "--ignore=tests/test_core_polyrepo_pr003_repo_venv_binding.py"
+
+    failures: list[str] = []
+    for desc, command, expected_markers in PREFLIGHT_ACCEPTANCE_COMMANDS:
+        result = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=900,
+        )
+        combined_output = result.stdout + result.stderr
+        if result.returncode != 0:
+            failures.append(
+                f"{desc} exited {result.returncode}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            )
+            continue
+        missing = [marker for marker in expected_markers if marker not in combined_output]
+        if missing:
+            failures.append(
+                f"{desc} missing expected marker(s): {missing}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            )
+
+    assert not failures, "\n\n".join(failures)
 
 
 def test_polyrepo_pr003_bash_targets_pass_with_clean_trap_ambient_python(tmp_path: Path):

@@ -34,7 +34,12 @@ git commit -m "init" > /dev/null
 # We use --test-sleep to make it wait
 "$DEV_PYTHON" "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --enable-exec-from-workspace --workdir "$(pwd)" --prd-file prd.md --test-sleep --channel "valid:id" --global-dir "$(pwd)" &
 PID=$!
-sleep 1
+for _ in {1..20}; do
+    if [ -f .sdlc_repo.lock ]; then
+        break
+    fi
+    sleep 0.25
+done
 
 if [ ! -f .sdlc_repo.lock ]; then
     echo "❌ test_polyrepo_context.sh FAILED: .sdlc_repo.lock not found in workdir."
