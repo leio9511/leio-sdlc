@@ -246,7 +246,7 @@ def test_trap_mode_does_not_modify_repo_venv_and_cleans_temp_venv(tmp_path: Path
     assert not trap_venv_path.exists()
 
 
-def test_trap_quarantine_banner_is_printed_for_non_empty_manifest(tmp_path: Path):
+def test_non_empty_fixture_manifest_still_prints_remediation_pending_banner(tmp_path: Path):
     repo = _create_fixture_repo(tmp_path, bash_manifest=["scripts/test_ambient_yaml.sh"])
 
     result = _run_preflight(repo, "--trap-mode", "--report-all")
