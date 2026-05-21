@@ -69,10 +69,12 @@ def test_test_mode_leakage_harness_references_dev_python_binding():
     assert all("run_sandbox_python" in line for line in orchestrator_invocations)
 
 
-def test_test_mode_leakage_harness_still_quarantined_until_manifest_slice():
+def test_test_mode_leakage_removed_from_trap_manifest_only():
     manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
 
-    assert HARNESS_MANIFEST_ENTRY in manifest["bash"]
+    assert HARNESS_MANIFEST_ENTRY not in manifest["bash"]
+    assert HARNESS_MANIFEST_ENTRY not in manifest["pytest"]
+    assert manifest["bash"] == ["scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh"]
     assert manifest["pytest"] == []
 
 

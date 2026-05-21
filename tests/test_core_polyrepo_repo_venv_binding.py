@@ -12,7 +12,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 POLYREPO_BASH_TARGET = REPO_ROOT / "scripts" / "test_polyrepo_context.sh"
 POLYREPO_MANIFEST_ENTRY = "scripts/test_polyrepo_context.sh"
 UNRELATED_TRAP_MANIFEST_ENTRIES = {
-    "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
 }
 AMBIENT_PYTHON_RE = re.compile(
