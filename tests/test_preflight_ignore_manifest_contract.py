@@ -53,14 +53,19 @@ PRD_TARGETED_MOCKED_E2E_TARGETS = {
 
 def test_mocked_e2e_manifest_burn_down_does_not_require_global_empty_manifest_yet():
     manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
-    quarantined_entries = set(manifest["bash"]) | set(manifest["pytest"])
 
+    assert isinstance(manifest, dict)
+    assert set(manifest) == {"bash", "pytest"}
+    assert isinstance(manifest["bash"], list)
+    assert isinstance(manifest["pytest"], list)
+    assert all(isinstance(item, str) for item in manifest["bash"])
+    assert all(isinstance(item, str) for item in manifest["pytest"])
+
+    quarantined_entries = set(manifest["bash"]) | set(manifest["pytest"])
     assert PRD_TARGETED_MOCKED_E2E_TARGETS.isdisjoint(quarantined_entries)
-    assert manifest == {"bash": [], "pytest": []}
-    # PR-003 proves mocked-E2E burn-down only.  If a future slice carries
-    # non-mocked-E2E trap debt, this test may allow that debt while continuing
-    # to reject all eleven PRD-targeted mocked E2E paths.  PR-004 owns making
-    # a non-empty manifest fail as final rollout completion criteria.
+    # PR-003 proves mocked-E2E burn-down only.  Non-mocked-E2E trap debt may
+    # still use the temporary rollout manifest and print TRAP REMEDIATION
+    # PENDING; PR-004 owns final global empty-manifest enforcement.
 
 
 def test_ignore_manifest_initialized_only_with_prd_trap_targets():
