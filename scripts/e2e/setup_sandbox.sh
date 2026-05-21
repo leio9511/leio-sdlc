@@ -123,6 +123,18 @@ init_hermetic_sandbox() {
     cp "$PROJECT_ROOT/scripts/envelope_assembler.py" "$target_dir/" 2>/dev/null || true
     cp "$PROJECT_ROOT/scripts/thinking_resolver.py" "$target_dir/" 2>/dev/null || true
 
+    # Expose the repository-controlled Python entrypoint for mocked E2E sandboxes.
+    # This wrapper intentionally delegates back to the source repository script so
+    # downstream harnesses bind to the repo .venv contract instead of the sandbox
+    # directory, ambient python, bare pytest, or manual virtualenv activation.
+    cat >"$target_dir/dev_python.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec "$PROJECT_ROOT/scripts/dev_python.sh" "\$@"
+EOF
+    chmod +x "$target_dir/dev_python.sh"
+
     local parent_dir="$(dirname "$target_dir")"
     mkdir -p "$parent_dir/config"
     cp -r "$PROJECT_ROOT/config/"* "$parent_dir/config/" 2>/dev/null || true
