@@ -37,6 +37,11 @@ jobs:
         run: |
           bash preflight.sh --report-all
 
+      - name: Run trap-mode preflight
+        id: run-trap-preflight
+        run: |
+          bash preflight.sh --trap-mode --report-all
+
       - name: Run runtime smoke
         id: run-runtime-smoke
         run: |

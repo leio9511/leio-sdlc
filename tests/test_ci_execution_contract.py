@@ -125,8 +125,12 @@ def test_preflight_source_encodes_trap_mode_execution_contract():
         assert line in preflight_text
 
     workflow_text = _workflow_text()
-    assert TRAP_MODE_PREFLIGHT_COMMAND not in workflow_text
+    assert TRAP_MODE_PREFLIGHT_COMMAND in workflow_text
     assert _step_run("run-preflight").strip() == "bash preflight.sh --report-all"
+    assert _step_run("run-trap-preflight").strip() == TRAP_MODE_PREFLIGHT_COMMAND
+
+    step_ids = [step.get("id") for step in _preflight_steps()]
+    assert step_ids.index("run-preflight") < step_ids.index("run-trap-preflight")
 
     for repaired_target in (
         "scripts/test_escalation_clean.sh",

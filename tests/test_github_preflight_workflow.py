@@ -24,6 +24,7 @@ REQUIRED_STEP_IDS = {
     "node-runtime-setup",
     "minimal-bootstrap",
     "run-preflight",
+    "run-trap-preflight",
     "run-runtime-smoke",
 }
 CONTROLLED_INTERPRETER_MARKERS = ("scripts/dev_python.sh", ".venv/bin/python")
@@ -77,13 +78,23 @@ def _get_preflight_job():
     return preflight_job
 
 
-def _get_steps_by_id():
+def _get_steps():
     preflight_job = _get_preflight_job()
     steps = preflight_job.get("steps")
     assert isinstance(steps, list), "Preflight job must define steps as a list."
+    return steps
 
+
+def _step_index(step_id):
+    for index, step in enumerate(_get_steps()):
+        if step.get("id") == step_id:
+            return index
+    raise AssertionError(f"Missing workflow step id: {step_id}")
+
+
+def _get_steps_by_id():
     steps_by_id = {}
-    for step in steps:
+    for step in _get_steps():
         assert isinstance(step, dict), "Each workflow step must be a mapping."
         step_id = step.get("id")
         if step_id:
@@ -181,12 +192,13 @@ def test_github_preflight_runs_standard_preflight_after_controlled_bootstrap():
     assert LEGACY_REPORT_ALL_PREFLIGHT_COMMAND != preflight_run
 
 
-def test_github_preflight_trap_mode_is_available_but_not_the_default_ci_gate():
-    workflow_text = _workflow_text()
+def test_github_preflight_runs_trap_mode_as_additional_ci_gate():
     preflight_text = _preflight_text()
+    steps_by_id = _get_steps_by_id()
 
-    assert _get_steps_by_id()["run-preflight"].get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
-    assert TRAP_MODE_PREFLIGHT_COMMAND not in workflow_text
+    assert steps_by_id["run-preflight"].get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
+    assert steps_by_id["run-trap-preflight"].get("run", "").strip() == TRAP_MODE_PREFLIGHT_COMMAND
+    assert _step_index("run-preflight") < _step_index("run-trap-preflight")
     for marker in TRAP_MODE_SOURCE_MARKERS:
         assert marker in preflight_text
 
@@ -242,6 +254,8 @@ def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(
     assert REQUIRED_TRIGGER_KEYS.issubset(workflow["on"].keys())
     assert REQUIRED_STEP_IDS.issubset(steps_by_id.keys())
     assert steps_by_id["run-preflight"]["run"].strip() == REPORT_ALL_PREFLIGHT_COMMAND
+    assert steps_by_id["run-trap-preflight"]["run"].strip() == TRAP_MODE_PREFLIGHT_COMMAND
+    assert _step_index("run-preflight") < _step_index("run-trap-preflight")
     _assert_required_runtime_smoke_command(steps_by_id["run-runtime-smoke"].get("run", ""))
 
 
