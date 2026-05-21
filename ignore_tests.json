@@ -1,6 +1,4 @@
 {
-  "bash": [
-    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh"
-  ],
+  "bash": [],
   "pytest": []
 }

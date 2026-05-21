@@ -156,7 +156,7 @@ def test_preflight_guardrails_removed_from_trap_quarantine_after_binding():
 
     assert PREFLIGHT_GUARDRAILS_MANIFEST_ENTRY not in manifest["bash"]
     assert "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh" not in manifest["bash"]
-    assert "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh" in manifest["bash"]
+    assert "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh" not in manifest["bash"]
     assert "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh" not in manifest["bash"]
     assert manifest["pytest"] == []
 

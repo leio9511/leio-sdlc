@@ -27,6 +27,7 @@ INNER_EOF
     mkdir -p scripts config
 
     init_hermetic_sandbox "scripts"
+    SANDBOX_DEV_PYTHON="$sandbox_dir/scripts/dev_python.sh"
 
     echo "*.lock" >> .gitignore
     echo "scripts/__pycache__/" >> .gitignore
@@ -76,12 +77,16 @@ INNER_EOF
     # Use a lock-safe execution environment
     export SDLC_BYPASS_BRANCH_CHECK=1
 
+    run_sandbox_python() {
+        "$SANDBOX_DEV_PYTHON" "$@"
+    }
+
     # Use a mock global dir
     echo "Starting orchestrator..."
     # We use a temporary log file so we don't pollute the git status of the sandbox if it checks it
     mkdir -p "$RUN_DIR" 
     git rev-parse HEAD > "$RUN_DIR/baseline_commit.txt" 2>/dev/null || true 
-    python3 scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
+    run_sandbox_python scripts/orchestrator.py --enable-exec-from-workspace --global-dir "$MOCK_GLOBAL_DIR" --force-replan false --enable-exec-from-workspace --channel "valid:id" --workdir "$(pwd)" --prd-file docs/PRDs/TestProject.md --max-prs-to-process 1 --coder-session-strategy always > ../orchestrator.log 2>&1 || true
     mv ../orchestrator.log orchestrator.log
 
     # Assertions

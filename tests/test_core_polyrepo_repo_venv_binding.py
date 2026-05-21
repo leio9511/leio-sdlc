@@ -11,9 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POLYREPO_BASH_TARGET = REPO_ROOT / "scripts" / "test_polyrepo_context.sh"
 POLYREPO_MANIFEST_ENTRY = "scripts/test_polyrepo_context.sh"
-UNRELATED_TRAP_MANIFEST_ENTRIES = {
-    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
-}
+UNRELATED_TRAP_MANIFEST_ENTRIES: set[str] = set()
 AMBIENT_PYTHON_RE = re.compile(
     r"(^|[;&|(){}]|\s)(?P<cmd>python3\s+-m\s+pytest|python\s+-m\s+pytest|python3|python|pytest)(?=\s|$)"
 )

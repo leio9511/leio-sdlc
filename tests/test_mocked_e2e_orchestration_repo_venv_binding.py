@@ -14,9 +14,7 @@ TARGETED_ORCHESTRATION_HARNESSES = {
     "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
     "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 }
-REMAINING_MOCKED_E2E_TRAP_ENTRIES = {
-    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
-}
+REMAINING_MOCKED_E2E_TRAP_ENTRIES: set[str] = set()
 AMBIENT_CONTRACT_CALL = re.compile(
     r"(^|[;&|()[:space:]])(?:python|python3|pytest)(?:[[:space:]]|$)".replace(
         "[:space:]", "\\s"

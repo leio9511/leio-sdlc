@@ -27,9 +27,7 @@ TARGETED_PYTEST_IGNORES = {
     "tests/test_planner_envelope_forward_compatibility.py",
 }
 
-PRD_TRAP_BASH_IGNORES = {
-    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
-}
+PRD_TRAP_BASH_IGNORES: set[str] = set()
 REPAIRED_TEST_MODE_LEAKAGE_TARGET = "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh"
 REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS = {
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",

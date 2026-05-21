@@ -26,9 +26,7 @@ REPAIRED_ORCHESTRATOR_BASH_TARGETS = {
     "scripts/test_orchestrator_session_strategy.sh",
     "scripts/test_pr_003.sh",
 }
-REMAINING_TRAP_BASH_TARGETS = [
-    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
-]
+REMAINING_TRAP_BASH_TARGETS: list[str] = []
 TEST_MODE_LEAKAGE_TARGET = "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh"
 REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS = {
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
@@ -230,7 +228,7 @@ def test_trap_quarantine_banner_is_printed_for_non_empty_manifest(tmp_path: Path
     assert "debt-quarantine green" not in result.stdout
 
 
-def test_slice_trap_preflight_stays_green_with_only_state5_residual_trap_debt(tmp_path: Path):
+def test_slice_trap_preflight_is_clean_after_state5_trap_debt_burndown(tmp_path: Path):
     manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
     bash_entries = set(manifest["bash"])
 
@@ -248,18 +246,17 @@ def test_slice_trap_preflight_stays_green_with_only_state5_residual_trap_debt(tm
     result = _run_preflight(repo, "--trap-mode", "--report-all")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert TRAP_BANNER in result.stdout
-    assert "✅" in result.stdout
-    assert "TRAP MODE CLEAN" not in result.stdout
-    assert f"{len(REMAINING_TRAP_BASH_TARGETS)} bash target(s)" not in result.stdout
+    assert TRAP_CLEAN_BANNER in result.stdout
+    assert TRAP_BANNER not in result.stdout
     assert "debt-quarantine green" not in result.stdout
     assert TEST_MODE_LEAKAGE_TARGET not in result.stdout
+    assert "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh" not in result.stdout
     assert "scripts/test_escalation_clean.sh" not in result.stdout
     assert "scripts/test_orchestrator_logs.sh" not in result.stdout
     assert "scripts/test_orchestrator_session_strategy.sh" not in result.stdout
 
 
-def test_slice_normal_preflight_stays_green_with_only_state5_residual_trap_debt(tmp_path: Path):
+def test_slice_normal_preflight_stays_green_after_state5_trap_debt_burndown(tmp_path: Path):
     manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
     bash_entries = set(manifest["bash"])
 
@@ -270,7 +267,7 @@ def test_slice_normal_preflight_stays_green_with_only_state5_residual_trap_debt(
     assert TEST_MODE_LEAKAGE_TARGET not in manifest["pytest"]
     assert REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS.isdisjoint(bash_entries)
     assert REPAIRED_PREFLIGHT_GUARDRAILS_TARGET not in bash_entries
-    assert len(manifest["bash"]) == 1
+    assert len(manifest["bash"]) == 0
 
     repo = _create_fixture_repo(
         tmp_path,
@@ -280,7 +277,6 @@ def test_slice_normal_preflight_stays_green_with_only_state5_residual_trap_debt(
     result = _run_preflight(repo, "--report-all")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "debt-quarantine green" in result.stdout
-    assert f"{len(REMAINING_TRAP_BASH_TARGETS)} bash target(s)" in result.stdout
+    assert "debt-quarantine green" not in result.stdout
     assert TEST_MODE_LEAKAGE_TARGET not in result.stdout
     assert TRAP_BANNER not in result.stdout

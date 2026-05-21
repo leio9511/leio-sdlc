@@ -14,9 +14,7 @@ GUARDRAIL_MOCKED_E2E_TARGETS = [
     Path("scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh"),
     Path("scripts/e2e/mocked/e2e_test_ignition_guardrail.sh"),
 ]
-REMAINING_MOCKED_E2E_TRAP_ENTRIES = {
-    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
-}
+REMAINING_MOCKED_E2E_TRAP_ENTRIES: set[str] = set()
 
 
 def _script_text(path: Path) -> str:
