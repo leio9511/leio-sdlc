@@ -27,7 +27,7 @@ TARGETED_PYTEST_IGNORES = {
     "tests/test_planner_envelope_forward_compatibility.py",
 }
 
-PRD_TRAP_BASH_IGNORES: set[str] = set()
+ALLOWED_NON_MOCKED_E2E_TRAP_ENTRY = "scripts/test_ambient_yaml.sh"
 REPAIRED_TEST_MODE_LEAKAGE_TARGET = "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh"
 REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS = {
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
@@ -51,9 +51,7 @@ PRD_TARGETED_MOCKED_E2E_TARGETS = {
 }
 
 
-def test_mocked_e2e_manifest_burn_down_does_not_require_global_empty_manifest_yet():
-    manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
-
+def _assert_manifest_allows_only_non_mocked_e2e_trap_debt(manifest: dict[str, object]) -> None:
     assert isinstance(manifest, dict)
     assert set(manifest) == {"bash", "pytest"}
     assert isinstance(manifest["bash"], list)
@@ -63,6 +61,19 @@ def test_mocked_e2e_manifest_burn_down_does_not_require_global_empty_manifest_ye
 
     quarantined_entries = set(manifest["bash"]) | set(manifest["pytest"])
     assert PRD_TARGETED_MOCKED_E2E_TARGETS.isdisjoint(quarantined_entries)
+
+
+def test_mocked_e2e_manifest_burn_down_does_not_require_global_empty_manifest_yet():
+    manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
+    _assert_manifest_allows_only_non_mocked_e2e_trap_debt(manifest)
+
+    rollout_manifest_with_non_mocked_e2e_debt = {
+        "bash": [ALLOWED_NON_MOCKED_E2E_TRAP_ENTRY],
+        "pytest": [],
+    }
+    _assert_manifest_allows_only_non_mocked_e2e_trap_debt(
+        rollout_manifest_with_non_mocked_e2e_debt
+    )
     # PR-003 proves mocked-E2E burn-down only.  Non-mocked-E2E trap debt may
     # still use the temporary rollout manifest and print TRAP REMEDIATION
     # PENDING; PR-004 owns final global empty-manifest enforcement.
@@ -71,15 +82,12 @@ def test_mocked_e2e_manifest_burn_down_does_not_require_global_empty_manifest_ye
 def test_ignore_manifest_initialized_only_with_prd_trap_targets():
     manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
 
-    assert isinstance(manifest, dict)
-    assert set(manifest) == {"bash", "pytest"}
-    assert set(manifest["bash"]) == PRD_TRAP_BASH_IGNORES
+    _assert_manifest_allows_only_non_mocked_e2e_trap_debt(manifest)
     assert REPAIRED_TEST_MODE_LEAKAGE_TARGET not in manifest["bash"]
     assert REPAIRED_TEST_MODE_LEAKAGE_TARGET not in manifest["pytest"]
     assert REPAIRED_PREFLIGHT_GUARDRAILS_TARGET not in manifest["bash"]
     assert REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS.isdisjoint(manifest["bash"])
     assert REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS.isdisjoint(manifest["bash"])
-    assert manifest["pytest"] == []
 
 
 def _make_executable(path: Path) -> None:
