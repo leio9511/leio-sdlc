@@ -20,7 +20,6 @@ UNRELATED_TRAP_MANIFEST_ENTRIES = {
     "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
     "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
     "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
-    "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
     "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 }

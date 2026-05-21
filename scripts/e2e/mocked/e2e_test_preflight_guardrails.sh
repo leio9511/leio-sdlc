@@ -4,6 +4,12 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$PROJECT_ROOT/scripts/e2e/setup_sandbox.sh"
 
+SANDBOX_DEV_PYTHON="scripts/dev_python.sh"
+
+run_sandbox_python() {
+    "$SANDBOX_DEV_PYTHON" "$@"
+}
+
 echo "Starting Pre-flight Guardrails Test..."
 
 # 1. Initialize Sandbox
@@ -23,10 +29,10 @@ create_preflight_fixture() {
     mkdir -p "$sandbox_dir/scripts" "$sandbox_dir/tests"
     cp "$PROJECT_ROOT/preflight.sh" "$sandbox_dir/preflight.sh"
     chmod +x "$sandbox_dir/preflight.sh"
-    cat > "$sandbox_dir/scripts/dev_python.sh" <<'SH'
+    cat > "$sandbox_dir/scripts/dev_python.sh" <<SH
 #!/usr/bin/env bash
 set -euo pipefail
-exec python3 "$@"
+exec "$PROJECT_ROOT/scripts/dev_python.sh" "\$@"
 SH
     chmod +x "$sandbox_dir/scripts/dev_python.sh"
     cat > "$sandbox_dir/tests/test_template_compliance.py" <<'PY'
@@ -46,7 +52,7 @@ run_sandbox_preflight() {
 # 2. Test Planner Pre-flight
 echo "Testing Planner Pre-flight..."
 set +e
-output=$(python3 scripts/spawn_planner.py --enable-exec-from-workspace --prd-file missing.md --workdir . --global-dir . 2>&1)
+output=$(run_sandbox_python scripts/spawn_planner.py --enable-exec-from-workspace --prd-file missing.md --workdir . --global-dir . 2>&1)
 exit_code=$?
 set -e
 if [ $exit_code -ne 1 ]; then
@@ -63,7 +69,7 @@ fi
 echo "Testing Coder Pre-flight..."
 git checkout -b feature/dummy-guardrails >/dev/null 2>&1
 set +e
-output=$(python3 scripts/spawn_coder.py --enable-exec-from-workspace --pr-file missing.md --prd-file missing.md --workdir . --global-dir . 2>&1)
+output=$(run_sandbox_python scripts/spawn_coder.py --enable-exec-from-workspace --pr-file missing.md --prd-file missing.md --workdir . --global-dir . 2>&1)
 exit_code=$?
 set -e
 git checkout master >/dev/null 2>&1
@@ -84,7 +90,7 @@ echo "---
 status: open
 ---" > PR.md
 set +e
-output=$(python3 scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR.md --diff-target HEAD --workdir . --global-dir . 2>&1)
+output=$(run_sandbox_python scripts/spawn_reviewer.py --enable-exec-from-workspace --pr-file PR.md --diff-target HEAD --workdir . --global-dir . 2>&1)
 exit_code=$?
 set -e
 
@@ -92,7 +98,7 @@ set -e
 echo "Testing Merge Pre-flight..."
 # Action 1: fake review file
 set +e
-output=$(python3 scripts/merge_code.py --branch fake-branch --review-file missing.md 2>&1)
+output=$(run_sandbox_python scripts/merge_code.py --branch fake-branch --review-file missing.md 2>&1)
 exit_code=$?
 set -e
 if [ $exit_code -ne 1 ]; then
@@ -108,7 +114,7 @@ fi
 # Action 2: {"overall_assessment": "NEEDS_IMMEDIATE_REWORK"} without force
 echo '{"overall_assessment": "NEEDS_IMMEDIATE_REWORK"}' > review.md
 set +e
-output=$(python3 scripts/merge_code.py --branch fake-branch --review-file review.md 2>&1)
+output=$(run_sandbox_python scripts/merge_code.py --branch fake-branch --review-file review.md 2>&1)
 exit_code=$?
 set -e
 if [ $exit_code -ne 1 ]; then
@@ -124,7 +130,7 @@ fi
 # Action 3: {"overall_assessment": "NEEDS_IMMEDIATE_REWORK"} with force
 echo "Testing Merge with force-approved..."
 set +e
-python3 scripts/merge_code.py --branch fake-branch --review-file review.md --force-approved >/dev/null 2>&1
+run_sandbox_python scripts/merge_code.py --branch fake-branch --review-file review.md --force-approved >/dev/null 2>&1
 exit_code=$?
 set -e
 if [ $exit_code -ne 0 ]; then
@@ -136,7 +142,7 @@ fi
 echo "Testing Merge with APPROVED..."
 echo '{"overall_assessment": "EXCELLENT"}' > review2.md
 set +e
-python3 scripts/merge_code.py --branch fake-branch --review-file review2.md >/dev/null 2>&1
+run_sandbox_python scripts/merge_code.py --branch fake-branch --review-file review2.md >/dev/null 2>&1
 exit_code=$?
 set -e
 if [ $exit_code -ne 0 ]; then

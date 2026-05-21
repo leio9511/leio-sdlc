@@ -35,10 +35,10 @@ REMAINING_TRAP_BASH_TARGETS = [
     "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
     "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
     "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
-    "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
     "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 ]
+REPAIRED_PREFLIGHT_GUARDRAILS_TARGET = "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh"
 
 
 def _make_executable(path: Path) -> None:
@@ -256,7 +256,8 @@ def test_slice_normal_preflight_stays_green_with_remaining_trap_debt_only(tmp_pa
 
     assert REPAIRED_ORCHESTRATOR_BASH_TARGETS.isdisjoint(bash_entries)
     assert set(REMAINING_TRAP_BASH_TARGETS).issubset(bash_entries)
-    assert len(manifest["bash"]) == 11
+    assert REPAIRED_PREFLIGHT_GUARDRAILS_TARGET not in bash_entries
+    assert len(manifest["bash"]) == 10
 
     repo = _create_fixture_repo(
         tmp_path,

@@ -36,10 +36,10 @@ PRD_TRAP_BASH_IGNORES = {
     "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
     "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
     "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
-    "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
     "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 }
+REPAIRED_PREFLIGHT_GUARDRAILS_TARGET = "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh"
 
 
 def test_ignore_manifest_initialized_only_with_prd_trap_targets():
@@ -48,6 +48,7 @@ def test_ignore_manifest_initialized_only_with_prd_trap_targets():
     assert isinstance(manifest, dict)
     assert set(manifest) == {"bash", "pytest"}
     assert set(manifest["bash"]) == PRD_TRAP_BASH_IGNORES
+    assert REPAIRED_PREFLIGHT_GUARDRAILS_TARGET not in manifest["bash"]
     assert manifest["pytest"] == []
 
 
