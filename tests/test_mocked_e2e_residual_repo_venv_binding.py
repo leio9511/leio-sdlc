@@ -13,6 +13,19 @@ STATE5_TIER1_RESET_HARNESS = Path("scripts/e2e/mocked/e2e_test_state5_tier1_rese
 STATE5_TIER1_RESET_MANIFEST_ENTRY = str(STATE5_TIER1_RESET_HARNESS)
 TEST_MODE_LEAKAGE_HARNESS = Path("scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh")
 HARNESS_MANIFEST_ENTRY = str(TEST_MODE_LEAKAGE_HARNESS)
+PRD_TARGETED_MOCKED_E2E_TARGETS = {
+    "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
+    "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
+    "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
+    "scripts/e2e/mocked/e2e_test_git_boundary.sh",
+    "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
+    "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
+    "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
+    "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
+    "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
+    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
+    "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
+}
 
 
 def _harness_text(harness: Path = TEST_MODE_LEAKAGE_HARNESS) -> str:
@@ -41,6 +54,13 @@ def _executable_lines(text: str) -> list[str]:
         lines.append(stripped)
 
     return lines
+
+
+def test_all_prd_targeted_mocked_e2e_targets_removed_from_trap_manifest():
+    manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
+    quarantined_entries = set(manifest["bash"]) | set(manifest["pytest"])
+
+    assert PRD_TARGETED_MOCKED_E2E_TARGETS.isdisjoint(quarantined_entries)
 
 
 def test_state5_tier1_reset_harness_has_no_contract_critical_ambient_python_calls():

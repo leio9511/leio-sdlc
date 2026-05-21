@@ -42,6 +42,25 @@ REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS = {
     "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
     "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
 }
+PRD_TARGETED_MOCKED_E2E_TARGETS = {
+    REPAIRED_TEST_MODE_LEAKAGE_TARGET,
+    *REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS,
+    REPAIRED_PREFLIGHT_GUARDRAILS_TARGET,
+    *REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS,
+    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
+}
+
+
+def test_mocked_e2e_manifest_burn_down_does_not_require_global_empty_manifest_yet():
+    manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
+    quarantined_entries = set(manifest["bash"]) | set(manifest["pytest"])
+
+    assert PRD_TARGETED_MOCKED_E2E_TARGETS.isdisjoint(quarantined_entries)
+    assert manifest == {"bash": [], "pytest": []}
+    # PR-003 proves mocked-E2E burn-down only.  If a future slice carries
+    # non-mocked-E2E trap debt, this test may allow that debt while continuing
+    # to reject all eleven PRD-targeted mocked E2E paths.  PR-004 owns making
+    # a non-empty manifest fail as final rollout completion criteria.
 
 
 def test_ignore_manifest_initialized_only_with_prd_trap_targets():

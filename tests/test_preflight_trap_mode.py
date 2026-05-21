@@ -41,6 +41,34 @@ REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS = {
     "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
     "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
 }
+PRD_TARGETED_MOCKED_E2E_TARGETS = {
+    TEST_MODE_LEAKAGE_TARGET,
+    *REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS,
+    REPAIRED_PREFLIGHT_GUARDRAILS_TARGET,
+    *REPAIRED_GUARDRAIL_MOCKED_E2E_TARGETS,
+    "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
+}
+
+
+def test_preflight_trap_mode_repaired_mocked_e2e_sets_match_manifest_expectations():
+    assert PRD_TARGETED_MOCKED_E2E_TARGETS == {
+        "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
+        "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
+        "scripts/e2e/mocked/e2e_test_forensic_quarantine.sh",
+        "scripts/e2e/mocked/e2e_test_git_boundary.sh",
+        "scripts/e2e/mocked/e2e_test_hierarchical_resilience.sh",
+        "scripts/e2e/mocked/e2e_test_ignition_guardrail.sh",
+        "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
+        "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
+        "scripts/e2e/mocked/e2e_test_preflight_guardrails.sh",
+        "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
+        "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
+    }
+
+    manifest = json.loads((REPO_ROOT / "ignore_tests.json").read_text(encoding="utf-8"))
+    quarantined_entries = set(manifest["bash"]) | set(manifest["pytest"])
+
+    assert PRD_TARGETED_MOCKED_E2E_TARGETS.isdisjoint(quarantined_entries)
 
 
 def _make_executable(path: Path) -> None:
