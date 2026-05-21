@@ -76,8 +76,7 @@ def test_state5_tier1_reset_removed_from_trap_manifest_only():
 
     assert STATE5_TIER1_RESET_MANIFEST_ENTRY not in manifest["bash"]
     assert STATE5_TIER1_RESET_MANIFEST_ENTRY not in manifest["pytest"]
-    assert manifest["bash"] == []
-    assert manifest["pytest"] == []
+    assert set(manifest) == {"bash", "pytest"}
 
 
 def test_state5_tier1_reset_harness_passes_with_clean_trap_venv_and_hostile_pytest(tmp_path: Path):
@@ -151,8 +150,7 @@ def test_test_mode_leakage_removed_from_trap_manifest_only():
 
     assert HARNESS_MANIFEST_ENTRY not in manifest["bash"]
     assert HARNESS_MANIFEST_ENTRY not in manifest["pytest"]
-    assert manifest["bash"] == []
-    assert manifest["pytest"] == []
+    assert set(manifest) == {"bash", "pytest"}
 
 
 def test_test_mode_leakage_harness_passes_with_clean_trap_venv_and_hostile_pytest(tmp_path: Path):

@@ -26,7 +26,7 @@ REPAIRED_ORCHESTRATOR_BASH_TARGETS = {
     "scripts/test_orchestrator_session_strategy.sh",
     "scripts/test_pr_003.sh",
 }
-REMAINING_TRAP_BASH_TARGETS = ["scripts/test_ambient_yaml.sh"]
+FIXTURE_TRAP_BASH_TARGETS = ["scripts/test_ambient_yaml.sh"]
 TEST_MODE_LEAKAGE_TARGET = "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh"
 REPAIRED_MOCKED_E2E_ORCHESTRATION_TARGETS = {
     "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
@@ -240,7 +240,7 @@ def test_slice_trap_preflight_stays_green_after_state5_removed_from_rollout_mani
 
     repo = _create_fixture_repo(
         tmp_path,
-        bash_manifest=REMAINING_TRAP_BASH_TARGETS,
+        bash_manifest=FIXTURE_TRAP_BASH_TARGETS,
     )
     result = _run_preflight(repo, "--trap-mode", "--report-all")
 
@@ -268,13 +268,13 @@ def test_slice_normal_preflight_stays_green_after_state5_removed_from_rollout_ma
 
     repo = _create_fixture_repo(
         tmp_path,
-        bash_manifest=REMAINING_TRAP_BASH_TARGETS,
+        bash_manifest=FIXTURE_TRAP_BASH_TARGETS,
     )
     result = _run_preflight(repo, "--report-all")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "debt-quarantine green" in result.stdout
-    assert f"{len(REMAINING_TRAP_BASH_TARGETS)} bash target(s)" in result.stdout
+    assert f"{len(FIXTURE_TRAP_BASH_TARGETS)} bash target(s)" in result.stdout
     assert TEST_MODE_LEAKAGE_TARGET not in result.stdout
     assert "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh" not in result.stdout
     assert TRAP_BANNER not in result.stdout
