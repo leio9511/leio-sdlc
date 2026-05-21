@@ -36,12 +36,17 @@ INNER_EOF
 # Script path
 ORCHESTRATOR="$WORK_DIR/scripts/orchestrator.py"
 
+run_sandbox_python() {
+    "$WORK_DIR/scripts/dev_python.sh" "$@"
+}
+
 export SDLC_TEST_MODE=true
 export SDLC_RUNTIME_DIR="$WORK_DIR/scripts"
 
 echo "--- Scenario 1: With --enable-exec-from-workspace (Warning only) ---"
 # We run it with --test-sleep so it exits quickly
-OUTPUT1=$(python3 "$ORCHESTRATOR" --workdir "$WORK_DIR" --prd-file dummy_prd.md --force-replan false --channel test --test-sleep --enable-exec-from-workspace 2>&1 || true)
+OUTPUT1=$(run_sandbox_python "$ORCHESTRATOR" --workdir "$WORK_DIR" --prd-file dummy_prd.md --force-replan false --channel test --test-sleep --enable-exec-from-workspace 2>&1 || true)
+echo "$OUTPUT1"
 
 if echo "$OUTPUT1" | grep -q "\[WARNING\] Running Orchestrator in TEST MODE with mocked LLMs. Production safety checks are bypassed."; then
     echo "Scenario 1 passed: Warning detected."
@@ -58,8 +63,9 @@ fi
 
 echo "--- Scenario 2: Without --enable-exec-from-workspace (Fatal) ---"
 set +e
-OUTPUT2=$(python3 "$ORCHESTRATOR" --workdir "$WORK_DIR" --prd-file dummy_prd.md --force-replan false --channel test --test-sleep 2>&1)
+OUTPUT2=$(run_sandbox_python "$ORCHESTRATOR" --workdir "$WORK_DIR" --prd-file dummy_prd.md --force-replan false --channel test --test-sleep 2>&1)
 EXIT_CODE=$?
+echo "$OUTPUT2"
 set -e
 
 if [ $EXIT_CODE -eq 1 ]; then
