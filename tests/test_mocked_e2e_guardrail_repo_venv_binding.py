@@ -16,11 +16,7 @@ GUARDRAIL_MOCKED_E2E_TARGETS = [
 ]
 REMAINING_MOCKED_E2E_TRAP_ENTRIES = {
     "scripts/e2e/mocked/e2e_test_1058_test_mode_leakage.sh",
-    "scripts/e2e/mocked/e2e_test_1092_dual_yellow_path.sh",
-    "scripts/e2e/mocked/e2e_test_job_queue_engine.sh",
-    "scripts/e2e/mocked/e2e_test_orchestrator_fsm.sh",
     "scripts/e2e/mocked/e2e_test_state5_tier1_reset.sh",
-    "scripts/e2e/mocked/e2e_test_uat_orchestrator.sh",
 }
 
 

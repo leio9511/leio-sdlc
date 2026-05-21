@@ -21,7 +21,7 @@ git commit -m "init" > /dev/null
 export SDLC_TEST_MODE="true"
 
 echo "Testing spawn_planner.py without --global-dir..."
-python3 "$SDLC_ROOT/scripts/spawn_planner.py" --enable-exec-from-workspace --workdir "$TEST_DIR" --prd-file PRD.md
+"$SDLC_ROOT/scripts/dev_python.sh" "$SDLC_ROOT/scripts/spawn_planner.py" --enable-exec-from-workspace --workdir "$TEST_DIR" --prd-file PRD.md
 
 echo "Checking if .sdlc_runs is created in workdir..."
 if [ -d "$TEST_DIR/.sdlc_runs" ]; then
@@ -32,9 +32,9 @@ else
 fi
 
 echo "Testing orchestrator.py without --global-dir..."
-python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR" --fix
+"$SDLC_ROOT/scripts/dev_python.sh" "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR" --fix
 git rev-parse HEAD > "$TEST_DIR/.sdlc_runs/$(basename $TEST_DIR)/PRD/baseline_commit.txt"
-python3 "$SDLC_ROOT/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$TEST_DIR" --prd-file PRD.md --force-replan false --test-sleep --enable-exec-from-workspace --channel test_channel
+"$SDLC_ROOT/scripts/dev_python.sh" "$SDLC_ROOT/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$TEST_DIR" --prd-file PRD.md --force-replan false --test-sleep --enable-exec-from-workspace --channel test_channel
 
 echo "PASS: orchestrator.py did not raise RuntimeError"
 
@@ -106,7 +106,7 @@ status: in_progress
 ---" > .sdlc_runs/mock2/PRD/PR_001.md
     git add .gitignore .sdlc_runs/mock2/PRD/baseline_commit.txt .sdlc_runs/mock2/PRD/PR_001.md
     git commit -m "add pr" > /dev/null
-    python3 "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR/mock2" --fix
+    "$SDLC_ROOT/scripts/dev_python.sh" "$SDLC_ROOT/scripts/doctor.py" "$TEST_DIR/mock2" --fix
     git add .
     git commit -m "doctor fix" > /dev/null
 }
@@ -114,7 +114,7 @@ status: in_progress
 echo "Test Case 1: Mock git status dirty"
 setup_fake_pr
 export mock_dirty="1"
-python3 "$TMP_SCRIPTS/orchestrator.py" --workdir "$TEST_DIR/mock2" --prd-file PRD.md --force-replan false --channel test_channel --enable-exec-from-workspace --debug > /tmp/orch.log 2>&1 || true
+"$TMP_SCRIPTS/dev_python.sh" "$TMP_SCRIPTS/orchestrator.py" --workdir "$TEST_DIR/mock2" --prd-file PRD.md --force-replan false --channel test_channel --enable-exec-from-workspace --debug > /tmp/orch.log 2>&1 || true
 if grep -q "Dirty status detected" /tmp/orch.log; then
     echo "PASS: Test Case 1 (Git status dirty increments yellow counter / system alert)"
 else
@@ -126,7 +126,7 @@ unset mock_dirty
 echo "Test Case 2: Mock clean git status but failing preflight.sh"
 setup_fake_pr
 export mock_preflight_fail="1"
-python3 "$TMP_SCRIPTS/orchestrator.py" --workdir "$TEST_DIR/mock2" --prd-file PRD.md --force-replan false --channel test_channel --enable-exec-from-workspace --debug > /tmp/orch.log 2>&1 || true
+"$TMP_SCRIPTS/dev_python.sh" "$TMP_SCRIPTS/orchestrator.py" --workdir "$TEST_DIR/mock2" --prd-file PRD.md --force-replan false --channel test_channel --enable-exec-from-workspace --debug > /tmp/orch.log 2>&1 || true
 if grep -q "Preflight failed with code 1" /tmp/orch.log; then
     echo "PASS: Test Case 2 (Failing preflight increments yellow counter / system alert)"
 else
@@ -138,7 +138,7 @@ unset mock_preflight_fail
 echo "Test Case 3: Trigger orch_yellow_counter >= yellow_retry_limit (Moves to State 5)"
 setup_fake_pr
 export mock_exhaust="1"
-python3 "$TMP_SCRIPTS/orchestrator.py" --workdir "$TEST_DIR/mock2" --prd-file PRD.md --force-replan false --channel test_channel --enable-exec-from-workspace --debug > /tmp/orch.log 2>&1 || true
+"$TMP_SCRIPTS/dev_python.sh" "$TMP_SCRIPTS/orchestrator.py" --workdir "$TEST_DIR/mock2" --prd-file PRD.md --force-replan false --channel test_channel --enable-exec-from-workspace --debug > /tmp/orch.log 2>&1 || true
 if grep -q "State 5 Escalation" /tmp/orch.log || grep -q "Archiving forensic artifacts" /tmp/orch.log || grep -q "Archiving crashed dir" /tmp/orch.log; then
     echo "PASS: Test Case 3 (Exhausting yellow limit triggers State 5 / Red Path)"
 else

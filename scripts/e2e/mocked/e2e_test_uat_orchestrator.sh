@@ -72,7 +72,7 @@ git clean -fd >/dev/null 2>&1
 echo "DEBUG: git status before orchestrator:"
 git status --porcelain
 
-OUT=$(python3 "$ORCHESTRATOR" --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
+OUT=$("$TEST_DIR/scripts/dev_python.sh" "$ORCHESTRATOR" --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
 
 echo "DEBUG: git status after orchestrator:"
 git status --porcelain
@@ -91,7 +91,7 @@ export MOCK_VERIFIER_RESULT='{"status": "PASS", "executive_summary": "Mock passe
 git reset --hard HEAD >/dev/null 2>&1
 git clean -fd >/dev/null 2>&1
 
-OUT=$(python3 "$ORCHESTRATOR" --debug --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
+OUT=$("$TEST_DIR/scripts/dev_python.sh" "$ORCHESTRATOR" --debug --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
 if [[ "$OUT" != *"[SUCCESS_HANDOFF] UAT Passed. You are authorized to close the ticket using issues.py."* ]]; then
     echo "Fail Test Case 2: Did not print SUCCESS_HANDOFF"
     echo "$OUT"
@@ -106,7 +106,7 @@ export MOCK_VERIFIER_RESULT='{"status": "NEEDS_FIX", "executive_summary": "Mock 
 git reset --hard HEAD >/dev/null 2>&1
 git clean -fd >/dev/null 2>&1
 
-OUT=$(python3 "$ORCHESTRATOR" --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
+OUT=$("$TEST_DIR/scripts/dev_python.sh" "$ORCHESTRATOR" --max-prs-to-process 0 --workdir "$WORK_DIR" --prd-file "$PRD_FILE" --force-replan false --enable-exec-from-workspace 2>&1 || true)
 if [[ "$OUT" != *"[ACTION REQUIRED FOR MANAGER] UAT Failed. Read uat_report.json, summarize the unmet findings to the Boss, and ask whether to append a hotfix or redo."* ]]; then
     echo "Fail Test Case 3: Did not print ACTION REQUIRED FOR MANAGER"
     echo "$OUT"

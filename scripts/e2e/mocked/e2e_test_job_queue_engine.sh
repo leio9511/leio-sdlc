@@ -73,8 +73,8 @@ assert_success() {
   echo "✅ PASS: $cmd"
 }
 
-GET_NEXT_PR="python3 $SANDBOX/scripts/get_next_pr.py --workdir $SANDBOX"
-UPDATE_PR_STATUS="python3 $SANDBOX/scripts/update_pr_status.py"
+GET_NEXT_PR="$PROJECT_ROOT/scripts/dev_python.sh $SANDBOX/scripts/get_next_pr.py --workdir $SANDBOX"
+UPDATE_PR_STATUS="$PROJECT_ROOT/scripts/dev_python.sh $SANDBOX/scripts/update_pr_status.py"
 
 echo "--------------------------------------"
 echo "Test 1: Negative - get_next_pr on missing dir"
