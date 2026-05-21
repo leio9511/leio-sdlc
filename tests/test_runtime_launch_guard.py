@@ -85,7 +85,10 @@ def test_runtime_smoke_skill_root_resolver_prefers_explicit_skill_root_over_pyth
     assert resolved == _canonicalize(explicit_root)
 
 
-def test_runtime_interpreter_validation_accepts_canonical_matching_interpreter(tmp_path, monkeypatch):
+def test_runtime_interpreter_validation_rejects_non_runtime_venv_symlink_to_matching_interpreter(
+    tmp_path,
+    monkeypatch,
+):
     skill_root = tmp_path / "skill-root"
     python_path = skill_root / ".venv" / "bin" / "python"
     python_path.parent.mkdir(parents=True)
@@ -97,13 +100,17 @@ def test_runtime_interpreter_validation_accepts_canonical_matching_interpreter(t
     symlink_python.symlink_to(python_path)
     monkeypatch.chdir(symlink_dir)
 
-    resolved = validate_runtime_interpreter(
-        actual_python="./python",
-        skill_root=str(skill_root),
-        env={},
-    )
+    with pytest.raises(RuntimeInterpreterMismatch) as excinfo:
+        validate_runtime_interpreter(
+            actual_python="./python",
+            skill_root=str(skill_root),
+            env={},
+        )
 
-    assert resolved == _canonicalize(python_path)
+    diagnostic = str(excinfo.value)
+    assert _canonicalize(python_path) in diagnostic
+    assert "actual_identity=" in diagnostic
+    assert "expected_identity=" in diagnostic
 
 
 def test_runtime_interpreter_validation_rejects_system_or_other_python_with_clear_diagnostic(tmp_path):

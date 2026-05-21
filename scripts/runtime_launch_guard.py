@@ -147,11 +147,7 @@ def validate_runtime_interpreter(
 
     actual_venv_root = _derive_skill_root_from_venv_python_shape(identity_actual)
     expected_venv_root = _derive_skill_root_from_venv_python_shape(identity_expected)
-    venv_identity_mismatch = bool(
-        actual_venv_root
-        and expected_venv_root
-        and identity_actual != identity_expected
-    )
+    venv_identity_mismatch = bool(expected_venv_root and identity_actual != identity_expected)
 
     if canonical_actual != canonical_expected or venv_identity_mismatch:
         raise RuntimeInterpreterMismatch(

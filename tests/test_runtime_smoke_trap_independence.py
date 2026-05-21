@@ -147,7 +147,51 @@ def test_runtime_smoke_rejects_trap_or_ambient_python_when_runtime_venv_expected
     assert result.returncode != 0
     assert "Runtime Python interpreter mismatch" in result.stderr
     assert f"expected={os.path.realpath(expected_runtime_python)}" in result.stderr
+    assert f"expected_identity={expected_runtime_python}" in result.stderr
     assert f"actual={os.path.realpath(trap_python)}" in result.stderr
+    assert f"actual_identity={trap_python}" in result.stderr
+
+
+def test_runtime_smoke_rejects_host_python_when_runtime_venv_expected(tmp_path):
+    skill_root = tmp_path / "runtime-skill"
+    smoke_path = _copy_minimal_skill_root(skill_root)
+    runtime_python = _create_runtime_venv(skill_root)
+
+    result = _run_smoke(sys.executable, smoke_path, "--skill-root", skill_root, cwd=skill_root)
+
+    assert result.returncode != 0
+    assert "Runtime Python interpreter mismatch" in result.stderr
+    assert f"expected_identity={runtime_python}" in result.stderr
+    assert f"actual_identity={sys.executable}" in result.stderr
+
+
+def test_runtime_smoke_rejects_repo_development_venv_when_runtime_venv_expected(tmp_path):
+    skill_root = tmp_path / "runtime-skill"
+    smoke_path = _copy_minimal_skill_root(skill_root)
+    runtime_python = _create_runtime_venv(skill_root)
+    repo_dev_python = REPO_ROOT / ".venv" / "bin" / "python"
+    assert repo_dev_python.exists()
+
+    result = _run_smoke(repo_dev_python, smoke_path, "--skill-root", skill_root, cwd=skill_root)
+
+    assert result.returncode != 0
+    assert "Runtime Python interpreter mismatch" in result.stderr
+    assert f"expected_identity={runtime_python}" in result.stderr
+    assert f"actual_identity={repo_dev_python}" in result.stderr
+
+
+def test_runtime_smoke_rejects_host_python_even_when_runtime_venv_symlinks_to_same_binary(tmp_path):
+    skill_root = tmp_path / "runtime-skill"
+    smoke_path = _copy_minimal_skill_root(skill_root)
+    runtime_python = _create_runtime_venv(skill_root)
+    assert os.path.realpath(runtime_python) == os.path.realpath(sys.executable)
+
+    result = _run_smoke(sys.executable, smoke_path, "--skill-root", skill_root, cwd=skill_root)
+
+    assert result.returncode != 0
+    assert "Runtime Python interpreter mismatch" in result.stderr
+    assert f"expected_identity={runtime_python}" in result.stderr
+    assert f"actual_identity={sys.executable}" in result.stderr
 
 
 def test_runtime_smoke_accepts_only_explicit_runtime_venv_python_after_trap_preflight_exists(tmp_path):
