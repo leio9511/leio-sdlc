@@ -56,10 +56,14 @@ def _format_success_line(args, expected_python, imported):
         expected_python=args.expected_runtime_python,
         script_path=__file__,
     )
+    expected_identity = runtime_launch_guard._identity_path(
+        args.expected_runtime_python or (Path(runtime_skill_root) / ".venv" / "bin" / "python")
+    )
     return (
         "runtime smoke ok: "
         f"python={runtime_launch_guard._canonicalize_path(sys.executable)}; "
         f"expected={expected_python}; "
+        f"expected_identity={expected_identity}; "
         f"skill_root={runtime_skill_root}; "
         f"startup_path={runtime_launch_guard._canonicalize_path(SCRIPT_DIR)}; "
         f"imports={', '.join(imported)}"

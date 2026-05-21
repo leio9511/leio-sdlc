@@ -25,6 +25,10 @@ def _canonicalize_path(path):
     return os.path.realpath(os.path.abspath(os.path.expanduser(os.fspath(path))))
 
 
+def _identity_path(path):
+    return os.path.abspath(os.path.expanduser(os.fspath(path)))
+
+
 def _configured_path(explicit_value, env, env_var_name):
     """Return explicit value first, then environment value, ignoring unset/empty values."""
     if explicit_value:
@@ -129,12 +133,32 @@ def validate_runtime_interpreter(
         script_path=script_path,
         env=env,
     )
+    identity_actual = _identity_path(actual_python or sys.executable)
+    identity_expected = _identity_path(
+        expected_python
+        or _configured_path(None, env or os.environ, EXPECTED_RUNTIME_PYTHON_ENV_VAR)
+        or os.path.join(
+            resolve_runtime_skill_root(skill_root=skill_root, script_path=script_path, env=env),
+            ".venv",
+            "bin",
+            "python",
+        )
+    )
 
-    if canonical_actual != canonical_expected:
+    actual_venv_root = _derive_skill_root_from_venv_python_shape(identity_actual)
+    expected_venv_root = _derive_skill_root_from_venv_python_shape(identity_expected)
+    venv_identity_mismatch = bool(
+        actual_venv_root
+        and expected_venv_root
+        and identity_actual != identity_expected
+    )
+
+    if canonical_actual != canonical_expected or venv_identity_mismatch:
         raise RuntimeInterpreterMismatch(
             "Runtime Python interpreter mismatch for "
             f"{RUNTIME_EXECUTION_CONTEXT_DESCRIPTION}: "
-            f"actual={canonical_actual}; expected={canonical_expected}"
+            f"actual={canonical_actual}; expected={canonical_expected}; "
+            f"actual_identity={identity_actual}; expected_identity={identity_expected}"
         )
 
     return canonical_expected

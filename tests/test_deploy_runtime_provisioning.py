@@ -67,6 +67,27 @@ def test_runtime_dependencies_are_installed_from_single_requirements_entry():
         assert "pyproject.toml" not in pip_lines[0]
 
 
+def test_deploy_runtime_smoke_still_runs_before_atomic_swap_with_runtime_wrapper():
+    with isolated_repo_env(REPO_ROOT) as isolated:
+        log_path = install_fake_python_toolchain(isolated["repo_root"], isolated["env"])
+
+        result = _run_deploy(isolated["repo_root"], isolated["env"])
+
+        assert result.returncode == 0, result.stderr + result.stdout
+        lines = _log_lines(log_path)
+        import_index = _line_index(lines, "import-smoke:")
+        wrapper_index = _line_index(lines, "runtime-python-wrapper:")
+        smoke_index = _line_index(lines, "runtime-smoke:")
+        atomic_swap_index = result.stdout.index("🔄 Performing atomic directory swap")
+
+        assert import_index < wrapper_index < smoke_index
+        assert result.stdout.index("Running minimal import smoke") < result.stdout.index("Running official runtime smoke")
+        assert result.stdout.index("Running official runtime smoke") < atomic_swap_index
+        assert "scripts/runtime_python.sh" in lines[wrapper_index]
+        assert "scripts/runtime_smoke.py" in lines[wrapper_index]
+        assert "scripts/runtime_smoke.py" in lines[smoke_index]
+
+
 def test_deploy_runs_runtime_smoke_before_atomic_swap():
     with isolated_repo_env(REPO_ROOT) as isolated:
         log_path = install_fake_python_toolchain(isolated["repo_root"], isolated["env"])

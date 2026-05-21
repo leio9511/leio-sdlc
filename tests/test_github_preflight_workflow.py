@@ -130,9 +130,11 @@ def _preflight_text():
 def _assert_required_runtime_smoke_command(run_command):
     assert RUNTIME_SMOKE_SCRIPT in run_command
     assert "scripts/runtime_python.sh" in run_command
+    assert "RUNTIME_SMOKE_ROOT" in run_command
     assert "RUNNER_TEMP" in run_command
     assert "requirements.txt" in run_command
     assert any(marker in run_command for marker in CONTROLLED_INTERPRETER_MARKERS)
+    assert "python scripts/runtime_smoke.py" not in run_command
     assert "python3 scripts/runtime_smoke.py" not in run_command
     assert "--expected-runtime-python" not in run_command
 
@@ -257,6 +259,21 @@ def test_preflight_workflow_contract_is_locally_verifiable_from_repository_data(
     assert steps_by_id["run-trap-preflight"]["run"].strip() == TRAP_MODE_PREFLIGHT_COMMAND
     assert _step_index("run-preflight") < _step_index("run-trap-preflight")
     _assert_required_runtime_smoke_command(steps_by_id["run-runtime-smoke"].get("run", ""))
+
+
+def test_github_workflow_preserves_controlled_runtime_smoke_after_preflight_gates():
+    steps_by_id = _get_steps_by_id()
+    runtime_smoke_run = steps_by_id["run-runtime-smoke"].get("run", "")
+
+    assert _step_index("run-preflight") < _step_index("run-trap-preflight") < _step_index("run-runtime-smoke")
+    assert steps_by_id["run-preflight"].get("run", "").strip() == REPORT_ALL_PREFLIGHT_COMMAND
+    assert steps_by_id["run-trap-preflight"].get("run", "").strip() == TRAP_MODE_PREFLIGHT_COMMAND
+    assert "RUNTIME_SMOKE_ROOT" in runtime_smoke_run
+    assert "requirements.txt" in runtime_smoke_run
+    assert "scripts/runtime_python.sh" in runtime_smoke_run
+    assert "python scripts/runtime_smoke.py" not in runtime_smoke_run
+    assert "python3 scripts/runtime_smoke.py" not in runtime_smoke_run
+    _assert_required_runtime_smoke_command(runtime_smoke_run)
 
 
 def test_github_preflight_bootstraps_python_from_requirements_via_dev_wrapper():
