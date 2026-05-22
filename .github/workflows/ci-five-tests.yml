@@ -2,6 +2,8 @@ name: CI Five Tests Probe
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [ master ]
 
 jobs:
   probe:
