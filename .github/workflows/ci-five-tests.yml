@@ -1,0 +1,26 @@
+name: CI Five Tests Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Bootstrap venv
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r requirements.txt
+      - name: Run 5 tests with full tracebacks
+        run: |
+          .venv/bin/python -m pytest -vv -s --tb=long \
+            tests/test_notification_integration.py \
+            tests/test_planner_envelope_debug.py \
+            tests/test_planner_envelope_forward_compatibility.py \
+            tests/test_pr_004_rollback.py \
+            tests/test_trap_mode_final_clean_contract.py
