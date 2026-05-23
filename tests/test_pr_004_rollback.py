@@ -1,6 +1,7 @@
 import os
 import subprocess
 
+from openclaw_mock_support import provision_fake_openclaw
 from deploy_test_support import (
     ROOT_SKILL_SLUG,
     assert_isolated_checkout,
@@ -82,20 +83,26 @@ def test_rollback_no_restart_with_mock():
         deploy_script = os.path.join(isolated_root, "kit-deploy.sh")
         root_rollback = os.path.join(isolated_root, "scripts", "rollback.sh")
 
-        first = _run(["bash", deploy_script], env=env, cwd=isolated_root)
-        assert first.returncode == 0, f"First kit-deploy.sh failed:\nSTDOUT: {first.stdout}\nSTDERR: {first.stderr}"
+        with provision_fake_openclaw() as (temp_bin, get_calls):
+            # Prepend to the isolated env PATH
+            original_path = env.get("PATH", "")
+            env["PATH"] = f"{temp_bin}:{original_path}"
+            
+            first = _run(["bash", deploy_script], env=env, cwd=isolated_root)
+            assert first.returncode == 0, f"First kit-deploy.sh failed:\nSTDOUT: {first.stdout}\nSTDERR: {first.stderr}"
 
-        second = _run(["bash", deploy_script], env=env, cwd=isolated_root)
-        assert second.returncode == 0, f"Second kit-deploy.sh failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
+            second = _run(["bash", deploy_script], env=env, cwd=isolated_root)
+            assert second.returncode == 0, f"Second kit-deploy.sh failed:\nSTDOUT: {second.stdout}\nSTDERR: {second.stderr}"
 
-        marker = os.path.join(canonical_skill_dir(mock_home, ROOT_SKILL_SLUG), MODIFIED_MARKER)
-        with open(marker, "w", encoding="utf-8") as handle:
-            handle.write("modified")
+            marker = os.path.join(canonical_skill_dir(mock_home, ROOT_SKILL_SLUG), MODIFIED_MARKER)
+            with open(marker, "w", encoding="utf-8") as handle:
+                handle.write("modified")
 
-        result = _run(["bash", root_rollback], env=env, cwd=isolated_root)
-        assert result.returncode == 0, f"Rollback failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-        assert "Skipping OpenClaw gateway restart (mock environment detected)..." in result.stdout
-        assert not os.path.exists(marker)
+            result = _run(["bash", root_rollback], env=env, cwd=isolated_root)
+            assert result.returncode == 0, f"Rollback failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            assert "Skipping OpenClaw gateway restart (mock environment detected)..." in result.stdout
+            assert not os.path.exists(marker)
+
 
 
 def test_rollback_lock_guardrails():

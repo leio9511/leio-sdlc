@@ -1,7 +1,4 @@
 {
   "bash": [],
-  "pytest": [
-    "tests/test_notification_integration.py",
-    "tests/test_pr_004_rollback.py"
-  ]
+  "pytest": []
 }
