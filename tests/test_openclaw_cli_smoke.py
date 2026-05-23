@@ -24,7 +24,7 @@ class TestOpenClawCLISmoke(unittest.TestCase):
         # We need the REAL openclaw, not the one in mock_bin which might have been injected into PATH
         # by other tests (like test_078).
         current_path = os.environ.get("PATH", "").split(os.pathsep)
-        real_paths = [p for p in current_path if "mock_bin" not in p]
+        real_paths = [p for p in current_path if "mock_bin" not in p and "trap_bin" not in p]
         cls.openclaw_path = shutil.which("openclaw", path=os.pathsep.join(real_paths))
 
     def test_real_cli_discovery(self):

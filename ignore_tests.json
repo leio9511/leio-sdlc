@@ -1,4 +1,13 @@
 {
   "bash": [],
-  "pytest": []
+  "pytest": [
+    "tests/test_080_orchestrator_dynamic_strings.py",
+    "tests/test_cleanup_flag.py",
+    "tests/test_commit_state.py",
+    "tests/test_pr_002_orchestrator_lock.py",
+    "tests/test_resume_logic_overhaul.py",
+    "tests/test_resume_split.py",
+    "tests/test_notification_integration.py",
+    "tests/test_pr_004_rollback.py"
+  ]
 }

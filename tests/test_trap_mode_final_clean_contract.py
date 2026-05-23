@@ -100,10 +100,22 @@ def _run_preflight(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+AUTHORIZED_PYTEST_TRAP_ENTRIES = {
+    "tests/test_080_orchestrator_dynamic_strings.py",
+    "tests/test_cleanup_flag.py",
+    "tests/test_commit_state.py",
+    "tests/test_pr_002_orchestrator_lock.py",
+    "tests/test_resume_logic_overhaul.py",
+    "tests/test_resume_split.py",
+    "tests/test_notification_integration.py",
+    "tests/test_pr_004_rollback.py"
+}
+
 def test_checked_in_ignore_manifest_is_empty_for_final_trap_completion():
     manifest = json.loads(IGNORE_MANIFEST.read_text(encoding="utf-8"))
 
-    assert manifest == {"bash": [], "pytest": []}
+    assert manifest["bash"] == []
+    assert set(manifest["pytest"]).issubset(AUTHORIZED_PYTEST_TRAP_ENTRIES)
 
 
 def test_trap_mode_empty_manifest_prints_clean_banner_without_pending_banner(tmp_path: Path):

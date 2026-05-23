@@ -118,7 +118,7 @@ def test_preflight_source_encodes_trap_mode_execution_contract():
     assert "mktemp -d" in preflight_text
     assert '"${PYTHON_CMD[@]}" -m venv "$TRAP_VENV_DIR"' in preflight_text
     assert 'cat > "$TRAP_VENV_DIR/bin/pytest"' in preflight_text
-    assert 'export PATH="$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"' in preflight_text
+    assert 'export PATH="$TRAP_BIN_DIR:$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"' in preflight_text
     assert "rm -rf \"$TRAP_VENV_DIR\"" in preflight_text
 
     for line in TRAP_REMEDIATION_BANNER + TRAP_CLEAN_BANNER:

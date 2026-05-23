@@ -22,6 +22,9 @@ FAIL_FAST_MODE_NAME="fail-fast"
 REPORT_ALL_MODE_NAME="report-all"
 
 TRAP_MODE=0
+if [[ "${SDLC_TEST_MODE:-}" == "trap" ]]; then
+    TRAP_MODE=1
+fi
 TRAP_VENV_DIR=""
 PREFLIGHT_BASE_PATH="$PATH"
 PREFLIGHT_BASE_VIRTUAL_ENV="${VIRTUAL_ENV:-}"
@@ -79,11 +82,16 @@ SH
     if [[ -n "${PREFLIGHT_TRAP_VENV_MARKER_FILE:-}" ]]; then
         printf '%s\n' "$TRAP_VENV_DIR" > "$PREFLIGHT_TRAP_VENV_MARKER_FILE"
     fi
+
+    TRAP_BIN_DIR="$TRAP_VENV_DIR/trap_bin"
+    mkdir -p "$TRAP_BIN_DIR"
+    cp "$PROJECT_DIR/tests/trap_stub_openclaw.sh" "$TRAP_BIN_DIR/openclaw"
+    chmod +x "$TRAP_BIN_DIR/openclaw"
 }
 
 enter_trap_ambient() {
     if (( TRAP_MODE == 1 )); then
-        export PATH="$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"
+        export PATH="$TRAP_BIN_DIR:$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"
         export VIRTUAL_ENV="$TRAP_VENV_DIR"
     fi
 }
@@ -101,6 +109,7 @@ leave_trap_ambient() {
 
 if (( TRAP_MODE == 1 )); then
     activate_trap_mode
+    enter_trap_ambient
 fi
 
 fail_ignore_manifest() {
@@ -208,13 +217,10 @@ run_test() {
     local cmd="$1"
     local desc="$2"
 
-    enter_trap_ambient
     if ! eval "$cmd" > "$TMP_TEST_LOG" 2>&1; then
-        leave_trap_ambient
         report_test_failure "$desc"
         return 1
     fi
-    leave_trap_ambient
     ((TOTAL_PASSED++))
     return 0
 }

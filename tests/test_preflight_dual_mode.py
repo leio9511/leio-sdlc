@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 
 import os
 import stat
@@ -48,7 +49,7 @@ def _create_fixture_repo(tmp_path: Path, *, bash_scripts: list[tuple[str, str]],
         repo / "scripts" / "dev_python.sh",
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "exec python3 \"$@\"\n",
+        f"exec {sys.executable} \"$@\"\n",
         executable=True,
     )
 

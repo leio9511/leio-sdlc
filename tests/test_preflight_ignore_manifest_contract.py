@@ -11,6 +11,7 @@ manifest, these tests will fail.
 """
 
 from __future__ import annotations
+import sys
 
 import json
 import os
@@ -142,7 +143,7 @@ def _create_fixture_repo(tmp_path: Path) -> Path:
         repo / "scripts" / "dev_python.sh",
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "exec python3 \"$@\"\n",
+        f"exec {sys.executable} \"$@\"\n",
         executable=True,
     )
 

@@ -54,7 +54,7 @@ TRAP_MODE_SOURCE_MARKERS = (
     "TRAP_MODE=0",
     "activate_trap_mode",
     'cat > "$TRAP_VENV_DIR/bin/pytest"',
-    'export PATH="$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"',
+    'export PATH="$TRAP_BIN_DIR:$TRAP_VENV_DIR/bin:$PREFLIGHT_BASE_PATH"',
     "TRAP REMEDIATION PENDING",
     "TRAP MODE CLEAN",
 )
