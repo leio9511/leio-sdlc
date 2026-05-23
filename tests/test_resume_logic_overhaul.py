@@ -1,4 +1,5 @@
 import os
+from tests.python_contract_support import get_repo_python
 import subprocess
 import tempfile
 import json
@@ -14,7 +15,7 @@ def setup_mock_env(td, git_test_sandbox):
     git_test_sandbox(td, baseline_commit=True)
     import subprocess
     doctor_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "doctor.py")
-    subprocess.run(["python3", doctor_path, td, "--fix"], check=True)
+    subprocess.run([get_repo_python(), doctor_path, td, "--fix"], check=True)
     subprocess.run(["git", "checkout", "-b", "feature/test"], check=True)
     
     prd_path = os.path.join(td, "docs", "PRDs", "PRD_Test.md")
@@ -42,7 +43,7 @@ def setup_mock_env(td, git_test_sandbox):
 def run_orchestrator(td, prd_path, *args):
     orchestrator_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "orchestrator.py")
     cmd = [
-        "python3", orchestrator_path, 
+        get_repo_python(), orchestrator_path, 
         "--workdir", td, 
         "--prd-file", prd_path,
         "--enable-exec-from-workspace"

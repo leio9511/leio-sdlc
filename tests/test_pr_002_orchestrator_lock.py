@@ -1,4 +1,5 @@
 import os
+from tests.python_contract_support import get_repo_python
 import subprocess
 import time
 import tempfile
@@ -14,7 +15,7 @@ class TestOrchestratorLock:
             workdir = tmpdir
             # Bootstrap only: shared helper owns git init, repo-local identity, and baseline commit.
             git_test_sandbox(workdir, baseline_commit=True)
-            subprocess.run(["python3", doctor_path, workdir, "--fix"], cwd=project_root, check=True, capture_output=True, text=True)
+            subprocess.run([get_repo_python(), doctor_path, workdir, "--fix"], cwd=project_root, check=True, capture_output=True, text=True)
 
             # We start a background orchestrator that sleeps
             env = os.environ.copy()
@@ -23,7 +24,7 @@ class TestOrchestratorLock:
 
             # Start first instance
             proc1 = subprocess.Popen(
-                ["python3", orchestrator_path, "--force-replan", "true", "--enable-exec-from-workspace", "--workdir", workdir, "--prd-file", "dummy", "--test-sleep"],
+                [get_repo_python(), orchestrator_path, "--force-replan", "true", "--enable-exec-from-workspace", "--workdir", workdir, "--prd-file", "dummy", "--test-sleep"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
@@ -35,7 +36,7 @@ class TestOrchestratorLock:
 
             # Start second instance
             proc2 = subprocess.Popen(
-                ["python3", orchestrator_path, "--force-replan", "true", "--enable-exec-from-workspace", "--workdir", workdir, "--prd-file", "dummy"],
+                [get_repo_python(), orchestrator_path, "--force-replan", "true", "--enable-exec-from-workspace", "--workdir", workdir, "--prd-file", "dummy"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,

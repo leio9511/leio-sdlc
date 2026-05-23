@@ -1,4 +1,5 @@
 import os
+from tests.python_contract_support import get_repo_python
 import subprocess
 import pytest
 import sys
@@ -14,7 +15,7 @@ def test_orchestrator_dynamic_strings(tmp_path, git_test_sandbox):
     
     # Make project compliant so we get past the doctor check
     doctor_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/doctor.py"
-    subprocess.run(["python3", doctor_script, str(tmp_path), "--fix"], check=True)
+    subprocess.run([get_repo_python(), doctor_script, str(tmp_path), "--fix"], check=True)
     
     # Create uncommitted PRD file
     with open("PRD_uncommitted.md", "w") as f:
@@ -27,7 +28,7 @@ def test_orchestrator_dynamic_strings(tmp_path, git_test_sandbox):
     env["SDLC_RUNTIME_DIR"] = custom_root
 
     result = subprocess.run(
-        ["python3", orchestrator_script, "--enable-exec-from-workspace", "--workdir", str(tmp_path), "--prd-file", "PRD_uncommitted.md", "--force-replan", "true"],
+        [get_repo_python(), orchestrator_script, "--enable-exec-from-workspace", "--workdir", str(tmp_path), "--prd-file", "PRD_uncommitted.md", "--force-replan", "true"],
         capture_output=True,
         text=True,
         env=env

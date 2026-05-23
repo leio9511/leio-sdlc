@@ -1,4 +1,5 @@
 import os
+from tests.python_contract_support import get_repo_python
 import subprocess
 import pytest
 import sys
@@ -20,7 +21,7 @@ def test_commit_state_validates_files(tmp_path, git_test_sandbox):
     script_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/commit_state.py"
 
     # Try to commit source code
-    result = subprocess.run(["python3", script_path, "--files", "main.py"], capture_output=True, text=True)
+    result = subprocess.run([get_repo_python(), script_path, "--files", "main.py"], capture_output=True, text=True)
 
     assert result.returncode == 1
     assert "[FATAL] commit_state.py can only be used for state and PRD files. Source code changes must go through the SDLC pipeline." in result.stdout
@@ -31,12 +32,12 @@ def test_orchestrator_rejects_uncommitted_state(tmp_path, git_test_sandbox):
     git_test_sandbox(tmp_path, baseline_commit=True)
     os.chdir(tmp_path)
     doctor_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/doctor.py"
-    subprocess.run(["python3", doctor_script, str(tmp_path), "--fix"])
+    subprocess.run([get_repo_python(), doctor_script, str(tmp_path), "--fix"])
     with open("PRD_uncommitted.md", "w") as f:
         f.write("uncommitted")
 
     orchestrator_script = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/orchestrator.py"
-    result = subprocess.run(["python3", orchestrator_script, "--enable-exec-from-workspace", "--workdir", str(tmp_path), "--prd-file", "PRD_uncommitted.md", "--force-replan", "true"], capture_output=True, text=True)
+    result = subprocess.run([get_repo_python(), orchestrator_script, "--enable-exec-from-workspace", "--workdir", str(tmp_path), "--prd-file", "PRD_uncommitted.md", "--force-replan", "true"], capture_output=True, text=True)
 
     assert result.returncode == 1
     assert "Workspace contains uncommitted state files." in result.stdout
@@ -148,7 +149,7 @@ def test_pre_commit_hook_output(tmp_path, git_test_sandbox):
     script_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/commit_state.py"
 
     # Try to commit with lock file present
-    result = subprocess.run(["python3", script_path, "--files", "STATE.md"], capture_output=True, text=True)
+    result = subprocess.run([get_repo_python(), script_path, "--files", "STATE.md"], capture_output=True, text=True)
 
     assert result.returncode == 1
     assert "[FATAL] Git index is locked. Please wait or remove .git/index.lock if a previous process crashed." in result.stdout

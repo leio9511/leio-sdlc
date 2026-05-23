@@ -1,4 +1,5 @@
 import os
+from tests.python_contract_support import get_repo_python
 import subprocess
 import tempfile
 import time
@@ -43,7 +44,7 @@ def test_cleanup_quarantine(clean_cwd, git_test_sandbox):
         # Run orchestrator cleanup
         orchestrator_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/orchestrator.py"
         res = subprocess.run([
-            "python3", orchestrator_path, 
+            get_repo_python(), orchestrator_path, 
             "--workdir", td, 
             "--prd-file", "dummy.md",
             "--cleanup",
@@ -78,7 +79,7 @@ def test_cleanup_lock_blocked(clean_cwd):
         
         orchestrator_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/scripts/orchestrator.py"
         res = subprocess.run([
-            "python3", orchestrator_path, 
+            get_repo_python(), orchestrator_path, 
             "--workdir", td, 
             "--prd-file", "dummy.md",
             "--cleanup",
