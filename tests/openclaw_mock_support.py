@@ -56,3 +56,4 @@ print("Fake openclaw executed successfully")
             yield temp_bin, get_calls
         finally:
             os.environ["PATH"] = original_path
+# PR-003: provision_fake_openclaw successfully isolates Family B tests
