@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Minimal ACP Validation Verdict",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "target_cli",
+    "validation_timestamp",
+    "connect_result",
+    "execute_turn_result",
+    "handle_capture_result",
+    "resume_once_result",
+    "failure_classification",
+    "continuity_mode",
+    "handle_acquisition_strategy",
+    "resume_requires_same_runtime_state",
+    "fallback_policy",
+    "capability_surface",
+    "final_verdict"
+  ],
+  "properties": {
+    "target_cli": {"type": "string", "const": "Gemini CLI"},
+    "validation_timestamp": {"type": "string"},
+    "connect_result": {"$ref": "#/$defs/operation_result"},
+    "execute_turn_result": {"$ref": "#/$defs/operation_result"},
+    "handle_capture_result": {"$ref": "#/$defs/operation_result"},
+    "resume_once_result": {"$ref": "#/$defs/operation_result"},
+    "failure_classification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["operation", "category", "detail"],
+        "properties": {
+          "operation": {"type": "string"},
+          "category": {"type": "string"},
+          "detail": {"type": "string"}
+        }
+      }
+    },
+    "continuity_mode": {"type": "string"},
+    "handle_acquisition_strategy": {"type": "string"},
+    "resume_requires_same_runtime_state": {"type": "boolean"},
+    "fallback_policy": {"type": "string"},
+    "capability_surface": {
+      "type": "object",
+      "required": [
+        "connect",
+        "execute_turn",
+        "capture_handle",
+        "resume_once",
+        "classify_failure",
+        "emit_verdict"
+      ],
+      "properties": {
+        "connect": {"type": "boolean"},
+        "execute_turn": {"type": "boolean"},
+        "capture_handle": {"type": "boolean"},
+        "resume_once": {"type": "boolean"},
+        "classify_failure": {"type": "boolean"},
+        "emit_verdict": {"type": "boolean"},
+        "surface_type": {"type": "string"}
+      }
+    },
+    "final_verdict": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "partially_supported",
+        "not_suitable_at_this_stage",
+        "blocked"
+      ]
+    },
+    "target_scope_note": {
+      "type": "string",
+      "const": "This PRD's ACP viability verdict applies only to the tested Gemini CLI path and must not be generalized to Codex or any other CLI."
+    },
+    "sdk_package_name": {"type": "string", "const": "agent-client-protocol"}
+  },
+  "$defs": {
+    "operation_result": {
+      "type": "object",
+      "required": ["operation", "ok", "status", "detail"],
+      "properties": {
+        "operation": {"type": "string"},
+        "ok": {"type": "boolean"},
+        "status": {"type": "string"},
+        "detail": {"type": "string"},
+        "error": {"type": "string"},
+        "metadata": {"type": "object"}
+      }
+    }
+  }
+}
