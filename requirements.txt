@@ -1,3 +1,4 @@
 PyYAML
 pytest
+# ACP Python SDK dependency for the minimal ACP validation framework.
 agent-client-protocol
