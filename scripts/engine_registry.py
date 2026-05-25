@@ -31,34 +31,18 @@ ALLOWED_CONTINUITY_MODE_VALUES = {"authoritative_resume", "unsupported"}
 ALLOWED_HANDLE_ACQUISITION_STRATEGY_VALUES = {"protocol_native", "explicit_returned_handle", "unavailable"}
 ALLOWED_FALLBACK_POLICY_VALUES = {"none", "legacy_direct_cli", "fail_closed_until_prerequisite_ready"}
 
-def _extract_sensitive_values(data):
-    vals = []
+def _scrub_config(data):
     if isinstance(data, dict):
+        scrubbed = {}
         for k, v in data.items():
             if k in SENSITIVE_KEYS:
-                if isinstance(v, str):
-                    vals.append(v)
-                elif isinstance(v, list):
-                    vals.extend([str(x) for x in v])
-                elif isinstance(v, dict):
-                    vals.append(json.dumps(v))
+                scrubbed[k] = "[REDACTED]"
             else:
-                vals.extend(_extract_sensitive_values(v))
+                scrubbed[k] = _scrub_config(v)
+        return scrubbed
     elif isinstance(data, list):
-        for item in data:
-            vals.extend(_extract_sensitive_values(item))
-    return vals
-
-def _redact_message(msg, config):
-    if not isinstance(config, dict):
-        return msg
-    sensitive_vals = _extract_sensitive_values(config)
-    # Sort by length descending so substrings don't replace parts of larger strings
-    sensitive_vals.sort(key=len, reverse=True)
-    for val in sensitive_vals:
-        if isinstance(val, str) and len(val) > 0:
-            msg = msg.replace(val, "[REDACTED]")
-    return msg
+        return [_scrub_config(item) for item in data]
+    return data
 
 def _check_no_sensitive_keys(data, source):
     if isinstance(data, dict):
@@ -110,25 +94,25 @@ def _merge_and_validate(default_config, local_config):
             
         for req_field in REQUIRED_ENGINE_FIELDS:
             if req_field not in entry:
-                raise ValueError(f"Engine '{map_key}' is missing required field '{req_field}': {entry}")
+                raise ValueError(f"Engine '{map_key}' is missing required field '{req_field}': {_scrub_config(entry)}")
                 
         if not isinstance(entry["capability_surface"], str) or not entry["capability_surface"]:
-            raise ValueError(f"Engine '{map_key}' must have a non-empty string capability_surface: {entry}")
+            raise ValueError(f"Engine '{map_key}' must have a non-empty string capability_surface: {_scrub_config(entry)}")
             
         if entry["registration_visibility"] not in ALLOWED_REGISTRATION_VISIBILITY_VALUES:
-            raise ValueError(f"Invalid registration_visibility: {entry['registration_visibility']} in {entry}")
+            raise ValueError(f"Invalid registration_visibility: {entry['registration_visibility']} in {_scrub_config(entry)}")
             
         if entry["runtime_mode"] not in ALLOWED_RUNTIME_MODE_VALUES:
-            raise ValueError(f"Invalid runtime_mode: {entry['runtime_mode']} in {entry}")
+            raise ValueError(f"Invalid runtime_mode: {entry['runtime_mode']} in {_scrub_config(entry)}")
             
         if entry["continuity_mode"] not in ALLOWED_CONTINUITY_MODE_VALUES:
-            raise ValueError(f"Invalid continuity_mode: {entry['continuity_mode']} in {entry}")
+            raise ValueError(f"Invalid continuity_mode: {entry['continuity_mode']} in {_scrub_config(entry)}")
             
         if entry["handle_acquisition_strategy"] not in ALLOWED_HANDLE_ACQUISITION_STRATEGY_VALUES:
-            raise ValueError(f"Invalid handle_acquisition_strategy: {entry['handle_acquisition_strategy']} in {entry}")
+            raise ValueError(f"Invalid handle_acquisition_strategy: {entry['handle_acquisition_strategy']} in {_scrub_config(entry)}")
             
         if entry["fallback_policy"] not in ALLOWED_FALLBACK_POLICY_VALUES:
-            raise ValueError(f"Invalid fallback_policy: {entry['fallback_policy']} in {entry}")
+            raise ValueError(f"Invalid fallback_policy: {entry['fallback_policy']} in {_scrub_config(entry)}")
             
     return registry
 
@@ -152,19 +136,11 @@ def load_engine_registry(sdlc_root):
             try:
                 local_config = json.load(f)
             except json.JSONDecodeError as e:
-                # JSON parsing error could potentially contain snippet of text, redact just in case
-                err_msg = str(e)
-                # Attempt to read text to redact it
-                f.seek(0)
-                raw_text = f.read()
                 # Basic pattern based redaction for JSON decode error isn't necessary because JSONDecodeError doesn't echo values usually.
-                raise RegistryValidationError(f"engines.local.json is malformed: {err_msg}")
+                raise RegistryValidationError(f"engines.local.json is malformed: {e}")
 
     try:
         merged_config = _merge_and_validate(default_config, local_config)
         return merged_config
     except Exception as e:
-        err_msg = str(e)
-        if local_config:
-            err_msg = _redact_message(err_msg, local_config)
-        raise RegistryValidationError(err_msg) from None
+        raise RegistryValidationError(str(e)) from None

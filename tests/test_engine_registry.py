@@ -37,19 +37,29 @@ def get_default_config():
         }
     }
 
-def test_gitignore_enforcement():
+def test_gitignore_enforcement(tmp_path):
+    # Initialize an isolated git repository
+    git_dir = tmp_path / "git_repo"
+    git_dir.mkdir()
+    
+    subprocess.run(["git", "init"], cwd=str(git_dir), check=True, capture_output=True)
+    
     # Verify .gitignore contains config/engines.local.json
     with open(".gitignore", "r") as f:
         content = f.read()
     assert "config/engines.local.json" in content
 
-    # Verify it is ignored by git
-    # Create the file just in case
-    os.makedirs("config", exist_ok=True)
-    with open("config/engines.local.json", "w") as f:
+    # Create .gitignore in tmp_path
+    with open(git_dir / ".gitignore", "w") as f:
+        f.write(content)
+        
+    config_dir = git_dir / "config"
+    config_dir.mkdir()
+    local_config = config_dir / "engines.local.json"
+    with open(local_config, "w") as f:
         f.write("{}")
     
-    result = subprocess.run(["git", "check-ignore", "config/engines.local.json"], capture_output=True, text=True)
+    result = subprocess.run(["git", "check-ignore", "config/engines.local.json"], cwd=str(git_dir), capture_output=True, text=True)
     # git check-ignore returns 0 if the file is ignored
     assert result.returncode == 0
 
@@ -210,3 +220,18 @@ def test_sensitive_key_in_default(tmp_path):
         load_engine_registry(sdlc_root)
         
     assert "contains sensitive field" in str(exc_info.value)
+
+def test_malformed_json_local_config(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    local_path = os.path.join(sdlc_root, "config", "engines.local.json")
+    with open(local_path, "w") as f:
+        f.write("{ \"engines\": { \"test\": \"value\" ") # Syntactically invalid JSON
+        
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    error_msg = str(exc_info.value)
+    assert error_msg.startswith("[FATAL] Engine Registry validation failed.")
+    assert "engines.local.json is malformed" in error_msg
