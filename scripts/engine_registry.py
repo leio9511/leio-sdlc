@@ -3,7 +3,8 @@ import json
 
 class RegistryValidationError(Exception):
     def __init__(self, message):
-        msg = message if message.startswith("[FATAL] Engine Registry validation failed.") else f"[FATAL] Engine Registry validation failed. {message}"
+        prefix = "[FATAL] Engine Registry validation failed."
+        msg = message if message.startswith(prefix) else f"{prefix} {message}"
         super().__init__(msg)
 
 SENSITIVE_KEYS = {
@@ -45,6 +46,7 @@ def _scrub_config(data):
     return data
 
 def _check_no_sensitive_keys(data, source):
+    # Reject public defaults containing sensitive fields
     if isinstance(data, dict):
         for k, v in data.items():
             if k in SENSITIVE_KEYS:
@@ -130,13 +132,14 @@ def load_engine_registry(sdlc_root):
     
     local_config = None
     if os.path.exists(local_path):
+        # Enforce fail-closed behavior on 0-byte local configs
         if os.path.getsize(local_path) == 0:
             raise RegistryValidationError("engines.local.json is a zero-byte file")
         with open(local_path, "r") as f:
             try:
                 local_config = json.load(f)
             except json.JSONDecodeError as e:
-                # Basic pattern based redaction for JSON decode error isn't necessary because JSONDecodeError doesn't echo values usually.
+                # Enforce fail-closed on malformed JSON
                 raise RegistryValidationError(f"engines.local.json is malformed: {e}")
 
     try:
