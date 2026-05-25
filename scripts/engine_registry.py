@@ -20,18 +20,45 @@ def _redact_raw_json(text):
     """Redact string values associated with sensitive keys directly in raw JSON text."""
     redacted = text
     for key in SENSITIVE_KEYS:
-        # Redact simple string values
-        redacted = re.sub(f'("{key}"\\s*:\\s*)"[^"]+"', r'\1"[REDACTED]"', redacted)
+        # 1. Redact simple string values (handles escaped quotes and missing closing quote)
+        redacted = re.sub(
+            r'("' + key + r'"\s*:\s*)"(?:[^"\\\n]|\\.)*(?:"?)',
+            r'\1"[REDACTED]"',
+            redacted
+        )
         
-        # Redact array string values
+        # 2. Redact array string values
         def repl_array(m):
-            return m.group(1) + re.sub(r'"[^"]+"', '"[REDACTED]"', m.group(2)) + m.group(3)
-        redacted = re.sub(f'("{key}"\\s*:\\s*\\[)(.*?)(\\])', repl_array, redacted, flags=re.DOTALL)
+            content = m.group(2)
+            content_redacted = re.sub(r'"(?:[^"\\\n]|\\.)*(?:"?)', '"[REDACTED]"', content)
+            return m.group(1) + content_redacted + m.group(3)
+            
+        redacted = re.sub(
+            r'("' + key + r'"\s*:\s*\[)(.*?)(\]|\Z)',
+            repl_array,
+            redacted,
+            flags=re.DOTALL
+        )
         
-        # Redact dict string values
+        # 3. Redact dict string values
         def repl_dict(m):
-            return m.group(1) + re.sub(r'("[^"]+"\s*:\s*)"[^"]+"', r'\1"[REDACTED]"', m.group(2)) + m.group(3)
-        redacted = re.sub(f'("{key}"\\s*:\\s*\\{{)(.*?)(\\}})', repl_dict, redacted, flags=re.DOTALL)
+            content = m.group(2)
+            content_redacted = re.sub(r'("[^"]+"\s*:\s*)"(?:[^"\\\n]|\\.)*(?:"?)', r'\1"[REDACTED]"', content)
+            return m.group(1) + content_redacted + m.group(3)
+            
+        redacted = re.sub(
+            r'("' + key + r'"\s*:\s*\{)(.*?)(\}|\Z)',
+            repl_dict,
+            redacted,
+            flags=re.DOTALL
+        )
+        
+        # 4. Catch-all for unquoted values on the same line
+        redacted = re.sub(
+            r'("' + key + r'"\s*:\s*)(?![ \t\r\n]*["\[\{])([^,\n\}]+)',
+            r'\1"[REDACTED]"',
+            redacted
+        )
         
     return redacted
 
@@ -172,4 +199,6 @@ def load_engine_registry(sdlc_root):
     except RegistryValidationError:
         raise
     except Exception as e:
-        raise RegistryValidationError(str(e)) from None
+        error_msg = str(e)
+        scrubbed_msg = _redact_raw_json(error_msg)
+        raise RegistryValidationError(scrubbed_msg) from None
