@@ -99,6 +99,49 @@ def test_missing_api_key_classifies_as_blocked_without_traceback():
     assert verdict["final_verdict"] in {"blocked", "partially_supported"}
 
 
+def test_client_produced_full_observation_set_is_valid_verdict_input():
+    observations = {
+        "connect": {
+            "operation": "connect",
+            "ok": True,
+            "status": "connected",
+            "detail": "fake client connected",
+            "metadata": {"sdk_package_name": "agent-client-protocol", "session_id": "fake-session-1"},
+        },
+        "execute_turn": {
+            "operation": "execute_turn",
+            "ok": True,
+            "status": "succeeded",
+            "detail": "fake turn completed",
+            "metadata": {"sdk_package_name": "agent-client-protocol", "response_text": "pong", "handle": "fake-handle-1"},
+        },
+        "capture_handle": {
+            "operation": "capture_handle",
+            "ok": True,
+            "status": "captured",
+            "detail": "fake handle captured",
+            "metadata": {"sdk_package_name": "agent-client-protocol", "handle": "fake-handle-1"},
+        },
+        "resume_once": {
+            "operation": "resume_once",
+            "ok": True,
+            "status": "succeeded",
+            "detail": "fake resume completed",
+            "metadata": {"sdk_package_name": "agent-client-protocol", "handle": "fake-handle-1", "attempt_count": 1},
+        },
+    }
+
+    verdict = acp_probe.emit_verdict(observations, validation_timestamp="2026-05-25T00:00:00Z")
+
+    assert REQUIRED_FIELDS.issubset(verdict)
+    assert verdict["connect_result"] == observations["connect"]
+    assert verdict["execute_turn_result"] == observations["execute_turn"]
+    assert verdict["handle_capture_result"] == observations["capture_handle"]
+    assert verdict["resume_once_result"] == observations["resume_once"]
+    assert verdict["final_verdict"] == "supported"
+    json.dumps(verdict)
+
+
 def test_requirements_declares_agent_client_protocol():
     requirements = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
 

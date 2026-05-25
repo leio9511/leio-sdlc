@@ -26,6 +26,140 @@ class FailingTurnSession:
         raise RuntimeError("simulated turn failure")
 
 
+class FakeResumeSession:
+    session_id = "fake-session-1"
+
+    def __init__(self):
+        self.resume_calls = []
+
+    def execute_turn(self, prompt):
+        return {
+            "ok": True,
+            "status": "succeeded",
+            "detail": f"fake response for {prompt}",
+            "response": "pong",
+            "handle": "fake-handle-1",
+        }
+
+    def resume(self, handle):
+        self.resume_calls.append(handle)
+        return {"ok": True, "status": "succeeded", "response": "resumed pong", "handle": handle}
+
+
+class FailingResumeSession:
+    def resume(self, _handle):
+        raise RuntimeError("simulated resume failure")
+
+
+def test_resume_once_is_single_bounded_attempt():
+    fake_session = FakeResumeSession()
+
+    result = acp_client.ACPClient(session_factory=lambda **_options: fake_session).resume_once("fake-handle-1")
+
+    assert fake_session.resume_calls == ["fake-handle-1"]
+    assert result["operation"] == "resume_once"
+    assert result["ok"] is True
+    assert result["status"] == "succeeded"
+    assert result["metadata"]["handle"] == "fake-handle-1"
+    assert result["metadata"]["attempt_count"] == 1
+
+
+def test_resume_once_without_handle_returns_unavailable_observation():
+    result = acp_client.resume_once(None, session_factory=lambda **_options: FakeResumeSession())
+
+    assert result["operation"] == "resume_once"
+    assert result["ok"] is False
+    assert result["status"] == "unavailable"
+    assert result["error"] == "Resume Handle Unavailable"
+    assert result["metadata"]["attempt_count"] == 0
+
+    verdict = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True, "detail": "connected"},
+            "execute_turn": {"ok": True, "detail": "turn completed"},
+            "capture_handle": {"ok": False, "status": "unavailable", "detail": "no handle"},
+            "resume_once": result,
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert verdict["resume_once_result"] == result
+    assert verdict["final_verdict"] in acp_probe.FINAL_VERDICTS
+
+
+def test_resume_failure_is_classifiable_probe_input():
+    result = acp_client.resume_once("fake-handle-1", session_factory=lambda **_options: FailingResumeSession())
+
+    assert result["operation"] == "resume_once"
+    assert result["ok"] is False
+    assert result["status"] == "failed"
+    assert "RuntimeError" in result["error"]
+    assert result["metadata"]["attempt_count"] == 1
+
+    verdict = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True, "detail": "connected"},
+            "execute_turn": {"ok": True, "detail": "turn completed"},
+            "capture_handle": {"ok": True, "metadata": {"handle": "fake-handle-1"}},
+            "resume_once": result,
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    categories = {item["category"] for item in verdict["failure_classification"]}
+    assert "Resume Unavailable" in categories
+    assert verdict["final_verdict"] == "partially_supported"
+
+
+def test_full_client_observation_set_emits_structured_verdict():
+    fake_session = FakeResumeSession()
+    client = acp_client.ACPClient(session_factory=lambda **_options: fake_session)
+    connect_result = client.connect()
+    turn_result = client.execute_turn("ping")
+    handle_result = client.capture_handle(turn_result)
+    resume_result = client.resume_once(handle_result["metadata"]["handle"])
+
+    verdict = acp_probe.emit_verdict(
+        {
+            "connect": connect_result,
+            "execute_turn": turn_result,
+            "capture_handle": handle_result,
+            "resume_once": resume_result,
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+
+    assert set(acp_probe.REQUIRED_VERDICT_FIELDS).issubset(verdict)
+    assert verdict["connect_result"] == connect_result
+    assert verdict["execute_turn_result"] == turn_result
+    assert verdict["handle_capture_result"] == handle_result
+    assert verdict["resume_once_result"] == resume_result
+    assert verdict["final_verdict"] == "supported"
+
+
+def test_default_full_client_tests_do_not_require_real_gemini_or_gemini_api_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    fake_session = FakeResumeSession()
+
+    def import_would_fail_if_real_sdk_were_used(_module_name):
+        raise AssertionError("default full client tests must use fake injection")
+
+    client = acp_client.ACPClient(
+        session_factory=lambda **_options: fake_session,
+        sdk_importer=import_would_fail_if_real_sdk_were_used,
+    )
+
+    connect_result = client.connect()
+    turn_result = client.execute_turn("ping")
+    handle_result = client.capture_handle(turn_result)
+    resume_result = client.resume_once("fake-handle-1")
+
+    assert "GEMINI_API_KEY" not in os.environ
+    assert connect_result["ok"] is True
+    assert turn_result["ok"] is True
+    assert handle_result["ok"] is True
+    assert resume_result["ok"] is True
+    assert fake_session.resume_calls == ["fake-handle-1"]
+
+
 def test_client_connect_uses_injected_fake_transport(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     calls = []

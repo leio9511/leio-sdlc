@@ -128,6 +128,43 @@ class ACPClient:
             },
         )
 
+    def resume_once(self, handle: Any | None = None, prompt: str | None = None, **session_options: Any) -> ConnectObservation:
+        """Attempt exactly one bounded continuation/resume operation.
+
+        Missing handles and SDK/session resume failures are returned as structured
+        observations.  This method intentionally performs one direct call only;
+        it does not start retry loops, continuation loops, or orchestration.
+        """
+
+        if handle is None:
+            return resume_observation(
+                False,
+                status="unavailable",
+                detail="Resume was not attempted because no continuation handle was available.",
+                error="Resume Handle Unavailable",
+                metadata={"sdk_package_name": SDK_PACKAGE_NAME, "attempt_count": 0},
+            )
+
+        try:
+            session = self._create_session(**session_options)
+            method = _find_callable(session, ("resume_once", "resume", "continue_session", "continue_turn"))
+            if method is None:
+                raise RuntimeError("No supported bounded resume method found on ACP session.")
+            if prompt is None:
+                response = method(handle)
+            else:
+                response = method(handle, prompt)
+        except Exception as exc:  # noqa: BLE001 - controlled failure surface is intentional.
+            return resume_observation(
+                False,
+                status="failed",
+                detail="ACP bounded resume attempt failed.",
+                error=f"{exc.__class__.__name__}: {exc}",
+                metadata={"sdk_package_name": SDK_PACKAGE_NAME, "handle": str(handle), "attempt_count": 1},
+            )
+
+        return resume_observation_from_response(response, handle=handle)
+
     def _load_default_session_factory(self) -> SessionFactory:
         """Load a likely session constructor from the official SDK module."""
 
@@ -283,6 +320,46 @@ def handle_observation(
     return observation
 
 
+def resume_observation(
+    ok: bool,
+    *,
+    status: str | None = None,
+    detail: str = "",
+    error: str | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> ConnectObservation:
+    """Return the stable resume_once observation shape consumed by acp_probe."""
+
+    observation = connect_observation(
+        ok,
+        status=status or ("succeeded" if ok else "failed"),
+        detail=detail,
+        error=error,
+        metadata=metadata,
+    )
+    observation["operation"] = "resume_once"
+    return observation
+
+
+def resume_observation_from_response(response: Any, *, handle: Any) -> ConnectObservation:
+    """Normalize fake/SDK resume response data into a resume_once observation."""
+
+    if isinstance(response, Mapping) and "ok" in response:
+        ok = bool(response["ok"])
+        status = str(response.get("status") or ("succeeded" if ok else "failed"))
+        detail = str(response.get("detail") or response.get("message") or "ACP bounded resume attempt completed.")
+        error = str(response["error"]) if response.get("error") else None
+    else:
+        ok = True
+        status = "succeeded"
+        detail = "ACP bounded resume attempt completed."
+        error = None
+    metadata = _response_metadata(response)
+    metadata["handle"] = str(handle)
+    metadata["attempt_count"] = 1
+    return resume_observation(ok, status=status, detail=detail, error=error, metadata=metadata)
+
+
 def connect(
     *,
     session_factory: SessionFactory | None = None,
@@ -316,3 +393,18 @@ def capture_handle(
     """Convenience function for one-shot handle capture callers."""
 
     return ACPClient(session_factory=session_factory, sdk_importer=sdk_importer).capture_handle(response, **session_options)
+
+
+def resume_once(
+    handle: Any | None = None,
+    prompt: str | None = None,
+    *,
+    session_factory: SessionFactory | None = None,
+    sdk_importer: Callable[[str], Any] = importlib.import_module,
+    **session_options: Any,
+) -> ConnectObservation:
+    """Convenience function for one-shot bounded resume callers."""
+
+    return ACPClient(session_factory=session_factory, sdk_importer=sdk_importer).resume_once(
+        handle, prompt, **session_options
+    )
