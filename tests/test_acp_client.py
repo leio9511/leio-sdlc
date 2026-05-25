@@ -1,3 +1,4 @@
+import importlib
 import os
 
 from scripts import acp_client, acp_probe
@@ -49,6 +50,50 @@ class FakeResumeSession:
 class FailingResumeSession:
     def resume(self, _handle):
         raise RuntimeError("simulated resume failure")
+
+
+class FakeStdioSDK:
+    def __init__(self):
+        self.calls = []
+
+    def ClientSession(self, **kwargs):
+        self.calls.append(kwargs)
+        session = FakeResumeSession()
+        session.metadata = {"session_id": "stdio-session-1"}
+        return session
+
+
+def test_stdio_session_factory_binds_subprocess_pipes_to_sdk_session():
+    fake_sdk = FakeStdioSDK()
+    stdin = object()
+    stdout = object()
+    stderr = object()
+    process = object()
+
+    factory = acp_client.stdio_session_factory(
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+        process=process,
+        launch_command=["gemini", "--acp"],
+        sdk_importer=lambda module_name: fake_sdk,
+    )
+    session = factory()
+
+    assert session is factory()
+    assert fake_sdk.calls == [{"stdin": stdin, "stdout": stdout, "stderr": stderr, "process": process}]
+    assert session.metadata["transport"] == "stdio"
+    assert session.metadata["target_cli"] == "Gemini CLI"
+    assert session.metadata["launch_command"] == ["gemini", "--acp"]
+
+
+def test_stdio_session_factory_requires_subprocess_pipes():
+    try:
+        acp_client.stdio_session_factory(stdin=None, stdout=object())
+    except ValueError as exc:
+        assert "stdin and stdout" in str(exc)
+    else:
+        raise AssertionError("stdio_session_factory must reject missing stdin pipe")
 
 
 def test_resume_once_is_single_bounded_attempt():

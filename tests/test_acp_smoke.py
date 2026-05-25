@@ -6,11 +6,10 @@ from scripts import acp_probe, acp_smoke
 
 
 class FakeProcess:
-    stdin = object()
-    stdout = object()
-    stderr = object()
-
     def __init__(self):
+        self.stdin = object()
+        self.stdout = object()
+        self.stderr = object()
         self.terminated = False
 
     def terminate(self):
@@ -121,6 +120,43 @@ def test_smoke_writes_timestamped_and_latest_artifacts(tmp_path):
     assert _read_json(result.timestamped_path) == _read_json(result.latest_path)
     assert set(acp_probe.REQUIRED_VERDICT_FIELDS).issubset(_read_json(result.latest_path))
     assert fake_process.terminated is True
+
+
+def test_default_smoke_path_binds_subprocess_stdio_to_acp_client(monkeypatch, tmp_path):
+    fake_process = FakeProcess()
+    captured_factory = {}
+
+    class RecordingClient(FakeClient):
+        def __init__(self, session_factory):
+            super().__init__()
+            captured_factory["session_factory"] = session_factory
+
+    monkeypatch.setattr(
+        acp_smoke.acp_client,
+        "stdio_session_factory",
+        lambda **kwargs: captured_factory.update({"stdio_kwargs": kwargs}) or "stdio-factory",
+    )
+    monkeypatch.setattr(
+        acp_smoke.acp_client,
+        "ACPClient",
+        lambda *, session_factory: RecordingClient(session_factory),
+    )
+
+    result = acp_smoke.run_smoke(
+        repo_root=tmp_path,
+        environ={"GEMINI_API_KEY": "test-key"},
+        timestamp="2026-05-25T00:00:00Z",
+        popen_factory=lambda _command, **_kwargs: fake_process,
+    )
+
+    assert captured_factory["session_factory"] == "stdio-factory"
+    assert captured_factory["stdio_kwargs"]["process"] is fake_process
+    assert captured_factory["stdio_kwargs"]["stdin"] is fake_process.stdin
+    assert captured_factory["stdio_kwargs"]["stdout"] is fake_process.stdout
+    assert captured_factory["stdio_kwargs"]["stderr"] is fake_process.stderr
+    assert captured_factory["stdio_kwargs"]["launch_command"] == ["gemini", "--acp"]
+    assert captured_factory["stdio_kwargs"]["target_cli"] == "Gemini CLI"
+    assert _read_json(result.latest_path)["final_verdict"] == "supported"
 
 
 def test_missing_gemini_api_key_emits_blocked_artifact_without_traceback(tmp_path):

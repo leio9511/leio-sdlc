@@ -11,13 +11,119 @@ from __future__ import annotations
 
 import importlib
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 SDK_PACKAGE_NAME = "agent-client-protocol"
 SDK_IMPORT_MODULE = "agent_client_protocol"
 
 ConnectObservation = dict[str, Any]
 SessionFactory = Callable[..., Any]
+StreamFactory = Callable[[], Any]
+
+
+@dataclass(frozen=True)
+class StdioACPClientSessionFactory:
+    """Lazy SDK session factory bound to a launched ACP stdio subprocess.
+
+    The smoke runner owns process launch.  This factory owns the narrow bridge
+    from that already-launched subprocess' stdin/stdout pipes into the official
+    ACP SDK boundary, then reuses the same SDK session object for connect,
+    execute_turn, handle capture, and one bounded resume observation.
+    """
+
+    stdin: Any
+    stdout: Any
+    stderr: Any | None = None
+    process: Any | None = None
+    launch_command: Sequence[str] | None = None
+    target_cli: str = "Gemini CLI"
+    sdk_importer: Callable[[str], Any] = importlib.import_module
+
+    def __post_init__(self) -> None:
+        if self.stdin is None or self.stdout is None:
+            raise ValueError("ACP stdio session factory requires subprocess stdin and stdout pipes.")
+        object.__setattr__(self, "_session", None)
+
+    def __call__(self, **_session_options: Any) -> Any:
+        cached = getattr(self, "_session", None)
+        if cached is None:
+            cached = self._create_session()
+            object.__setattr__(self, "_session", cached)
+        return cached
+
+    def _create_session(self) -> Any:
+        sdk = self.sdk_importer(SDK_IMPORT_MODULE)
+        metadata = {
+            "transport": "stdio",
+            "target_cli": self.target_cli,
+            "launch_command": list(self.launch_command or ()),
+            "sdk_package_name": SDK_PACKAGE_NAME,
+        }
+
+        session = _call_first_supported(
+            sdk,
+            names=("ClientSession", "Session", "ACPClientSession"),
+            kwargs_variants=(
+                {"stdin": self.stdin, "stdout": self.stdout, "stderr": self.stderr, "process": self.process},
+                {"input": self.stdin, "output": self.stdout, "error": self.stderr, "process": self.process},
+                {"read_stream": self.stdout, "write_stream": self.stdin, "error_stream": self.stderr},
+                {"reader": self.stdout, "writer": self.stdin},
+            ),
+            positional_variants=((self.stdout, self.stdin), (self.stdin, self.stdout)),
+        )
+        if session is not None:
+            _attach_metadata(session, metadata)
+            return session
+
+        transport = _call_first_supported(
+            sdk,
+            names=("StdioTransport", "StdioClientTransport", "stdio_client", "create_stdio_transport"),
+            kwargs_variants=(
+                {"stdin": self.stdin, "stdout": self.stdout, "stderr": self.stderr, "process": self.process},
+                {"input": self.stdin, "output": self.stdout, "error": self.stderr, "process": self.process},
+                {"read_stream": self.stdout, "write_stream": self.stdin, "error_stream": self.stderr},
+                {"reader": self.stdout, "writer": self.stdin},
+            ),
+            positional_variants=((self.stdout, self.stdin), (self.stdin, self.stdout)),
+        )
+        if transport is not None:
+            session = _call_first_supported(
+                sdk,
+                names=("ClientSession", "Session", "ACPClientSession"),
+                kwargs_variants=({"transport": transport}, {"connection": transport}, {"client": transport}),
+                positional_variants=((transport,),),
+            )
+            if session is not None:
+                _attach_metadata(session, metadata)
+                return session
+
+        raise RuntimeError(
+            "No supported ACP SDK stdio session constructor found; "
+            "expected agent_client_protocol to expose a session or stdio transport factory."
+        )
+
+
+def stdio_session_factory(
+    *,
+    stdin: Any,
+    stdout: Any,
+    stderr: Any | None = None,
+    process: Any | None = None,
+    launch_command: Sequence[str] | None = None,
+    target_cli: str = "Gemini CLI",
+    sdk_importer: Callable[[str], Any] = importlib.import_module,
+) -> StdioACPClientSessionFactory:
+    """Create a reusable ACP SDK session factory for subprocess stdio pipes."""
+
+    return StdioACPClientSessionFactory(
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+        process=process,
+        launch_command=launch_command,
+        target_cli=target_cli,
+        sdk_importer=sdk_importer,
+    )
 
 
 @dataclass(frozen=True)
@@ -179,6 +285,42 @@ class ACPClient:
         )
 
 
+def _call_first_supported(
+    sdk: Any,
+    *,
+    names: Sequence[str],
+    kwargs_variants: Sequence[Mapping[str, Any]],
+    positional_variants: Sequence[tuple[Any, ...]],
+) -> Any | None:
+    """Call the first SDK constructor/factory shape accepted by this SDK version."""
+
+    for name in names:
+        candidate = getattr(sdk, name, None)
+        if not callable(candidate):
+            continue
+        for kwargs in kwargs_variants:
+            try:
+                return candidate(**{key: value for key, value in kwargs.items() if value is not None})
+            except TypeError:
+                continue
+        for args in positional_variants:
+            try:
+                return candidate(*args)
+            except TypeError:
+                continue
+    return None
+
+
+def _attach_metadata(session: Any, metadata: Mapping[str, Any]) -> None:
+    """Best-effort metadata attachment for later observation extraction."""
+
+    try:
+        existing = getattr(session, "metadata", None)
+        merged = dict(existing) if isinstance(existing, Mapping) else {}
+        merged.update(metadata)
+        setattr(session, "metadata", merged)
+    except Exception:  # noqa: BLE001 - metadata is observational only.
+        return
 def _mapping_value(source: Mapping[str, Any], keys: tuple[str, ...]) -> Any | None:
     for key in keys:
         value = source.get(key)

@@ -192,7 +192,16 @@ def run_smoke(
         return SmokeResult(verdict=verdict, timestamped_path=timestamped_path, latest_path=latest_path)
 
     try:
-        client = client_factory() if client_factory is not None else acp_client.ACPClient()
+        client = client_factory() if client_factory is not None else acp_client.ACPClient(
+            session_factory=acp_client.stdio_session_factory(
+                process=process,
+                stdin=getattr(process, "stdin", None),
+                stdout=getattr(process, "stdout", None),
+                stderr=getattr(process, "stderr", None),
+                launch_command=command,
+                target_cli=TARGET_CLI,
+            )
+        )
         session_options = {
             "process": process,
             "stdin": getattr(process, "stdin", None),
