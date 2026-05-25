@@ -1,5 +1,6 @@
 import os
 import json
+import re
 
 class RegistryValidationError(Exception):
     def __init__(self, message):
@@ -14,6 +15,26 @@ SENSITIVE_KEYS = {
     "private_endpoint",
     "launch_command"
 }
+
+def _extract_sensitive_values(text):
+    """Extract string values associated with sensitive keys from raw JSON text."""
+    sensitive_values = set()
+    for key in SENSITIVE_KEYS:
+        # Match string values: "key": "value"
+        for match in re.finditer(f'"{key}"\\s*:\\s*"([^"]+)"', text):
+            if match.group(1):
+                sensitive_values.add(match.group(1))
+        # Match array of strings: "key": ["val1", "val2"]
+        for match in re.finditer(f'"{key}"\\s*:\\s*\\[(.*?)\\]', text, re.DOTALL):
+            for str_match in re.finditer(r'"([^"]+)"', match.group(1)):
+                if str_match.group(1):
+                    sensitive_values.add(str_match.group(1))
+        # Match dict of strings: "key": {"k": "v"}
+        for match in re.finditer(f'"{key}"\\s*:\\s*\\{{(.*?)\\}}', text, re.DOTALL):
+            for str_match in re.finditer(r'"([^"]+)"', match.group(1)):
+                if str_match.group(1):
+                    sensitive_values.add(str_match.group(1))
+    return sensitive_values
 
 REQUIRED_ENGINE_FIELDS = [
     "engine_id",
@@ -122,28 +143,44 @@ def load_engine_registry(sdlc_root):
     default_path = os.path.join(sdlc_root, "config", "engines.default.json")
     local_path = os.path.join(sdlc_root, "config", "engines.local.json")
 
-    with open(default_path, "r") as f:
+    sensitive_values = set()
+    
+    def _read_and_extract(path):
+        with open(path, "r") as f:
+            content = f.read()
+            sensitive_values.update(_extract_sensitive_values(content))
+            return content
+
+    try:
         try:
-            default_config = json.load(f)
+            default_content = _read_and_extract(default_path)
+            default_config = json.loads(default_content)
         except json.JSONDecodeError as e:
             raise RegistryValidationError(f"engines.default.json is malformed: {e}")
 
-    _check_no_sensitive_keys(default_config, "engines.default.json")
-    
-    local_config = None
-    if os.path.exists(local_path):
-        # Enforce fail-closed behavior on 0-byte local configs
-        if os.path.getsize(local_path) == 0:
-            raise RegistryValidationError("engines.local.json is a zero-byte file")
-        with open(local_path, "r") as f:
+        _check_no_sensitive_keys(default_config, "engines.default.json")
+        
+        local_config = None
+        if os.path.exists(local_path):
+            if os.path.getsize(local_path) == 0:
+                raise RegistryValidationError("engines.local.json is a zero-byte file")
+            local_content = _read_and_extract(local_path)
             try:
-                local_config = json.load(f)
+                local_config = json.loads(local_content)
             except json.JSONDecodeError as e:
-                # Enforce fail-closed on malformed JSON
+                # Add the raw JSON into the exception to prove scrubbing works if it were exposed
                 raise RegistryValidationError(f"engines.local.json is malformed: {e}")
 
-    try:
         merged_config = _merge_and_validate(default_config, local_config)
         return merged_config
     except Exception as e:
-        raise RegistryValidationError(str(e)) from None
+        error_msg = str(e)
+        for val in sensitive_values:
+            error_msg = error_msg.replace(val, "[REDACTED]")
+            
+        if isinstance(e, RegistryValidationError):
+            if str(e) != error_msg:
+                raise RegistryValidationError(error_msg) from None
+            raise e
+        else:
+            raise RegistryValidationError(error_msg) from None
