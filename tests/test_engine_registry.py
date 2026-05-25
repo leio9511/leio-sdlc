@@ -288,3 +288,4 @@ def test_malformed_json_redaction(tmp_path):
     assert error_msg.startswith("[FATAL] Engine Registry validation failed.")
     # The path should absolutely not be in the output, even if the error message somehow included it
     assert "/secret_corp/malformed" not in error_msg
+    assert "[REDACTED]" in error_msg

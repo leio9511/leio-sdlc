@@ -16,25 +16,24 @@ SENSITIVE_KEYS = {
     "launch_command"
 }
 
-def _extract_sensitive_values(text):
-    """Extract string values associated with sensitive keys from raw JSON text."""
-    sensitive_values = set()
+def _redact_raw_json(text):
+    """Redact string values associated with sensitive keys directly in raw JSON text."""
+    redacted = text
     for key in SENSITIVE_KEYS:
-        # Match string values: "key": "value"
-        for match in re.finditer(f'"{key}"\\s*:\\s*"([^"]+)"', text):
-            if match.group(1):
-                sensitive_values.add(match.group(1))
-        # Match array of strings: "key": ["val1", "val2"]
-        for match in re.finditer(f'"{key}"\\s*:\\s*\\[(.*?)\\]', text, re.DOTALL):
-            for str_match in re.finditer(r'"([^"]+)"', match.group(1)):
-                if str_match.group(1):
-                    sensitive_values.add(str_match.group(1))
-        # Match dict of strings: "key": {"k": "v"}
-        for match in re.finditer(f'"{key}"\\s*:\\s*\\{{(.*?)\\}}', text, re.DOTALL):
-            for str_match in re.finditer(r'"([^"]+)"', match.group(1)):
-                if str_match.group(1):
-                    sensitive_values.add(str_match.group(1))
-    return sensitive_values
+        # Redact simple string values
+        redacted = re.sub(f'("{key}"\\s*:\\s*)"[^"]+"', r'\1"[REDACTED]"', redacted)
+        
+        # Redact array string values
+        def repl_array(m):
+            return m.group(1) + re.sub(r'"[^"]+"', '"[REDACTED]"', m.group(2)) + m.group(3)
+        redacted = re.sub(f'("{key}"\\s*:\\s*\\[)(.*?)(\\])', repl_array, redacted, flags=re.DOTALL)
+        
+        # Redact dict string values
+        def repl_dict(m):
+            return m.group(1) + re.sub(r'("[^"]+"\s*:\s*)"[^"]+"', r'\1"[REDACTED]"', m.group(2)) + m.group(3)
+        redacted = re.sub(f'("{key}"\\s*:\\s*\\{{)(.*?)(\\}})', repl_dict, redacted, flags=re.DOTALL)
+        
+    return redacted
 
 REQUIRED_ENGINE_FIELDS = [
     "engine_id",
@@ -143,20 +142,14 @@ def load_engine_registry(sdlc_root):
     default_path = os.path.join(sdlc_root, "config", "engines.default.json")
     local_path = os.path.join(sdlc_root, "config", "engines.local.json")
 
-    sensitive_values = set()
-    
-    def _read_and_extract(path):
-        with open(path, "r") as f:
-            content = f.read()
-            sensitive_values.update(_extract_sensitive_values(content))
-            return content
-
     try:
+        with open(default_path, "r") as f:
+            default_content = f.read()
+            
         try:
-            default_content = _read_and_extract(default_path)
             default_config = json.loads(default_content)
         except json.JSONDecodeError as e:
-            raise RegistryValidationError(f"engines.default.json is malformed: {e}")
+            raise RegistryValidationError(f"engines.default.json is malformed: {e}\nRaw Content:\n{_redact_raw_json(default_content)}")
 
         _check_no_sensitive_keys(default_config, "engines.default.json")
         
@@ -164,23 +157,19 @@ def load_engine_registry(sdlc_root):
         if os.path.exists(local_path):
             if os.path.getsize(local_path) == 0:
                 raise RegistryValidationError("engines.local.json is a zero-byte file")
-            local_content = _read_and_extract(local_path)
+            
+            with open(local_path, "r") as f:
+                local_content = f.read()
+                
             try:
                 local_config = json.loads(local_content)
             except json.JSONDecodeError as e:
                 # Add the raw JSON into the exception to prove scrubbing works if it were exposed
-                raise RegistryValidationError(f"engines.local.json is malformed: {e}")
+                raise RegistryValidationError(f"engines.local.json is malformed: {e}\nRaw Content:\n{_redact_raw_json(local_content)}")
 
         merged_config = _merge_and_validate(default_config, local_config)
         return merged_config
+    except RegistryValidationError:
+        raise
     except Exception as e:
-        error_msg = str(e)
-        for val in sensitive_values:
-            error_msg = error_msg.replace(val, "[REDACTED]")
-            
-        if isinstance(e, RegistryValidationError):
-            if str(e) != error_msg:
-                raise RegistryValidationError(error_msg) from None
-            raise e
-        else:
-            raise RegistryValidationError(error_msg) from None
+        raise RegistryValidationError(str(e)) from None
