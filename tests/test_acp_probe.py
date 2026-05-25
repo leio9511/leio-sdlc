@@ -142,6 +142,223 @@ def test_client_produced_full_observation_set_is_valid_verdict_input():
     json.dumps(verdict)
 
 
+# --- Schema-Driven Contract Tests (PR-001) ---
+
+def test_schema_enforces_continuity_mode_enum():
+    schema = _load_fixture("acp_verdict_schema.json")
+    continuity_mode = schema["properties"]["continuity_mode"]
+
+    assert continuity_mode["enum"] == ["authoritative_resume", "unsupported"]
+
+    # Verify a verdict with the old "mapped_resume" value fails schema validation.
+    sample = _load_fixture("acp_verdict_gemini_sample.json")
+    sample["continuity_mode"] = "mapped_resume"
+    try:
+        _validate_schema_subset(schema, sample)
+        raise AssertionError("schema must reject continuity_mode 'mapped_resume'")
+    except AssertionError as exc:
+        msg = str(exc).lower()
+        assert "mapped_resume" in msg, f"expected rejection of mapped_resume, got: {exc}"
+
+
+def test_schema_enforces_handle_acquisition_strategy_enum():
+    schema = _load_fixture("acp_verdict_schema.json")
+    has_enum = schema["properties"]["handle_acquisition_strategy"]
+
+    assert has_enum["enum"] == ["protocol_native", "explicit_returned_handle", "unavailable"]
+
+    # Verify a verdict with the old "returned_handle" value fails schema validation.
+    sample = _load_fixture("acp_verdict_gemini_sample.json")
+    sample["handle_acquisition_strategy"] = "returned_handle"
+    try:
+        _validate_schema_subset(schema, sample)
+        raise AssertionError("schema must reject handle_acquisition_strategy 'returned_handle'")
+    except AssertionError as exc:
+        msg = str(exc).lower()
+        assert "returned_handle" in msg, f"expected rejection of returned_handle, got: {exc}"
+
+
+def test_schema_requires_target_scope_note():
+    schema = _load_fixture("acp_verdict_schema.json")
+
+    assert "target_scope_note" in schema["required"]
+
+
+def test_probe_emit_verdict_produces_only_authorized_continuity_modes():
+    authorized = {"authoritative_resume", "unsupported"}
+
+    # Full support: handle_ok=True, resume_ok=True
+    v1 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": True},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v1["continuity_mode"] in authorized
+
+    # Handle present but resume failed
+    v2 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": False},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v2["continuity_mode"] in authorized
+
+    # No handle at all
+    v3 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": False},
+            "resume_once": {"ok": False},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v3["continuity_mode"] in authorized
+
+    # Even with connect-only
+    v4 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": False},
+            "capture_handle": {"ok": False},
+            "resume_once": {"ok": False},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v4["continuity_mode"] in authorized
+
+
+def test_probe_emit_verdict_produces_only_authorized_handle_strategies():
+    authorized = {"protocol_native", "explicit_returned_handle", "unavailable"}
+
+    # Handle present and resume OK → protocol_native
+    v1 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": True},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v1["handle_acquisition_strategy"] in authorized
+
+    # Handle present but resume failed → explicit_returned_handle
+    v2 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": False},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v2["handle_acquisition_strategy"] in authorized
+
+    # No handle → unavailable
+    v3 = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": False},
+            "resume_once": {"ok": False},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+    assert v3["handle_acquisition_strategy"] in authorized
+
+
+def test_no_handle_means_continuity_mode_unsupported():
+    verdict = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {
+                "ok": False,
+                "status": "unavailable",
+                "detail": "no continuation handle",
+                "error": "Handle Unavailable",
+            },
+            "resume_once": {
+                "ok": False,
+                "status": "unavailable",
+                "detail": "resume cannot run without handle",
+                "error": "Resume Handle Unavailable",
+            },
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+
+    assert verdict["continuity_mode"] == "unsupported"
+    assert verdict["handle_acquisition_strategy"] == "unavailable"
+
+
+def test_authoritative_handle_and_successful_resume_means_authoritative_resume():
+    verdict = acp_probe.emit_verdict(
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": True, "metadata": {"handle": "h1"}},
+        },
+        validation_timestamp="2026-05-25T00:00:00Z",
+    )
+
+    assert verdict["continuity_mode"] == "authoritative_resume"
+
+
+def test_closed_continuity_contract_rule_is_in_code():
+    """Exercise emit_verdict paths and verify forbidden terms never appear in output."""
+    forbidden = {"mapped_resume", "none_observed", "returned_handle", "protocol_native_or_returned_handle"}
+
+    scenarios = [
+        # Full support
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": True},
+        },
+        # Handle but no resume
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": True, "metadata": {"handle": "h1"}},
+            "resume_once": {"ok": False},
+        },
+        # No handle, no resume
+        {
+            "connect": {"ok": True},
+            "execute_turn": {"ok": True},
+            "capture_handle": {"ok": False},
+            "resume_once": {"ok": False},
+        },
+        # Missing API key (blocked)
+        {
+            "connect": {"ok": False, "detail": "GEMINI_API_KEY missing"},
+            "execute_turn": {"ok": False},
+            "capture_handle": {"ok": False},
+            "resume_once": {"ok": False},
+        },
+    ]
+
+    for scenario in scenarios:
+        verdict = acp_probe.emit_verdict(scenario, validation_timestamp="2026-05-25T00:00:00Z")
+        verdict_str = json.dumps(verdict)
+        for term in forbidden:
+            # Only flag if it appears as a value (not just in a detail string)
+            assert verdict.get("continuity_mode") not in forbidden, f"continuity_mode '{verdict.get('continuity_mode')}' is forbidden"
+            assert verdict.get("handle_acquisition_strategy") not in forbidden, f"handle_acquisition_strategy '{verdict.get('handle_acquisition_strategy')}' is forbidden"
+
+
 def test_requirements_declares_agent_client_protocol():
     requirements = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
 

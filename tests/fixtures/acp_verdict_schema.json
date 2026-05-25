@@ -5,6 +5,7 @@
   "additionalProperties": true,
   "required": [
     "target_cli",
+    "target_scope_note",
     "validation_timestamp",
     "connect_result",
     "execute_turn_result",
@@ -37,8 +38,14 @@
         }
       }
     },
-    "continuity_mode": {"type": "string"},
-    "handle_acquisition_strategy": {"type": "string"},
+    "continuity_mode": {
+      "type": "string",
+      "enum": ["authoritative_resume", "unsupported"]
+    },
+    "handle_acquisition_strategy": {
+      "type": "string",
+      "enum": ["protocol_native", "explicit_returned_handle", "unavailable"]
+    },
     "resume_requires_same_runtime_state": {"type": "boolean"},
     "fallback_policy": {"type": "string"},
     "capability_surface": {

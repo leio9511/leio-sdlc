@@ -230,7 +230,7 @@ class ACPClient:
             metadata={
                 "sdk_package_name": SDK_PACKAGE_NAME,
                 "handle": str(handle),
-                "handle_acquisition_strategy": "protocol_native_or_returned_handle",
+                "handle_acquisition_strategy": "protocol_native",
             },
         )
 

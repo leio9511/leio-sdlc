@@ -39,7 +39,7 @@
       "detail": "Resume was not attempted because no continuation handle was available."
     }
   ],
-  "continuity_mode": "none_observed",
+  "continuity_mode": "unsupported",
   "handle_acquisition_strategy": "unavailable",
   "resume_requires_same_runtime_state": true,
   "fallback_policy": "fallback_to_legacy_direct_cli_for_continuity",

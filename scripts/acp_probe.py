@@ -200,14 +200,14 @@ def _derive_contract_fields(results: Mapping[str, Mapping[str, Any]], failures: 
 
     if handle_ok and resume_ok:
         continuity_mode = "authoritative_resume"
-        handle_strategy = "protocol_native_or_returned_handle"
+        handle_strategy = "protocol_native"
         same_runtime_state = False
     elif handle_ok:
-        continuity_mode = "mapped_resume"
-        handle_strategy = "returned_handle"
+        continuity_mode = "unsupported"
+        handle_strategy = "explicit_returned_handle"
         same_runtime_state = True
     else:
-        continuity_mode = "none_observed"
+        continuity_mode = "unsupported"
         handle_strategy = "unavailable"
         same_runtime_state = True
 

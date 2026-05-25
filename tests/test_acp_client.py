@@ -290,14 +290,14 @@ def test_execute_turn_returns_contract_observation():
     assert verdict["execute_turn_result"]["ok"] is True
 
 
-def test_capture_handle_records_protocol_native_or_returned_strategy():
+def test_capture_handle_uses_protocol_native_strategy():
     handle_result = acp_client.capture_handle({"response": "pong", "handle": "fake-handle-1"})
 
     assert handle_result["operation"] == "capture_handle"
     assert handle_result["ok"] is True
     assert handle_result["status"] == "captured"
     assert handle_result["metadata"]["handle"] == "fake-handle-1"
-    assert handle_result["metadata"]["handle_acquisition_strategy"] == "protocol_native_or_returned_handle"
+    assert handle_result["metadata"]["handle_acquisition_strategy"] == "protocol_native"
 
     verdict = acp_probe.emit_verdict(
         {
@@ -310,7 +310,7 @@ def test_capture_handle_records_protocol_native_or_returned_strategy():
     )
 
     assert verdict["handle_capture_result"]["ok"] is True
-    assert verdict["handle_acquisition_strategy"] in {"returned_handle", "protocol_native_or_returned_handle"}
+    assert verdict["handle_acquisition_strategy"] == "explicit_returned_handle"
 
 
 def test_capture_handle_records_explicit_unavailable_when_no_handle():
