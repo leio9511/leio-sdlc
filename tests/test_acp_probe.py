@@ -6,6 +6,23 @@ from scripts import acp_probe
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FIELDS = set(acp_probe.REQUIRED_VERDICT_FIELDS)
 
+# PRD Section 7: forbidden non-authoritative continuation support terms
+_FORBIDDEN_CONTINUITY_MODES = frozenset({
+    "none_observed",
+    "mapped_resume",
+    "heuristic",
+    "inferred",
+    "mapped",
+    "local_guess",
+    "prompt_illusion",
+})
+
+# PRD Section 7: forbidden handle acquisition strategy terms
+_FORBIDDEN_HANDLE_ACQUISITION_STRATEGIES = frozenset({
+    "protocol_native_or_returned_handle",
+    "returned_handle",
+})
+
 
 def _load_fixture(name: str):
     with (PROJECT_ROOT / "tests" / "fixtures" / name).open(encoding="utf-8") as handle:
@@ -38,6 +55,25 @@ def _validate_schema_subset(schema, instance):
             assert value == rules["const"]
         if "enum" in rules:
             assert value in rules["enum"]
+
+
+def _load_fixture_by_path(path: Path):
+    """Load a JSON fixture file from the given Path and return the parsed dict."""
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _discover_all_verdict_fixtures():
+    """Return a list of Paths to all verdict fixture files.
+
+    Matches tests/fixtures/acp_verdict_*.json, excluding acp_verdict_schema.json.
+    """
+    fixtures_dir = PROJECT_ROOT / "tests" / "fixtures"
+    schema_name = "acp_verdict_schema.json"
+    return sorted(
+        p for p in fixtures_dir.glob("acp_verdict_*.json")
+        if p.name != schema_name
+    )
 
 
 def test_emit_verdict_contains_required_contract_fields():
@@ -383,3 +419,161 @@ def test_unsupported_resume_sample_has_no_authoritative_handle():
     assert sample["resume_once_result"]["ok"] == False
     assert sample["final_verdict"] == "partially_supported"
     assert isinstance(sample.get("target_scope_note"), str) and sample["target_scope_note"] != ""
+
+
+# --- PR-002_2: Comprehensive Fixture Cross-Validation Tests ---
+
+def test_all_fixture_samples_pass_schema_validation():
+    """Discover all verdict fixtures, validate each against the schema.
+
+    Assert at least 2 fixtures exist. On failure, report which fixture failed.
+    """
+    schema = _load_fixture("acp_verdict_schema.json")
+    fixtures = _discover_all_verdict_fixtures()
+
+    assert len(fixtures) >= 2, (
+        f"Expected at least 2 verdict fixtures, found {len(fixtures)}"
+    )
+
+    for path in fixtures:
+        try:
+            sample = _load_fixture_by_path(path)
+            _validate_schema_subset(schema, sample)
+        except AssertionError:
+            raise AssertionError(
+                f"Fixture {path.name} failed schema validation"
+            )
+
+
+def test_no_sample_uses_forbidden_non_authoritative_continuation_terms():
+    """Load every verdict fixture and assert no forbidden terms are used.
+
+    continuity_mode must not equal any PRD-forbidden term.
+    handle_acquisition_strategy must not equal any forbidden term.
+    """
+    fixtures = _discover_all_verdict_fixtures()
+
+    for path in fixtures:
+        sample = _load_fixture_by_path(path)
+
+        cm = sample.get("continuity_mode")
+        assert cm not in _FORBIDDEN_CONTINUITY_MODES, (
+            f"{path.name}: continuity_mode '{cm}' is a forbidden non-authoritative term"
+        )
+
+        has = sample.get("handle_acquisition_strategy")
+        assert has not in _FORBIDDEN_HANDLE_ACQUISITION_STRATEGIES, (
+            f"{path.name}: handle_acquisition_strategy '{has}' is a forbidden term"
+        )
+        assert has not in _FORBIDDEN_CONTINUITY_MODES, (
+            f"{path.name}: handle_acquisition_strategy '{has}' is a forbidden non-authoritative continuation term"
+        )
+
+
+def test_all_samples_are_target_scoped():
+    """Load every verdict fixture and assert target-scoping presence.
+
+    Each fixture must have non-empty target_cli, non-empty target_scope_note,
+    and target_scope_note must contain at least one scope-limiting marker phrase.
+    """
+    fixtures = _discover_all_verdict_fixtures()
+    scope_markers = {"must not be generalized", "applies only to"}
+
+    for path in fixtures:
+        sample = _load_fixture_by_path(path)
+
+        target_cli = sample.get("target_cli", "")
+        assert target_cli != "", f"{path.name}: target_cli is empty"
+        assert isinstance(target_cli, str), f"{path.name}: target_cli is not a string"
+
+        scope_note = sample.get("target_scope_note", "")
+        assert scope_note != "", f"{path.name}: target_scope_note is empty"
+        assert isinstance(scope_note, str), f"{path.name}: target_scope_note is not a string"
+
+        scope_lower = scope_note.lower()
+        assert any(marker in scope_lower for marker in scope_markers), (
+            f"{path.name}: target_scope_note must contain at least one scope-limiting marker "
+            f"('must not be generalized' or 'applies only to'), got: {scope_note!r}"
+        )
+
+
+def test_all_samples_have_valid_final_verdict():
+    """Load every verdict fixture and assert final_verdict is authorized."""
+    authorized = {"supported", "partially_supported", "not_suitable_at_this_stage", "blocked"}
+    fixtures = _discover_all_verdict_fixtures()
+
+    for path in fixtures:
+        sample = _load_fixture_by_path(path)
+        fv = sample.get("final_verdict")
+        assert fv in authorized, (
+            f"{path.name}: final_verdict '{fv}' is not in authorized set {authorized}"
+        )
+
+
+def test_unsupported_resume_sample_failure_classification_is_accurate():
+    """Load the unsupported-resume sample and assert failure classification accuracy.
+
+    Must have at least 2 entries, both with category 'Continuation Handle Unavailable',
+    covering both capture_handle and resume_once operations.
+    """
+    sample = _load_fixture("acp_verdict_unsupported_resume_sample.json")
+    fc = sample["failure_classification"]
+
+    assert len(fc) >= 2, (
+        f"Expected at least 2 failure classification entries, got {len(fc)}"
+    )
+
+    for entry in fc:
+        assert entry["category"] == "Continuation Handle Unavailable", (
+            f"Expected category 'Continuation Handle Unavailable', got '{entry['category']}'"
+        )
+
+    operations = {entry["operation"] for entry in fc}
+    assert "capture_handle" in operations, (
+        "Missing capture_handle in failure_classification"
+    )
+    assert "resume_once" in operations, (
+        "Missing resume_once in failure_classification"
+    )
+
+
+def test_negative_verdict_is_valid_structured_output():
+    """Load the Gemini sample (partially_supported) and assert structured output validity.
+
+    Must contain all REQUIRED_VERDICT_FIELDS, have structured failure_classification
+    entries with operation and category fields, and not be a bare traceback or error.
+    """
+    sample = _load_fixture("acp_verdict_gemini_sample.json")
+
+    # Contains all REQUIRED_VERDICT_FIELDS
+    for field in acp_probe.REQUIRED_VERDICT_FIELDS:
+        assert field in sample, f"Missing required field '{field}' in Gemini sample"
+
+    # Not a bare traceback or bare error message — must have full verdict structure
+    assert sample["final_verdict"] == "partially_supported"
+    assert isinstance(sample["failure_classification"], list)
+    assert len(sample["failure_classification"]) > 0
+
+    # Structured failure_classification entries with operation and category fields
+    for entry in sample["failure_classification"]:
+        assert "operation" in entry, (
+            "failure_classification entry missing 'operation'"
+        )
+        assert "category" in entry, (
+            "failure_classification entry missing 'category'"
+        )
+
+
+def test_gemini_sample_continuity_mode_is_unsupported():
+    """Load the Gemini sample and assert continuity_mode and final_verdict are correct.
+
+    Regression guard against drift back to old enum values.
+    """
+    sample = _load_fixture("acp_verdict_gemini_sample.json")
+
+    assert sample["continuity_mode"] == "unsupported", (
+        f"Expected continuity_mode 'unsupported', got '{sample['continuity_mode']}'"
+    )
+    assert sample["final_verdict"] == "partially_supported", (
+        f"Expected final_verdict 'partially_supported', got '{sample['final_verdict']}'"
+    )
