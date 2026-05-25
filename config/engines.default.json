@@ -1,0 +1,34 @@
+{
+  "engines": {
+    "openclaw_native": {
+      "engine_id": "openclaw_native",
+      "display_name": "OpenClaw Native",
+      "runtime_mode": "openclaw_native",
+      "registration_visibility": "public",
+      "continuity_mode": "authoritative_resume",
+      "handle_acquisition_strategy": "unavailable",
+      "fallback_policy": "none",
+      "capability_surface": "runtime_managed"
+    },
+    "gemini_direct_cli": {
+      "engine_id": "gemini_direct_cli",
+      "display_name": "Gemini Direct CLI",
+      "runtime_mode": "direct_cli",
+      "registration_visibility": "public",
+      "continuity_mode": "unsupported",
+      "handle_acquisition_strategy": "unavailable",
+      "fallback_policy": "legacy_direct_cli",
+      "capability_surface": "engine_managed"
+    },
+    "gemini_acp_reference": {
+      "engine_id": "gemini_acp_reference",
+      "display_name": "Gemini ACP Reference",
+      "runtime_mode": "acp",
+      "registration_visibility": "public",
+      "continuity_mode": "authoritative_resume",
+      "handle_acquisition_strategy": "protocol_native",
+      "fallback_policy": "fail_closed_until_prerequisite_ready",
+      "capability_surface": "client_mediated"
+    }
+  }
+}

@@ -155,6 +155,7 @@ def _copy_minimal_smoke_skill(source_root, target_root):
         "runtime_smoke.py",
         "runtime_launch_guard.py",
         "config.py",
+        "engine_registry.py",
         "utils_json.py",
     ):
         (scripts_dir / filename).write_text(

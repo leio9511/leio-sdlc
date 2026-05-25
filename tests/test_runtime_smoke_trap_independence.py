@@ -31,6 +31,7 @@ def _copy_minimal_skill_root(target_root):
         "runtime_launch_guard.py",
         "runtime_python.sh",
         "config.py",
+        "engine_registry.py",
         "utils_json.py",
     ):
         shutil.copy2(SCRIPTS_DIR / name, scripts_dir / name)

@@ -17,7 +17,7 @@ SMOKE_POLICY = "Use a minimal, no-side-effect official smoke path that proves in
 def _copy_minimal_skill_root(target_root):
     scripts_dir = target_root / "scripts"
     scripts_dir.mkdir(parents=True)
-    for name in ("runtime_smoke.py", "runtime_launch_guard.py", "config.py", "utils_json.py"):
+    for name in ("runtime_smoke.py", "runtime_launch_guard.py", "config.py", "engine_registry.py", "utils_json.py"):
         shutil.copy2(SCRIPTS_DIR / name, scripts_dir / name)
     return scripts_dir / "runtime_smoke.py"
 

@@ -1,0 +1,212 @@
+import os
+import json
+import subprocess
+import pytest
+
+from scripts.engine_registry import load_engine_registry, RegistryValidationError
+
+def create_config(sdlc_root, filename, content):
+    config_dir = os.path.join(sdlc_root, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    with open(os.path.join(config_dir, filename), "w") as f:
+        json.dump(content, f)
+
+def get_default_config():
+    return {
+        "engines": {
+            "openclaw_native": {
+                "engine_id": "openclaw_native",
+                "display_name": "OpenClaw Native",
+                "runtime_mode": "openclaw_native",
+                "registration_visibility": "public",
+                "continuity_mode": "authoritative_resume",
+                "handle_acquisition_strategy": "unavailable",
+                "fallback_policy": "none",
+                "capability_surface": "runtime_managed"
+            },
+            "gemini_direct_cli": {
+                "engine_id": "gemini_direct_cli",
+                "display_name": "Gemini Direct CLI",
+                "runtime_mode": "direct_cli",
+                "registration_visibility": "public",
+                "continuity_mode": "unsupported",
+                "handle_acquisition_strategy": "unavailable",
+                "fallback_policy": "legacy_direct_cli",
+                "capability_surface": "engine_managed"
+            }
+        }
+    }
+
+def test_gitignore_enforcement():
+    # Verify .gitignore contains config/engines.local.json
+    with open(".gitignore", "r") as f:
+        content = f.read()
+    assert "config/engines.local.json" in content
+
+    # Verify it is ignored by git
+    # Create the file just in case
+    os.makedirs("config", exist_ok=True)
+    with open("config/engines.local.json", "w") as f:
+        f.write("{}")
+    
+    result = subprocess.run(["git", "check-ignore", "config/engines.local.json"], capture_output=True, text=True)
+    # git check-ignore returns 0 if the file is ignored
+    assert result.returncode == 0
+
+def test_pure_default_loading(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    registry = load_engine_registry(sdlc_root)
+    assert "engines" in registry
+    assert "openclaw_native" in registry["engines"]
+    assert registry["engines"]["openclaw_native"]["continuity_mode"] == "authoritative_resume"
+
+def test_shallow_merge_overrides(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    local_config = {
+        "engines": {
+            "openclaw_native": {
+                "capability_surface": "overridden_surface"
+            },
+            "private_claw": {
+                "engine_id": "private_claw",
+                "display_name": "Private Claw",
+                "runtime_mode": "acp",
+                "continuity_mode": "unsupported",
+                "handle_acquisition_strategy": "explicit_returned_handle",
+                "fallback_policy": "none",
+                "capability_surface": "private_surface"
+            }
+        }
+    }
+    create_config(sdlc_root, "engines.local.json", local_config)
+    
+    registry = load_engine_registry(sdlc_root)
+    
+    # Overridden field
+    assert registry["engines"]["openclaw_native"]["capability_surface"] == "overridden_surface"
+    # Inherited field
+    assert registry["engines"]["openclaw_native"]["continuity_mode"] == "authoritative_resume"
+    
+    # New engine
+    assert "private_claw" in registry["engines"]
+    assert registry["engines"]["private_claw"]["registration_visibility"] == "local_private"
+
+def test_schema_validation_failures(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    local_config = {
+        "engines": {
+            "private_claw": {
+                "engine_id": "private_claw",
+                "display_name": "Private Claw",
+                "runtime_mode": "acp",
+                "continuity_mode": "mapped_resume", # Invalid value
+                "handle_acquisition_strategy": "explicit_returned_handle",
+                "fallback_policy": "none",
+                "capability_surface": "private_surface",
+                "executable_path": "/usr/local/secret_corp/bin/acp" # Sensitive data
+            }
+        }
+    }
+    create_config(sdlc_root, "engines.local.json", local_config)
+    
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    error_msg = str(exc_info.value)
+    assert error_msg.startswith("[FATAL] Engine Registry validation failed.")
+    assert "mapped_resume" in error_msg # It's part of the invalid value error
+    assert "[REDACTED]" in error_msg
+    assert "/usr/local/secret_corp/bin/acp" not in error_msg
+
+def test_outer_key_mismatch(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    local_config = {
+        "engines": {
+            "mismatch_key": {
+                "engine_id": "private_claw",
+                "display_name": "Private Claw",
+                "runtime_mode": "acp",
+                "continuity_mode": "unsupported",
+                "handle_acquisition_strategy": "explicit_returned_handle",
+                "fallback_policy": "none",
+                "capability_surface": "private_surface"
+            }
+        }
+    }
+    create_config(sdlc_root, "engines.local.json", local_config)
+    
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    assert "Outer map key 'mismatch_key' does not match engine_id" in str(exc_info.value)
+
+def test_visibility_constraints(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    local_config = {
+        "engines": {
+            "openclaw_native": {
+                "registration_visibility": "local_private"
+            }
+        }
+    }
+    create_config(sdlc_root, "engines.local.json", local_config)
+    
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    assert "visibility to local_private" in str(exc_info.value)
+    
+    local_config2 = {
+        "engines": {
+            "private_claw": {
+                "engine_id": "private_claw",
+                "display_name": "Private Claw",
+                "runtime_mode": "acp",
+                "registration_visibility": "public",
+                "continuity_mode": "unsupported",
+                "handle_acquisition_strategy": "explicit_returned_handle",
+                "fallback_policy": "none",
+                "capability_surface": "private_surface"
+            }
+        }
+    }
+    create_config(sdlc_root, "engines.local.json", local_config2)
+    
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    assert "cannot be public" in str(exc_info.value)
+
+def test_zero_byte_local_config(tmp_path):
+    sdlc_root = str(tmp_path)
+    create_config(sdlc_root, "engines.default.json", get_default_config())
+    
+    local_path = os.path.join(sdlc_root, "config", "engines.local.json")
+    with open(local_path, "w") as f:
+        pass # Create empty file
+        
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    assert "zero-byte file" in str(exc_info.value)
+
+def test_sensitive_key_in_default(tmp_path):
+    sdlc_root = str(tmp_path)
+    default_cfg = get_default_config()
+    default_cfg["engines"]["openclaw_native"]["executable_path"] = "/bin/bash"
+    create_config(sdlc_root, "engines.default.json", default_cfg)
+    
+    with pytest.raises(RegistryValidationError) as exc_info:
+        load_engine_registry(sdlc_root)
+        
+    assert "contains sensitive field" in str(exc_info.value)
