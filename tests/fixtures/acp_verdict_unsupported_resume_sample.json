@@ -1,0 +1,58 @@
+{
+  "target_cli": "Gemini CLI",
+  "validation_timestamp": "2026-05-25T00:00:00Z",
+  "connect_result": {
+    "operation": "connect",
+    "ok": true,
+    "status": "succeeded",
+    "detail": "ACP connection established successfully."
+  },
+  "execute_turn_result": {
+    "operation": "execute_turn",
+    "ok": true,
+    "status": "succeeded",
+    "detail": "Single turn executed and returned a valid response."
+  },
+  "handle_capture_result": {
+    "operation": "capture_handle",
+    "ok": false,
+    "status": "unavailable",
+    "detail": "No authoritative continuation handle was provided by the CLI.",
+    "error": "Handle Unavailable"
+  },
+  "resume_once_result": {
+    "operation": "resume_once",
+    "ok": false,
+    "status": "unavailable",
+    "detail": "Cannot resume: no authoritative handle was captured.",
+    "error": "Resume Handle Unavailable"
+  },
+  "failure_classification": [
+    {
+      "operation": "capture_handle",
+      "category": "Continuation Handle Unavailable",
+      "detail": "No authoritative continuation handle was provided by the CLI."
+    },
+    {
+      "operation": "resume_once",
+      "category": "Continuation Handle Unavailable",
+      "detail": "Cannot resume: no authoritative handle was captured."
+    }
+  ],
+  "continuity_mode": "unsupported",
+  "handle_acquisition_strategy": "unavailable",
+  "resume_requires_same_runtime_state": true,
+  "fallback_policy": "fallback_to_legacy_direct_cli_for_continuity",
+  "capability_surface": {
+    "connect": true,
+    "execute_turn": true,
+    "capture_handle": false,
+    "resume_once": false,
+    "classify_failure": true,
+    "emit_verdict": true,
+    "surface_type": "mixed"
+  },
+  "final_verdict": "partially_supported",
+  "target_scope_note": "This PRD's ACP viability verdict applies only to the tested Gemini CLI path and must not be generalized to Codex or any other CLI.",
+  "sdk_package_name": "agent-client-protocol"
+}

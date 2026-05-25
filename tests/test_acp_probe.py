@@ -363,3 +363,23 @@ def test_requirements_declares_agent_client_protocol():
     requirements = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
 
     assert "agent-client-protocol" in {line.strip() for line in requirements}
+
+
+# --- PR-002_1: Unsupported-Resume Reference Sample Fixture Tests ---
+
+def test_unsupported_resume_sample_passes_schema():
+    schema = _load_fixture("acp_verdict_schema.json")
+    sample = _load_fixture("acp_verdict_unsupported_resume_sample.json")
+
+    _validate_schema_subset(schema, sample)
+
+
+def test_unsupported_resume_sample_has_no_authoritative_handle():
+    sample = _load_fixture("acp_verdict_unsupported_resume_sample.json")
+
+    assert sample["continuity_mode"] == "unsupported"
+    assert sample["handle_acquisition_strategy"] == "unavailable"
+    assert sample["handle_capture_result"]["ok"] == False
+    assert sample["resume_once_result"]["ok"] == False
+    assert sample["final_verdict"] == "partially_supported"
+    assert isinstance(sample.get("target_scope_note"), str) and sample["target_scope_note"] != ""
