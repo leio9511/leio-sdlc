@@ -197,7 +197,7 @@ def test_visibility_constraints(tmp_path):
         
     assert "cannot be public" in str(exc_info.value)
 
-def test_zero_byte_local_config(tmp_path):
+def test_zero_byte_local_config_fail_closed(tmp_path):
     sdlc_root = str(tmp_path)
     create_config(sdlc_root, "engines.default.json", get_default_config())
     
@@ -208,9 +208,10 @@ def test_zero_byte_local_config(tmp_path):
     with pytest.raises(RegistryValidationError) as exc_info:
         load_engine_registry(sdlc_root)
         
+    assert str(exc_info.value).startswith("[FATAL] Engine Registry validation failed.")
     assert "zero-byte file" in str(exc_info.value)
 
-def test_sensitive_key_in_default(tmp_path):
+def test_public_defaults_reject_sensitive_fields(tmp_path):
     sdlc_root = str(tmp_path)
     default_cfg = get_default_config()
     default_cfg["engines"]["openclaw_native"]["executable_path"] = "/bin/bash"
@@ -219,9 +220,10 @@ def test_sensitive_key_in_default(tmp_path):
     with pytest.raises(RegistryValidationError) as exc_info:
         load_engine_registry(sdlc_root)
         
+    assert str(exc_info.value).startswith("[FATAL] Engine Registry validation failed.")
     assert "contains sensitive field" in str(exc_info.value)
 
-def test_malformed_json_local_config(tmp_path):
+def test_malformed_json_fail_closed(tmp_path):
     sdlc_root = str(tmp_path)
     create_config(sdlc_root, "engines.default.json", get_default_config())
     
