@@ -13,6 +13,11 @@ import envelope_assembler
 from agent_driver import invoke_agent
 from thinking_resolver import resolve_thinking
 
+# Engine registry integration — loaded at module level so spawner entrypoints
+# share a single resolution path. SDLC_ROOT is computed from __file__.
+SDLC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from engine_registry import load_engine_registry, build_spawner_engine_choices
+
 
 def extract_pr_id(pr_file_path):
     basename = os.path.basename(pr_file_path)
@@ -605,7 +610,6 @@ def main():
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     runtime_dir = os.path.dirname(os.path.abspath(__file__))
     sdlc_root_dir = os.path.dirname(runtime_dir)
-    from engine_registry import load_engine_registry, build_spawner_engine_choices
     try:
         engine_reg = load_engine_registry(sdlc_root_dir)
     except Exception:

@@ -10,6 +10,11 @@ import subprocess
 import uuid
 import fnmatch
 
+# Engine registry integration — loaded at module level so spawner entrypoints
+# share a single resolution path. SDLC_ROOT is computed from __file__.
+SDLC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from engine_registry import load_engine_registry, build_spawner_engine_choices
+
 def check_guardrails(workdir, pr_content, diff_files):
     guardrail_path = os.path.join(workdir, ".sdlc_guardrail")
     if not os.path.exists(guardrail_path):
@@ -69,8 +74,6 @@ def main():
     )
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
-    SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
-    from engine_registry import load_engine_registry, build_spawner_engine_choices
     try:
         engine_reg = load_engine_registry(SDLC_ROOT)
     except Exception:
@@ -107,11 +110,12 @@ def main():
         with open(session_file, "r") as sf:
             session_id = sf.read().strip()
 
-        # Resolve engine spec to check continuity mode
-        sdlc_root_resolved = os.environ.get("SDLC_ROOT", SDLC_ROOT)
+        # Resolve engine spec to check continuity mode — use the CLI-resolved
+        # args.engine (not LLM_DRIVER env var) so the guard works regardless of
+        # whether the engine was selected via --engine flag or environment.
         try:
             eng_spec = engine_reg.get("engines", {}).get(
-                engine_alias_map.get(os.environ.get("LLM_DRIVER", ""), ""), {}
+                engine_alias_map.get(args.engine, ""), {}
             )
         except Exception:
             eng_spec = {}

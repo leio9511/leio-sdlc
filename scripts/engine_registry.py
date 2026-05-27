@@ -227,7 +227,7 @@ def build_spawner_engine_choices(registry):
     choices = list(alias_to_id.keys()) or ["openclaw", "gemini"]
     # Resolve default_alias: find the alias that maps to 'openclaw_native',
     # or use the well-known literal 'openclaw' as a safe fallback.
-    reverse_map = {v: k for k, v in alias_to_id.items()}
+    reverse_map = {eid: alias for alias, eid in alias_to_id.items()}
     default_alias = reverse_map.get("openclaw_native", "openclaw")
     if default_alias not in choices:
         default_alias = choices[0] if choices else "openclaw"
