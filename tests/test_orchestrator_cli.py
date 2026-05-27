@@ -38,11 +38,37 @@ class TestOrchestratorCLI(unittest.TestCase):
             "engines": {
                 "openclaw_native": {"engine_id": "openclaw_native", "cli_alias": "openclaw"},
                 "gemini_direct_cli": {"engine_id": "gemini_direct_cli", "cli_alias": "gemini"},
+                "agy_direct_cli": {"engine_id": "agy_direct_cli", "cli_alias": "agy"},
                 "custom_direct_cli": {"engine_id": "custom_direct_cli"},
             }
         }
         choices = orchestrator.build_engine_cli_choices(registry)
-        self.assertEqual(choices, ["openclaw", "gemini", "custom_direct_cli"])
+        self.assertEqual(choices, ["openclaw", "gemini", "agy", "custom_direct_cli"])
+
+    def test_engine_choices_include_agy_alias(self):
+        """TC2: dynamic choices include agy after loading the default registry."""
+        import orchestrator
+        registry = {
+            "engines": {
+                "openclaw_native": {"engine_id": "openclaw_native", "cli_alias": "openclaw"},
+                "gemini_direct_cli": {"engine_id": "gemini_direct_cli", "cli_alias": "gemini"},
+                "agy_direct_cli": {"engine_id": "agy_direct_cli", "cli_alias": "agy"},
+            }
+        }
+        choices = orchestrator.build_engine_cli_choices(registry)
+        self.assertIn("agy", choices)
+
+    def test_agy_alias_resolves_to_agy_direct_cli(self):
+        """TC3: resolver maps agy to agy_direct_cli."""
+        import orchestrator
+        registry = {
+            "engines": {
+                "openclaw_native": {"engine_id": "openclaw_native", "cli_alias": "openclaw"},
+                "gemini_direct_cli": {"engine_id": "gemini_direct_cli", "cli_alias": "gemini"},
+                "agy_direct_cli": {"engine_id": "agy_direct_cli", "cli_alias": "agy"},
+            }
+        }
+        self.assertEqual(orchestrator.resolve_engine_id("agy", registry), "agy_direct_cli")
 
     def test_engine_alias_resolves_to_engine_id(self):
         import orchestrator

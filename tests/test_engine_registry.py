@@ -338,6 +338,21 @@ def test_fallback_policy_accepts_fail_closed(tmp_path):
     assert registry["engines"]["gemini_direct_cli"]["fallback_policy"] == "fail_closed"
 
 
+def test_agy_direct_cli_default_entry_validates():
+    """TC1: default registry loads agy_direct_cli with runtime_mode=direct_cli,
+    continuity_mode=stateless, fallback_policy=fail_closed, and cli_alias=agy."""
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    registry = load_engine_registry(repo_root)
+    engines = registry["engines"]
+    assert "agy_direct_cli" in engines
+    agy = engines["agy_direct_cli"]
+    assert agy["runtime_mode"] == "direct_cli"
+    assert agy["continuity_mode"] == "stateless"
+    assert agy["fallback_policy"] == "fail_closed"
+    assert agy["cli_alias"] == "agy"
+    assert agy["capability_surface"] == "client_mediated"
+
+
 def test_malformed_json_unquoted(tmp_path):
     sdlc_root = str(tmp_path)
     create_config(sdlc_root, "engines.default.json", get_default_config())

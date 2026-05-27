@@ -392,6 +392,128 @@ class TestGeminiAgentDriver(unittest.TestCase):
 
         self.assertEqual(popen_calls[0]["env"]["GEMINI_API_KEY"], "stateless_mock_key_123")
 
+    def test_agy_uses_generic_direct_cli_renderer(self):
+        """TC4: with LLM_DRIVER=agy, subprocess command invokes mock agy
+        through generic renderer and includes --add-dir <workdir> and --print <prompt>."""
+        popen_calls = []
+        with patch.dict(os.environ, {"LLM_DRIVER": "agy"}, clear=False):
+            with patch("agent_driver.resolve_cmd", return_value="/mock/bin/agy"):
+                with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="[]", stderr="")):
+                    with patch(
+                        "agent_driver.subprocess.Popen",
+                        side_effect=fake_popen_factory("agy success", "", 0, popen_calls),
+                    ):
+                        with stdlib_tempfile.TemporaryDirectory() as workdir:
+                            result = invoke_agent("test task", session_key="test-agy", run_dir=workdir)
+
+        self.assertIsInstance(result, AgentResult)
+        self.assertEqual(result.stdout, "agy success")
+        cmd = popen_calls[0]["cmd"]
+        self.assertEqual(cmd[0], "/mock/bin/agy")
+        self.assertIn("--add-dir", cmd)
+        self.assertIn("--dangerously-skip-permissions", cmd)
+        self.assertIn("--sandbox", cmd)
+        self.assertIn("--print", cmd)
+        # Prompt is after --print
+        print_idx = cmd.index("--print")
+        prompt_arg = cmd[print_idx + 1]
+        self.assertTrue(prompt_arg.startswith("Read your complete task instructions from"))
+        # No session artifact patterns
+        self.assertNotIn("-r", cmd)
+        self.assertNotIn("--list-sessions", cmd)
+
+    def test_agy_direct_cli_has_no_session_artifacts(self):
+        """TC5: a successful mock agy invocation creates no .session_map_*,
+        .coder_session, or .reviewer_session files."""
+        popen_calls = []
+        with stdlib_tempfile.TemporaryDirectory() as run_dir:
+            with patch.dict(os.environ, {"LLM_DRIVER": "agy"}, clear=False):
+                with patch("agent_driver.resolve_cmd", return_value="/mock/bin/agy"):
+                    with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="[]", stderr="")):
+                        with patch(
+                            "agent_driver.subprocess.Popen",
+                            side_effect=fake_popen_factory("agy ok", "", 0, popen_calls),
+                        ):
+                            invoke_agent("test task", session_key="capture-agy", run_dir=run_dir)
+
+            # No session_map_* files
+            tmp_dir = os.path.join(run_dir, ".tmp")
+            session_map_files = [
+                f for f in os.listdir(tmp_dir)
+                if f.startswith(".session_map_")
+            ] if os.path.isdir(tmp_dir) else []
+            self.assertEqual(session_map_files, [])
+            # No .coder_session or .reviewer_session at run_dir level
+            for artifact in [".coder_session", ".reviewer_session"]:
+                self.assertFalse(
+                    os.path.exists(os.path.join(run_dir, artifact)),
+                    f"{artifact} should not exist for agy direct_cli",
+                )
+
+    def test_direct_cli_model_arg_omitted_when_null(self):
+        """TC6: a fixture direct CLI engine with model_arg: null launches
+        without any model flag, and default_model is not mandatory."""
+        popen_calls = []
+        with stdlib_tempfile.TemporaryDirectory() as sdlc_root:
+            config_dir = os.path.join(sdlc_root, "config")
+            os.makedirs(config_dir, exist_ok=True)
+            fixture_config = {
+                "engines": {
+                    "openclaw_native": {
+                        "engine_id": "openclaw_native",
+                        "cli_alias": "openclaw",
+                        "display_name": "OpenClaw Native",
+                        "runtime_mode": "openclaw_native",
+                        "registration_visibility": "public",
+                        "continuity_mode": "stateful",
+                        "handle_acquisition_strategy": "unavailable",
+                        "fallback_policy": "none",
+                        "capability_surface": "runtime_managed",
+                    },
+                    "null_model_cli": {
+                        "engine_id": "null_model_cli",
+                        "cli_alias": "null_model",
+                        "display_name": "Null Model CLI",
+                        "runtime_mode": "direct_cli",
+                        "registration_visibility": "public",
+                        "continuity_mode": "stateless",
+                        "handle_acquisition_strategy": "unavailable",
+                        "fallback_policy": "fail_closed",
+                        "capability_surface": "client_mediated",
+                        "execution": {
+                            "executable": "null_model_cli",
+                            "one_shot_args": ["--print"],
+                            "model_arg": None,
+                            "workspace_arg": None,
+                            "permission_args": [],
+                            "sandbox_args": [],
+                            "timeout_seconds": 300,
+                            "env_extra": {},
+                        },
+                    },
+                }
+            }
+            with open(os.path.join(config_dir, "engines.default.json"), "w") as f:
+                json.dump(fixture_config, f)
+            # No local config needed
+
+            with patch.dict(os.environ, {"LLM_DRIVER": "null_model", "SDLC_ROOT": sdlc_root}, clear=False):
+                with patch("agent_driver.resolve_cmd", return_value="/mock/bin/null_model_cli"):
+                    with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="[]", stderr="")):
+                        with patch(
+                            "agent_driver.subprocess.Popen",
+                            side_effect=fake_popen_factory("ok", "", 0, popen_calls),
+                        ):
+                            invoke_agent("test task", session_key="test-null-model")
+
+            cmd = popen_calls[0]["cmd"]
+            # No model flag anywhere in the command
+            self.assertNotIn("--model", cmd)
+            self.assertNotIn("-m", cmd)
+            # Must still contain the executable and one_shot_args
+            self.assertEqual(cmd[0], "/mock/bin/null_model_cli")
+            self.assertIn("--print", cmd)
+
 
 if __name__ == "__main__":
     unittest.main()

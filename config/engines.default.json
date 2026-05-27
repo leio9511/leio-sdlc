@@ -32,6 +32,28 @@
         "env_extra": {}
       }
     },
+    "agy_direct_cli": {
+      "engine_id": "agy_direct_cli",
+      "cli_alias": "agy",
+      "display_name": "Antigravity CLI (agy)",
+      "runtime_mode": "direct_cli",
+      "registration_visibility": "public",
+      "continuity_mode": "stateless",
+      "handle_acquisition_strategy": "unavailable",
+      "fallback_policy": "fail_closed",
+      "capability_surface": "client_mediated",
+      "execution": {
+        "executable": "agy",
+        "one_shot_args": ["--print"],
+        "model_arg": {"flag": "--model", "value": "{model}"},
+        "workspace_arg": {"flag": "--add-dir", "value": "{workdir}"},
+        "permission_args": ["--dangerously-skip-permissions"],
+        "sandbox_args": ["--sandbox"],
+        "timeout_seconds": 300,
+        "env_extra": {},
+        "default_model": "auto"
+      }
+    },
     "gemini_acp_reference": {
       "engine_id": "gemini_acp_reference",
       "display_name": "Gemini ACP Reference",

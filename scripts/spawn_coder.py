@@ -603,11 +603,25 @@ def main():
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--global-dir", required=False, help="Global directory for playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
+    runtime_dir = os.path.dirname(os.path.abspath(__file__))
+    sdlc_root_dir = os.path.dirname(runtime_dir)
+    from engine_registry import load_engine_registry
+    try:
+        engine_reg = load_engine_registry(sdlc_root_dir)
+    except Exception:
+        engine_reg = {"engines": {}}
+    engine_alias_map = {}
+    for eid, entry in engine_reg.get("engines", {}).items():
+        if isinstance(entry, dict):
+            alias = entry.get("cli_alias") or entry.get("engine_id", eid)
+            engine_alias_map[alias] = entry.get("engine_id", eid)
+    dynamic_choices = list(engine_alias_map.keys()) or ["openclaw", "gemini"]
+    default_engine = os.environ.get("LLM_DRIVER", engine_alias_map.get("openclaw", config.DEFAULT_LLM_ENGINE))
     parser.add_argument(
         "--engine",
-        choices=["openclaw", "gemini"],
-        default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE),
-        help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})",
+        choices=dynamic_choices,
+        default=default_engine,
+        help=f"Execution engine to use for the agent driver (default: {default_engine})",
     )
     parser.add_argument(
         "--model",
@@ -620,7 +634,6 @@ def main():
         default=None,
         help="OpenClaw thinking level (default: high). Only applies when engine is openclaw."
     )
-    runtime_dir = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
 
@@ -670,7 +683,7 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
-    sdlc_root = os.path.dirname(runtime_dir)
+    sdlc_root = sdlc_root_dir
     app_config = config.load_or_merge_config(sdlc_root)
     v1_playbook_path = os.path.join(sdlc_root, "playbooks", "coder_playbook.md")
     initial_mode = resolve_initial_coder_startup_mode(app_config)

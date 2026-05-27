@@ -61,8 +61,6 @@ def main():
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     parser.add_argument("--system-alert", help="Send a system alert to the existing reviewer session", default=None)
-    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
-    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     parser.add_argument(
         "--thinking",
         choices=["low", "medium", "high", "xhigh"],
@@ -71,6 +69,21 @@ def main():
     )
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
+    from engine_registry import load_engine_registry
+    try:
+        engine_reg = load_engine_registry(SDLC_ROOT)
+    except Exception:
+        engine_reg = {"engines": {}}
+    engine_alias_map = {}
+    for eid, entry in engine_reg.get("engines", {}).items():
+        if isinstance(entry, dict):
+            alias = entry.get("cli_alias") or entry.get("engine_id", eid)
+            engine_alias_map[alias] = entry.get("engine_id", eid)
+    dynamic_choices = list(engine_alias_map.keys()) or ["openclaw", "gemini"]
+    default_engine = os.environ.get("LLM_DRIVER", engine_alias_map.get("openclaw", config.DEFAULT_LLM_ENGINE))
+    parser.add_argument("--engine", choices=dynamic_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model override for the selected engine (default: {config.DEFAULT_GEMINI_MODEL})")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
     from handoff_prompter import HandoffPrompter
@@ -103,7 +116,6 @@ def main():
             print("[FATAL] System alert driver not found", file=sys.stderr)
             sys.exit(1)
         if cmd_exec.endswith("gemini"):
-            # If the driver is gemini, use actual gemini flags
             cmd = [cmd_exec, "-r", session_id, "-p", args.system_alert, "--yolo"]
         else:
             cmd = [cmd_exec, "agent", "--session-id", session_id, "-m", args.system_alert]
@@ -171,7 +183,6 @@ def main():
             sys.exit(0)
         sys.exit(0)
 
-    SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
     template_content = ""
 
     playbook_path = os.path.join(SDLC_ROOT, "playbooks", "reviewer_playbook.md")
