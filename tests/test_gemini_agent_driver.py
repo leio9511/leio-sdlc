@@ -82,6 +82,40 @@ class TestGeminiAgentDriver(unittest.TestCase):
         model_idx = cmd.index("--model")
         self.assertEqual(cmd[model_idx + 1], "google/gemini-2.0-flash")
 
+    def test_generic_renderer_preserves_gemini_command_shape(self):
+        """TC2: command contains gemini --yolo -p <prompt> --model <model>
+        in the agreed order, matching the old Gemini-specific branch behavior."""
+        popen_calls = []
+        env = os.environ.copy()
+        env["LLM_DRIVER"] = "gemini"
+        env["SDLC_MODEL"] = "google/gemini-2.0-flash"
+
+        with patch.dict(os.environ, env, clear=False):
+            with patch("agent_driver.resolve_cmd", return_value="/mock/bin/gemini"):
+                with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="[]", stderr="")):
+                    with patch(
+                        "agent_driver.subprocess.Popen",
+                        side_effect=fake_popen_factory("test stdout", "", 0, popen_calls),
+                    ):
+                        invoke_agent("test task", session_key="test-session")
+
+        cmd = popen_calls[0]["cmd"]
+        # Verify exact command structure: executable, one_shot_args, prompt, model_arg
+        self.assertEqual(cmd[0], "/mock/bin/gemini")
+        yolo_idx = cmd.index("--yolo")
+        p_idx = cmd.index("-p")
+        model_idx = cmd.index("--model")
+        # Order: --yolo before -p, -p before --model
+        self.assertLess(yolo_idx, p_idx)
+        self.assertLess(p_idx, model_idx)
+        # Prompt is between -p and --model
+        prompt_text = cmd[p_idx + 1]
+        self.assertTrue(prompt_text.startswith("Read your complete task instructions from"))
+        self.assertEqual(cmd[model_idx + 1], "google/gemini-2.0-flash")
+        # No extra arguments beyond expected structure
+        expected_len = 6  # [exec, --yolo, -p, <prompt>, --model, <model>]
+        self.assertEqual(len(cmd), expected_len)
+
     def test_gemini_driver_env_var_priority(self):
         popen_calls = []
         env = os.environ.copy()

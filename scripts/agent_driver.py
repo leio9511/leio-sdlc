@@ -230,9 +230,15 @@ def _assemble_direct_cli_command(engine_spec, secure_msg, workdir, model):
     workspace_arg = execution.get("workspace_arg")
     if workspace_arg is not None:
         if isinstance(workspace_arg, dict):
-            flag = workspace_arg["flag"]
-            value = str(workspace_arg.get("value", "")).replace("{workdir}", workdir or "")
-            cmd.extend([flag, value])
+            raw_value = workspace_arg.get("value")
+            if raw_value is None:
+                # Dict-form workspace_arg with null value is invalid: skip to avoid
+                # producing literal "None" in CLI args (e.g. "--add-dir None").
+                pass
+            else:
+                flag = workspace_arg["flag"]
+                value = str(raw_value).replace("{workdir}", workdir or "")
+                cmd.extend([flag, value])
         elif isinstance(workspace_arg, list):
             for arg in workspace_arg:
                 cmd.append(str(arg).replace("{workdir}", workdir or ""))
@@ -337,6 +343,10 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
             return AgentResult(session_key=session_key, stdout=os.environ["SDLC_MOCK_LLM_RESPONSE"], return_code=0)
 
         # --- Engine registry routing ---
+        # Two-path architecture:
+        #   stateful: openclaw_native → existing sessions_spawn path with session_map_file
+        #   stateless: direct_cli → generic config-driven renderer (no session state)
+        # Engine selection: LLM_DRIVER env var → engine spec via cli_alias or engine_id.
         llm_driver_raw = os.environ.get("LLM_DRIVER", "openclaw").lower()
         sdlc_root = _resolve_sdlc_root()
         engine_spec = _resolve_engine_spec(sdlc_root, llm_driver_raw)
@@ -382,14 +392,13 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 templates_dir = os.path.join(base_dir, "TEMPLATES", "openclaw_execution_agent")
                 if os.path.exists(templates_dir):
-                    import shutil as _shutil
                     for item in os.listdir(templates_dir):
                         s = os.path.join(templates_dir, item)
                         d = os.path.join(agent_ws, item)
                         if os.path.isdir(s):
-                            _shutil.copytree(s, d, dirs_exist_ok=True)
+                            shutil.copytree(s, d, dirs_exist_ok=True)
                         else:
-                            _shutil.copy2(s, d)
+                            shutil.copy2(s, d)
             else:
                 validate_openclaw_agent_model(cmd_exec, agent_id, model)
 
