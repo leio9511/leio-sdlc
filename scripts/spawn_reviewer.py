@@ -70,20 +70,16 @@ def main():
     
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     SDLC_ROOT = os.path.dirname(RUNTIME_DIR)
-    from engine_registry import load_engine_registry
+    from engine_registry import load_engine_registry, build_spawner_engine_choices
     try:
         engine_reg = load_engine_registry(SDLC_ROOT)
     except Exception:
+        import sys as _sys
+        print("[WARN] Could not load engine registry. Using fallback choices.", file=_sys.stderr)
         engine_reg = {"engines": {}}
-    engine_alias_map = {}
-    for eid, entry in engine_reg.get("engines", {}).items():
-        if isinstance(entry, dict):
-            alias = entry.get("cli_alias") or entry.get("engine_id", eid)
-            engine_alias_map[alias] = entry.get("engine_id", eid)
-    dynamic_choices = list(engine_alias_map.keys()) or ["openclaw", "gemini"]
-    default_engine = os.environ.get("LLM_DRIVER", engine_alias_map.get("openclaw", config.DEFAULT_LLM_ENGINE))
+    dynamic_choices, engine_alias_map, default_engine = build_spawner_engine_choices(engine_reg)
     parser.add_argument("--engine", choices=dynamic_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
-    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model override for the selected engine (default: {config.DEFAULT_GEMINI_MODEL})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL"), help="Model override for the selected engine. When unset the engine's default_model is used.")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
     from handoff_prompter import HandoffPrompter
@@ -110,11 +106,26 @@ def main():
             sys.exit(1)
         with open(session_file, "r") as sf:
             session_id = sf.read().strip()
-        
+
+        # Resolve engine spec to check continuity mode
+        sdlc_root_resolved = os.environ.get("SDLC_ROOT", SDLC_ROOT)
+        try:
+            eng_spec = engine_reg.get("engines", {}).get(
+                engine_alias_map.get(os.environ.get("LLM_DRIVER", ""), ""), {}
+            )
+        except Exception:
+            eng_spec = {}
+        if eng_spec.get("continuity_mode") == "stateless":
+            print("[FATAL] --system-alert is not supported for stateless engines. Use orchestrator-driven full re-prompt instead.", file=sys.stderr)
+            sys.exit(1)
+
         cmd_exec = resolve_cmd(os.environ.get("LLM_DRIVER", "openclaw").lower())
         if not cmd_exec:
             print("[FATAL] System alert driver not found", file=sys.stderr)
             sys.exit(1)
+        # Legacy session-based system alert — only openclaw_native expects this path.
+        # Stateless engines are gated above; other stateful engines should also use
+        # native session IDs, not CLI resume flags.
         if cmd_exec.endswith("gemini"):
             cmd = [cmd_exec, "-r", session_id, "-p", args.system_alert, "--yolo"]
         else:

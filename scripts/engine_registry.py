@@ -206,3 +206,29 @@ def load_engine_registry(sdlc_root):
         error_msg = str(e)
         scrubbed_msg = _redact_raw_json(error_msg)
         raise RegistryValidationError(scrubbed_msg) from None
+
+
+def build_spawner_engine_choices(registry):
+    """Build CLI engine choices and alias-to-id mapping from a loaded registry.
+
+    Returns (choices, alias_to_id, default_alias) tuple:
+      - choices: list of user-facing aliases (cli_alias or engine_id) for argparse
+      - alias_to_id: dict mapping alias → engine_id
+      - default_alias: the alias for 'openclaw' or the first alias, always present in choices
+
+    Callers should use default_alias as the argparse default so the default value
+    is guaranteed to be in the choices list.
+    """
+    alias_to_id = {}
+    for eid, entry in registry.get("engines", {}).items():
+        if isinstance(entry, dict):
+            alias = entry.get("cli_alias") or entry.get("engine_id", eid)
+            alias_to_id[alias] = entry.get("engine_id", eid)
+    choices = list(alias_to_id.keys()) or ["openclaw", "gemini"]
+    # Resolve default_alias: find the alias that maps to 'openclaw_native',
+    # or use the well-known literal 'openclaw' as a safe fallback.
+    reverse_map = {v: k for k, v in alias_to_id.items()}
+    default_alias = reverse_map.get("openclaw_native", "openclaw")
+    if default_alias not in choices:
+        default_alias = choices[0] if choices else "openclaw"
+    return choices, alias_to_id, default_alias

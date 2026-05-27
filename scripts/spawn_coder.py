@@ -605,18 +605,14 @@ def main():
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     runtime_dir = os.path.dirname(os.path.abspath(__file__))
     sdlc_root_dir = os.path.dirname(runtime_dir)
-    from engine_registry import load_engine_registry
+    from engine_registry import load_engine_registry, build_spawner_engine_choices
     try:
         engine_reg = load_engine_registry(sdlc_root_dir)
     except Exception:
+        import sys as _sys
+        print("[WARN] Could not load engine registry. Using fallback choices.", file=_sys.stderr)
         engine_reg = {"engines": {}}
-    engine_alias_map = {}
-    for eid, entry in engine_reg.get("engines", {}).items():
-        if isinstance(entry, dict):
-            alias = entry.get("cli_alias") or entry.get("engine_id", eid)
-            engine_alias_map[alias] = entry.get("engine_id", eid)
-    dynamic_choices = list(engine_alias_map.keys()) or ["openclaw", "gemini"]
-    default_engine = os.environ.get("LLM_DRIVER", engine_alias_map.get("openclaw", config.DEFAULT_LLM_ENGINE))
+    dynamic_choices, engine_alias_map, default_engine = build_spawner_engine_choices(engine_reg)
     parser.add_argument(
         "--engine",
         choices=dynamic_choices,
