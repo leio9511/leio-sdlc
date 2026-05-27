@@ -60,6 +60,7 @@ def build_coder_startup_packet_and_prompt(
     system_alert=None,
     current_branch=None,
     latest_commit_hash=None,
+    previous_output=None,
 ):
     references = {
         "pr_contract_file": os.path.abspath(pr_file),
@@ -76,6 +77,8 @@ def build_coder_startup_packet_and_prompt(
         contract_params["current_branch"] = current_branch
     if latest_commit_hash:
         contract_params["latest_commit_hash"] = latest_commit_hash
+    if previous_output:
+        contract_params["previous_output"] = previous_output
 
     envelope = envelope_assembler.build_startup_envelope(
         role="coder",
@@ -432,13 +435,31 @@ def send_feedback(session_key, message, workdir=".", run_dir=".", thinking: str 
     print(f"Sent feedback to session {result.session_key}")
 
 
-def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False, thinking: str | None = None, app_config=None):
+def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, feedback_file, pr_id, test_mode=False, thinking: str | None = None, app_config=None, previous_output_file=None):
     session_file = os.path.join(run_dir, ".coder_session")
     current_branch = get_current_branch(workdir)
     latest_commit_hash = get_latest_commit_hash(workdir)
     review_report_json = read_text_file(feedback_file)
-    
-    if os.path.exists(session_file):
+
+    # Resolve engine continuity mode
+    try:
+        eng_reg = load_engine_registry(SDLC_ROOT)
+        llm_driver = os.environ.get("LLM_DRIVER", "openclaw")
+        eng_entry = None
+        for eid, entry in eng_reg.get("engines", {}).items():
+            if isinstance(entry, dict) and (entry.get("cli_alias") == llm_driver or entry.get("engine_id") == llm_driver):
+                eng_entry = entry
+                break
+        is_stateless = eng_entry.get("continuity_mode") == "stateless" if eng_entry else False
+    except Exception:
+        is_stateless = False
+
+    # Read previous output for stateless retry context
+    previous_output = None
+    if previous_output_file and os.path.exists(previous_output_file):
+        previous_output = read_text_file(previous_output_file)
+
+    if os.path.exists(session_file) and not is_stateless:
         mode = "revision"
         session_key = read_text_file(session_file).strip()
         rendered_prompt = build_coder_revision_continuation_prompt(
@@ -465,6 +486,10 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         mode = resolve_recovery_bootstrap_mode(app_config or {}, "revision_bootstrap")
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
         selected_playbook_path = playbook_path
+        # Inject previous output into contract params for stateless retry
+        contract_params = {}
+        if previous_output:
+            contract_params["previous_output"] = previous_output
         if mode == "revision_bootstrap":
             envelope, rendered_prompt = build_coder_startup_packet_and_prompt(
                 workdir=workdir,
@@ -476,6 +501,7 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
                 feedback_file=feedback_file,
                 current_branch=current_branch,
                 latest_commit_hash=latest_commit_hash,
+                previous_output=previous_output,
             )
             packet = envelope
         else:
@@ -490,6 +516,7 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
                 feedback_file=feedback_file,
                 current_branch=current_branch,
                 latest_commit_hash=latest_commit_hash,
+                previous_output=previous_output,
             )
             packet = envelope
 
@@ -511,18 +538,43 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         return True, session_key
     else:
         result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
-        with open(session_file, "w") as f:
-            f.write(result.session_key)
+        # Only write .coder_session for stateful engines
+        if not is_stateless:
+            with open(session_file, "w") as f:
+                f.write(result.session_key)
+        # Write stdout for potential stateless retry context
+        _write_coder_stdout(run_dir, pr_id, result.stdout)
         print(f"Spawned new session {result.session_key} with feedback")
         return False, result.session_key
+
+
+def _write_coder_stdout(run_dir, pr_id, stdout):
+    """Write coder agent stdout to a known file for stateless retry context injection."""
+    stdout_file = os.path.join(run_dir, f".coder_stdout_{pr_id}.txt")
+    with open(stdout_file, "w") as f:
+        f.write(stdout)
+
+
+def _resolve_is_stateless():
+    """Check whether the active engine is stateless."""
+    try:
+        eng_reg = load_engine_registry(SDLC_ROOT)
+        llm_driver = os.environ.get("LLM_DRIVER", "openclaw")
+        for eid, entry in eng_reg.get("engines", {}).items():
+            if isinstance(entry, dict) and (entry.get("cli_alias") == llm_driver or entry.get("engine_id") == llm_driver):
+                return entry.get("continuity_mode") == "stateless"
+    except Exception:
+        pass
+    return False
 
 
 def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_path, system_alert, pr_id, test_mode=False, thinking: str | None = None, app_config=None):
     session_file = os.path.join(run_dir, ".coder_session")
     current_branch = get_current_branch(workdir)
     latest_commit_hash = get_latest_commit_hash(workdir)
+    is_stateless = _resolve_is_stateless()
     
-    if os.path.exists(session_file):
+    if os.path.exists(session_file) and not is_stateless:
         mode = "system_alert"
         session_key = read_text_file(session_file).strip()
         rendered_prompt = build_coder_system_alert_continuation_prompt(
@@ -593,8 +645,12 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
         return True, session_key
     else:
         result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
-        with open(session_file, "w") as f:
-            f.write(result.session_key)
+        # Only write .coder_session for stateful engines
+        if not is_stateless:
+            with open(session_file, "w") as f:
+                f.write(result.session_key)
+        # Write stdout for potential stateless retry context
+        _write_coder_stdout(run_dir, pr_id, result.stdout)
         print(f"Spawned new session {result.session_key} with system alert")
         return False, result.session_key
 
@@ -605,6 +661,7 @@ def main():
     parser.add_argument("--prd-file", required=True, help="Path to the PRD file")
     parser.add_argument("--feedback-file", required=False, help="Path to the Review Report / Feedback file")
     parser.add_argument("--system-alert", required=False, help="System alert string (e.g. git status)")
+    parser.add_argument("--previous-output", required=False, help="Path to file containing previous coder stdout for stateless retry context")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--global-dir", required=False, help="Global directory for playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
@@ -719,6 +776,7 @@ def main():
             test_mode=test_mode,
             thinking=resolved_thinking,
             app_config=app_config,
+            previous_output_file=getattr(args, "previous_output", None),
         )
         return
 
@@ -750,10 +808,14 @@ def main():
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
 
     result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir, thinking=resolved_thinking)
-    if not os.path.exists(session_file):
-        with open(session_file, "w") as f:
-            f.write(result.session_key)
-        print(f"Spawned new session {result.session_key}")
+    # Only write .coder_session for stateful engines
+    if not _resolve_is_stateless():
+        if not os.path.exists(session_file):
+            with open(session_file, "w") as f:
+                f.write(result.session_key)
+            print(f"Spawned new session {result.session_key}")
+    # Write stdout for potential stateless retry context
+    _write_coder_stdout(args.run_dir, pr_id, result.stdout)
 
 
 if __name__ == "__main__":

@@ -66,6 +66,7 @@ def main():
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     parser.add_argument("--system-alert", help="Send a system alert to the existing reviewer session", default=None)
+    parser.add_argument("--alert-inline", help="Alert text to inject inline into the reviewer prompt for stateless retries (no session required)", default=None)
     parser.add_argument(
         "--thinking",
         choices=["low", "medium", "high", "xhigh"],
@@ -156,6 +157,15 @@ def main():
     os.chdir(workdir)
 
     # Production mode
+    # Resolve engine continuity mode for stateless checks
+    try:
+        eng_entry = engine_reg.get("engines", {}).get(
+            engine_alias_map.get(args.engine, ""), {},
+        )
+    except Exception:
+        eng_entry = {}
+    is_stateless = eng_entry.get("continuity_mode") == "stateless"
+
     if not os.path.exists(args.pr_file):
         print(f"Error: PR file not found: {args.pr_file}")
         sys.exit(1)
@@ -226,6 +236,9 @@ def main():
             ]
         }
     }
+    # Inject alert_inline for stateless reviewer retry
+    if args.alert_inline:
+        contract_params["alert_inline"] = args.alert_inline
 
     envelope = envelope_assembler.build_startup_envelope(
         role="reviewer",
@@ -280,8 +293,10 @@ def main():
         print('{"status": "mock_success", "role": "reviewer"}')
         # We DO NOT sys.exit(0) here, we want verification to run!
     else:
-        with open(session_file, "w") as sf:
-            sf.write(session_id)
+        # Only write .reviewer_session for stateful engines
+        if not is_stateless:
+            with open(session_file, "w") as sf:
+                sf.write(session_id)
             
         result = invoke_agent(task_string, session_key=session_id, role="reviewer", thinking=resolved_thinking)
 

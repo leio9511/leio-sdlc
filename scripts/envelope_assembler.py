@@ -42,6 +42,14 @@ ROLE_PROLOGUES = {
 
 START_WORK_CTA = "As the {role_upper}, begin your task now. Read the reference files first, then proceed."
 
+CODER_RETRY_PREVIOUS_OUTPUT_HEADER = (
+    "\n\n## PREVIOUS CODER OUTPUT\n"
+    "Your previous execution produced the following output. "
+    "Use it as context for this retry. "
+    "Do NOT repeat the same mistakes. Address the system alert below.\n\n"
+    "{previous_stdout}"
+)
+
 CODER_OPERATING_CONSTRAINTS = [
     "DO NOT git push.",
     "DO NOT change git branches.",
@@ -487,6 +495,12 @@ def _build_reviewer_envelope(workdir, references, contract_params):
         "Follow the REVIEWER PLAYBOOK methodologies.",
     ]
 
+    if contract_params.get("alert_inline"):
+        execution_contract.insert(
+            1,
+            contract_params["alert_inline"],
+        )
+
     reference_index = [
         {
             "id": "prd",
@@ -633,6 +647,14 @@ def _build_coder_envelope(workdir, references, contract_params, mode):
         "Completion rule: You must leave the workspace reviewable, commit your changes explicitly, and leave `git status` clean.",
         "Reporting rule: Execute `LATEST_HASH=$(git rev-parse HEAD)` and report the latest commit hash when the task is complete.",
     ]
+
+    if contract_params.get("previous_output"):
+        execution_contract.insert(
+            4,
+            CODER_RETRY_PREVIOUS_OUTPUT_HEADER.format(
+                previous_stdout=contract_params["previous_output"]
+            ),
+        )
 
     if mode in {"revision", "revision_bootstrap"}:
         execution_contract.insert(6, "Revision work is execution work, not acknowledgment work.")

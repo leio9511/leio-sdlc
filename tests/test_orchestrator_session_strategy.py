@@ -131,7 +131,7 @@ def _run_strategy_test(strategy: str, spawn_coder_returncode: int):
                 except SystemExit:
                     pass
 
-        mock_teardown.assert_called_with(workdir, ANY)
+        mock_teardown.assert_called_with(workdir, ANY, engine_mode="stateful")
 
 
 @patch("fcntl.flock")

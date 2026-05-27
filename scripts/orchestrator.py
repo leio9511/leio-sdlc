@@ -42,6 +42,16 @@ RETRY_RECOVERY_CONFIG_KEYS = (
     "max_uat_recovery_attempts",
 )
 
+REVIEWER_RETRY_ALERT = (
+    "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. "
+    "You MUST return ONLY a strict JSON object matching the required schema. "
+    "No markdown formatting, no conversational text. "
+    "Below is your previous raw output for reference. "
+    "Do NOT repeat it. Produce a corrected JSON output.\n\n"
+    "## PREVIOUS OUTPUT (NON-JSON)\n{previous_output}\n\n"
+    "## REQUIRED SCHEMA\n{output_schema}"
+)
+
 NULL_OUTPUT_SYSTEM_ALERT = """SYSTEM ALERT: Your previous coder round produced no implementation artifacts.
 
 Detected state:
@@ -201,7 +211,14 @@ def get_pr_slice_depth(pr_file):
         return int(match.group(1))
     return 0
 
-def teardown_coder_session(workdir, run_dir="."):
+def teardown_coder_session(workdir, run_dir=".", engine_mode=None):
+    """Tear down the coder session file.
+
+    For stateless engines, .coder_session is never created so there is nothing
+    to tear down. For stateful engines, remove the file as before.
+    """
+    if engine_mode == "stateless":
+        return
     session_file = os.path.join(run_dir, ".coder_session")
     if os.path.exists(session_file):
         with open(session_file, "r") as f:
@@ -390,6 +407,10 @@ def main():
     
     resolved_engine_id = resolve_engine_id(args.engine, engine_registry)
     os.environ["LLM_DRIVER"] = args.engine
+    # Resolve engine continuity mode for stateless retry handling
+    engine_entry = engine_registry.get("engines", {}).get(resolved_engine_id, {})
+    engine_continuity_mode = engine_entry.get("continuity_mode", "stateful")
+    is_stateless_engine = engine_continuity_mode == "stateless"
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
 
@@ -1027,7 +1048,7 @@ def main():
                     sys.exit(1)
                 set_pr_status(current_pr, "in_progress")
 
-            if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir, run_dir)
+            if args.coder_session_strategy == "per-pr": teardown_coder_session(workdir, run_dir, engine_mode=engine_continuity_mode)
             base_filename = os.path.splitext(os.path.basename(current_pr))[0]
             parent_dir_name = os.path.basename(os.path.dirname(os.path.abspath(current_pr)))
             branch_name = f"{parent_dir_name}/{base_filename}".replace(":", "_").replace(" ", "_").replace("?", "_")
@@ -1054,7 +1075,7 @@ def main():
                 current_feedback_file = None
                 system_alert_text = None
                 while True:
-                    if args.coder_session_strategy == "always": teardown_coder_session(workdir, run_dir)
+                    if args.coder_session_strategy == "always": teardown_coder_session(workdir, run_dir, engine_mode=engine_continuity_mode)
                     logger.info(f"State 3: Spawning Coder for {current_pr}")
                     write_resume_state(run_dir, "CODER_ACTIVE", get_baseline_commit(run_dir), current_pr_path=current_pr, current_branch=branch_name, split_allowed=True)
                     dlog(f"Transitioning to State 3: Spawning Coder for {current_pr}")
@@ -1063,6 +1084,12 @@ def main():
                     coder_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_coder.py"), "--thinking", resolved_thinking, "--pr-file", current_pr, "--workdir", workdir, "--prd-file", args.prd_file, "--global-dir", global_dir, "--run-dir", run_dir]
                     if current_feedback_file:
                         coder_cmd.extend(["--feedback-file", current_feedback_file])
+                        # For stateless engines, inject previous coder stdout as retry context
+                        if is_stateless_engine:
+                            pr_id_for_stdout = os.path.splitext(os.path.basename(current_pr))[0]
+                            coder_stdout_file = os.path.join(run_dir, f".coder_stdout_{pr_id_for_stdout}.txt")
+                            if os.path.exists(coder_stdout_file):
+                                coder_cmd.extend(["--previous-output", coder_stdout_file])
                     if system_alert_text:
                         coder_cmd.extend(["--system-alert", system_alert_text])
                         system_alert_text = None
@@ -1204,7 +1231,13 @@ def main():
                                 break
                                 
                             sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                            if is_stateless_engine:
+                                # Stateless: full re-prompt with alert inline (no session dependency)
+                                reviewer_retry_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--alert-inline", sys_alert]
+                            else:
+                                # Stateful: session-based system alert
+                                reviewer_retry_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert]
+                            proc = dpopen(reviewer_retry_cmd, start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                             proc.wait()
                                 
                     if verdict == "APPROVED":
@@ -1216,7 +1249,7 @@ def main():
                             drun(["git", "branch", "-D", branch_name], check=True)
                             set_pr_status(current_pr, "closed")
                             notify_channel(effective_channel, f"✅ {base_filename} successfully merged to master.", "pr_merged", {"pr_id": base_filename})
-                            teardown_coder_session(workdir, run_dir=run_dir)
+                            teardown_coder_session(workdir, run_dir=run_dir, engine_mode=engine_continuity_mode)
                             pr_done = True
                             break
                         else:
@@ -1238,7 +1271,7 @@ def main():
                         state_5_trigger = True
                         break
                 if state_5_trigger:
-                    if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir, run_dir)
+                    if args.coder_session_strategy == "on-escalation": teardown_coder_session(workdir, run_dir, engine_mode=engine_continuity_mode)
 
                     # PRD 1060: Forensic Quarantine: Use shutil.copytree instead of git tracking
                     job_dir_abs = run_dir
@@ -1264,7 +1297,7 @@ def main():
                         drun(["git", "branch", "-D", branch_name], check=False)
                         
                         # RED PATH ENFORCEMENT: Force a NEW Session ID
-                        teardown_coder_session(workdir, run_dir)
+                        teardown_coder_session(workdir, run_dir, engine_mode=engine_continuity_mode)
                         
                         red_counter += 1
                         continue
