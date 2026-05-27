@@ -452,6 +452,55 @@ class TestGeminiAgentDriver(unittest.TestCase):
                     f"{artifact} should not exist for agy direct_cli",
                 )
 
+    def test_direct_cli_missing_execution_fails_before_subprocess(self):
+        """PR-006 TC5: Invalid direct CLI config (missing execution subsection)
+        reports a fatal execution-config error and does not call subprocess.Popen."""
+        with stdlib_tempfile.TemporaryDirectory() as sdlc_root:
+            config_dir = os.path.join(sdlc_root, "config")
+            os.makedirs(config_dir, exist_ok=True)
+            # Engine with no execution subsection
+            fixture_config = {
+                "engines": {
+                    "openclaw_native": {
+                        "engine_id": "openclaw_native",
+                        "cli_alias": "openclaw",
+                        "display_name": "OpenClaw Native",
+                        "runtime_mode": "openclaw_native",
+                        "registration_visibility": "public",
+                        "continuity_mode": "stateful",
+                        "handle_acquisition_strategy": "unavailable",
+                        "fallback_policy": "none",
+                        "capability_surface": "runtime_managed",
+                    },
+                    "broken_cli": {
+                        "engine_id": "broken_cli",
+                        "cli_alias": "broken",
+                        "display_name": "Broken Direct CLI",
+                        "runtime_mode": "direct_cli",
+                        "registration_visibility": "public",
+                        "continuity_mode": "stateless",
+                        "handle_acquisition_strategy": "unavailable",
+                        "fallback_policy": "fail_closed",
+                        "capability_surface": "client_mediated",
+                        # Missing: execution subsection causes fail-closed
+                    },
+                }
+            }
+            with open(os.path.join(config_dir, "engines.default.json"), "w") as f:
+                json.dump(fixture_config, f)
+
+            with patch.dict(os.environ, {"LLM_DRIVER": "broken", "SDLC_ROOT": sdlc_root}, clear=False):
+                with patch("agent_driver.resolve_cmd", return_value="/mock/bin/broken_cli"):
+                    with patch("agent_driver.subprocess.run") as mock_run:
+                        with patch("agent_driver.subprocess.Popen") as mock_popen:
+                            with self.assertRaises(SystemExit) as cm:
+                                invoke_agent("test task", session_key="test-broken")
+
+                            # Must fail closed (non-zero exit)
+                            self.assertNotEqual(cm.exception.code, 0)
+                            # subprocess.Popen must NOT be called
+                            mock_popen.assert_not_called()
+
     def test_direct_cli_model_arg_omitted_when_null(self):
         """TC6: a fixture direct CLI engine with model_arg: null launches
         without any model flag, and default_model is not mandatory."""

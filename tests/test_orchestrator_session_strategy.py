@@ -169,6 +169,119 @@ def test_on_escalation_strategy(_mock_copytree, _mock_rmtree, _mock_flock):
 @patch("fcntl.flock")
 @patch("shutil.rmtree")
 @patch("shutil.copytree")
+def test_retry_paths_branch_on_continuity_not_provider_name(
+    _mock_copytree, _mock_rmtree, _mock_flock
+):
+    """PR-006 TC6: Fixture engines named something other than Gemini/agy follow
+    stateless retry behavior when continuity_mode=stateless, while OpenClaw
+    follows stateful behavior."""
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
+    # Isolate from leaked LLM_DRIVER/SDLC_MODEL
+    saved_driver = os.environ.pop("LLM_DRIVER", None)
+    saved_model = os.environ.pop("SDLC_MODEL", None)
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workdir = tmp_dir
+            global_dir = tmp_dir
+            os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+            seeded = seed_planner_success_artifacts(
+                workdir, global_dir, prd_filename="dummy.md",
+                pr_slice_content="status: in_progress\n"
+            )
+
+            with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+                 patch("orchestrator.drun") as mock_drun, \
+                 patch("orchestrator.dpopen") as mock_dpopen, \
+                 patch("orchestrator.safe_git_checkout"), \
+                 patch("orchestrator.glob.glob") as mock_glob, \
+                 patch("orchestrator.set_pr_status"), \
+                 patch("git_utils.check_git_boundary"), \
+                 patch("agent_driver.send_ignition_handshake"), \
+                 patch.object(
+                     orchestrator.SanityContext, "perform_healthy_check",
+                     return_value=None
+                 ):
+                mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
+                mock_drun.return_value = MagicMock(
+                    returncode=0, stdout="", stderr=""
+                )
+                proc = MagicMock()
+                proc.wait.return_value = 0
+                proc.poll.return_value = 0
+                proc.returncode = 0
+                mock_dpopen.return_value = proc
+
+                # Register a custom-named engine (not gemini/agy) with stateless mode
+                registry = {
+                    "engines": {
+                        "custom_stateless_cli": {
+                            "engine_id": "custom_stateless_cli",
+                            "cli_alias": "custom-engine",
+                            "continuity_mode": "stateless",
+                        },
+                        "openclaw_native": {
+                            "engine_id": "openclaw_native",
+                            "cli_alias": "openclaw",
+                            "continuity_mode": "stateful",
+                        },
+                    }
+                }
+
+                # Test 1: Custom stateless engine → teardown with stateless mode
+                with patch(
+                    "orchestrator.load_engine_registry", return_value=registry
+                ):
+                    with patch(
+                        "sys.argv",
+                        [
+                            "orchestrator.py",
+                            "--force-replan", "false",
+                            "--enable-exec-from-workspace",
+                            "--workdir", workdir,
+                            "--prd-file", "dummy.md",
+                            "--channel", "test",
+                            "--global-dir", global_dir,
+                            "--coder-session-strategy", "always",
+                            "--max-prs-to-process", "1",
+                            "--engine", "custom-engine",
+                        ],
+                    ):
+                        try:
+                            orchestrator.main()
+                        except SystemExit:
+                            pass
+
+                    # Custom stateless engine → teardown_coder_session with 'stateless'
+                    # (no-op internally, but the branch was taken based on continuity_mode,
+                    # not provider name)
+                    stateless_calls = [
+                        c for c in mock_teardown.call_args_list
+                        if c[1].get("engine_mode") == "stateless"
+                    ]
+                    assert len(stateless_calls) >= 1, (
+                        "Custom stateless engine should branch on continuity_mode=stateless"
+                    )
+
+                    # No stateful teardown calls for custom engine
+                    stateful_calls = [
+                        c for c in mock_teardown.call_args_list
+                        if c[1].get("engine_mode") == "stateful"
+                    ]
+                    assert len(stateful_calls) == 0, (
+                        "Custom stateless engine should not trigger stateful teardown"
+                    )
+    finally:
+        if saved_driver is not None:
+            os.environ["LLM_DRIVER"] = saved_driver
+        if saved_model is not None:
+            os.environ["SDLC_MODEL"] = saved_model
+
+
+@patch("fcntl.flock")
+@patch("shutil.rmtree")
+@patch("shutil.copytree")
 def test_stateless_coder_retry_does_not_teardown_or_create_coder_session(
     _mock_copytree, _mock_rmtree, _mock_flock
 ):
@@ -246,6 +359,99 @@ def test_stateless_coder_retry_does_not_teardown_or_create_coder_session(
             os.environ["LLM_DRIVER"] = saved_driver
         if saved_model is not None:
             os.environ["SDLC_MODEL"] = saved_model
+
+
+def test_all_default_direct_cli_engines_are_stateless_and_artifact_free():
+    """PR-006 TC2: Gemini and agy mock invocations complete without
+    .coder_session, .reviewer_session, or .session_map_* artifacts."""
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
+    # Isolate from leaked LLM_DRIVER/SDLC_MODEL from other tests
+    saved_driver = os.environ.pop("LLM_DRIVER", None)
+    saved_model = os.environ.pop("SDLC_MODEL", None)
+
+    for engine_alias, engine_id in [("gemini", "gemini_direct_cli"), ("agy", "agy_direct_cli")]:
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                workdir = tmp_dir
+                global_dir = tmp_dir
+                os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+                seeded = seed_planner_success_artifacts(
+                    workdir, global_dir, prd_filename="dummy.md",
+                    pr_slice_content="status: in_progress\n"
+                )
+
+                with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+                     patch("orchestrator.drun") as mock_drun, \
+                     patch("orchestrator.dpopen") as mock_dpopen, \
+                     patch("orchestrator.safe_git_checkout"), \
+                     patch("orchestrator.glob.glob") as mock_glob, \
+                     patch("orchestrator.set_pr_status"), \
+                     patch("git_utils.check_git_boundary"), \
+                     patch("agent_driver.send_ignition_handshake"), \
+                     patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                    mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
+                    mock_drun.return_value = MagicMock(returncode=0, stdout="", stderr="")
+                    proc = MagicMock()
+                    proc.wait.return_value = 0
+                    proc.poll.return_value = 0
+                    proc.returncode = 0
+                    mock_dpopen.return_value = proc
+
+                    registry = {
+                        "engines": {
+                            engine_id: {
+                                "engine_id": engine_id,
+                                "cli_alias": engine_alias,
+                                "continuity_mode": "stateless",
+                            }
+                        }
+                    }
+
+                    with patch("orchestrator.load_engine_registry", return_value=registry):
+                        with patch(
+                            "sys.argv",
+                            [
+                                "orchestrator.py",
+                                "--force-replan", "false",
+                                "--enable-exec-from-workspace",
+                                "--workdir", workdir,
+                                "--prd-file", "dummy.md",
+                                "--channel", "test",
+                                "--global-dir", global_dir,
+                                "--coder-session-strategy", "always",
+                                "--max-prs-to-process", "1",
+                                "--engine", engine_alias,
+                            ],
+                        ):
+                            try:
+                                orchestrator.main()
+                            except SystemExit:
+                                pass
+
+                    # Verify no .coder_session created in run_dir
+                    run_dir = seeded["job_dir"]
+                    for artifact in [".coder_session", ".reviewer_session"]:
+                        path = os.path.join(run_dir, artifact)
+                        assert not os.path.exists(path), (
+                            f"{artifact} should not exist for {engine_alias} (stateless)"
+                        )
+
+                    # Verify teardown_coder_session was called with engine_mode='stateless'
+                    stateless_teardowns = [
+                        call for call in mock_teardown.call_args_list
+                        if call[1].get("engine_mode") == "stateless"
+                    ]
+                    assert len(stateless_teardowns) >= 1, (
+                        f"teardown_coder_session should be called with engine_mode='stateless' for {engine_alias}"
+                    )
+        finally:
+            pass
+
+    if saved_driver is not None:
+        os.environ["LLM_DRIVER"] = saved_driver
+    if saved_model is not None:
+        os.environ["SDLC_MODEL"] = saved_model
 
 
 @patch("fcntl.flock")

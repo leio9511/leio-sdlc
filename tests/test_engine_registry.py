@@ -353,6 +353,52 @@ def test_agy_direct_cli_default_entry_validates():
     assert agy["capability_surface"] == "client_mediated"
 
 
+def test_future_direct_cli_fixture_validates_as_stateless(tmp_path):
+    """PR-006 TC4: A synthetic direct CLI engine with cli_alias,
+    runtime_mode=direct_cli, continuity_mode=stateless,
+    fallback_policy=fail_closed, and a minimal valid execution subsection
+    validates and resolves without code changes."""
+    sdlc_root = str(tmp_path)
+    cfg = get_default_config()
+    cfg["engines"]["future_direct_cli"] = {
+        "engine_id": "future_direct_cli",
+        "cli_alias": "future-cli",
+        "display_name": "Future Direct CLI Engine",
+        "runtime_mode": "direct_cli",
+        "registration_visibility": "public",
+        "continuity_mode": "stateless",
+        "handle_acquisition_strategy": "unavailable",
+        "fallback_policy": "fail_closed",
+        "capability_surface": "client_mediated",
+        "execution": {
+            "executable": "future-cli",
+            "one_shot_args": ["--generate"],
+            "model_arg": None,
+            "workspace_arg": None,
+            "permission_args": [],
+            "sandbox_args": [],
+            "timeout_seconds": 120,
+            "env_extra": {}
+        }
+    }
+    create_config(sdlc_root, "engines.default.json", cfg)
+
+    registry = load_engine_registry(sdlc_root)
+    assert "future_direct_cli" in registry["engines"]
+    future = registry["engines"]["future_direct_cli"]
+    assert future["runtime_mode"] == "direct_cli"
+    assert future["continuity_mode"] == "stateless"
+    assert future["fallback_policy"] == "fail_closed"
+    assert future["cli_alias"] == "future-cli"
+    assert future["capability_surface"] == "client_mediated"
+
+    # Verify alias resolution works from the registry
+    from engine_registry import build_spawner_engine_choices
+    choices, alias_to_id, default_alias = build_spawner_engine_choices(registry)
+    assert "future-cli" in choices
+    assert alias_to_id["future-cli"] == "future_direct_cli"
+
+
 def test_malformed_json_unquoted(tmp_path):
     sdlc_root = str(tmp_path)
     create_config(sdlc_root, "engines.default.json", get_default_config())

@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import tempfile
+import subprocess
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -215,6 +216,171 @@ def test_resume_works_after_slicing_crash():
 
 # ---------------------------------------------------------------------------
 # Test Case 3: run_manifest.json schema validation
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# PR-006 TC1: OpenClaw native full flow session semantics unchanged
+# ---------------------------------------------------------------------------
+def test_openclaw_native_full_flow_session_semantics_unchanged():
+    """PR-006 TC1: Mocked OpenClaw-native flow still passes and writes/uses the
+    same stateful artifacts as before.
+
+    Verifies:
+    - spawn_coder.py and spawn_reviewer.py are invoked for stateful engines
+    - spawn_reviewer.py does NOT receive --inline-alert for stateful engines
+    - The orchestrator flow completes without FATAL errors
+    """
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
+
+    with tempfile.TemporaryDirectory() as td:
+        workdir = os.path.join(td, "workdir")
+        global_dir = os.path.join(td, "global")
+        os.makedirs(workdir)
+        os.makedirs(os.path.join(workdir, ".git"))
+        os.makedirs(global_dir)
+        prd_file = os.path.join(td, "dummy_prd.md")
+        with open(prd_file, "w") as f:
+            f.write("# Dummy PRD")
+
+        target_project_name = os.path.basename(os.path.abspath(workdir))
+        base_name = os.path.splitext(os.path.basename(prd_file))[0]
+        job_dir = os.path.abspath(os.path.join(global_dir, ".sdlc_runs", target_project_name, base_name))
+        os.makedirs(job_dir, exist_ok=True)
+
+        # Pre-seed PR file (planner already ran) with proper YAML frontmatter
+        with open(os.path.join(job_dir, "PR_001.md"), "w") as f:
+            f.write("---\nstatus: in_progress\n---\n\n# PR 001\n\nTest PR content.\n")
+
+        run_call_count = 0
+        dpopen_calls = []
+
+        def fake_drun(cmd, **kwargs):
+            nonlocal run_call_count
+            run_call_count += 1
+            res = MagicMock()
+            res.returncode = 0
+            res.stdout = ""
+            res.stderr = ""
+            cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
+            if "rev-parse HEAD" in cmd_str:
+                # After first coder run, return a different hash to simulate
+                # the coder having made a commit
+                coder_runs = sum(1 for c in dpopen_calls if "spawn_coder.py" in " ".join(c["cmd"]))
+                if coder_runs > 0:
+                    res.stdout = "newhash0123456789abcdef98765433210fed\n"
+                else:
+                    res.stdout = "openclawdeadbeef0123456789abcdef9876ba\n"
+            elif "status --porcelain" in cmd_str:
+                coder_runs = sum(1 for c in dpopen_calls if "spawn_coder.py" in " ".join(c["cmd"]))
+                if coder_runs > 0:
+                    res.stdout = ""  # coder left clean workspace
+                else:
+                    res.stdout = ""
+            elif "branch" in cmd_str:
+                res.stdout = "master\n"
+            elif "show-ref" in cmd_str:
+                res.returncode = 1  # branch doesn't exist, create new
+            elif "merge-base --is-ancestor" in cmd_str:
+                res.returncode = 0
+            elif "doctor.py" in cmd_str:
+                res.stdout = "deadbeef"
+                res.returncode = 0
+            elif "merge_code.py" in cmd_str:
+                res.returncode = 0
+            elif "preflight.sh" in cmd_str:
+                res.returncode = 0
+            return res
+
+        def fake_dpopen(cmd, **kwargs):
+            dpopen_calls.append({"cmd": cmd})
+            proc = MagicMock()
+            cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
+
+            if "spawn_coder.py" in cmd_str:
+                run_dir_target = None
+                for i, arg in enumerate(cmd):
+                    if arg == "--run-dir" and i + 1 < len(cmd):
+                        run_dir_target = cmd[i + 1]
+                        break
+                if run_dir_target:
+                    # Create a dummy file change so the coder appears productive
+                    temp_file = os.path.join(run_dir_target, "coder_output.txt")
+                    with open(temp_file, "w") as cf:
+                        cf.write("coder produced output")
+                    with open(os.path.join(run_dir_target, ".coder_session"), "w") as cf:
+                        cf.write("test-openclaw-session-key")
+
+            if "spawn_reviewer.py" in cmd_str:
+                run_dir_target = None
+                out_file_target = None
+                for i, arg in enumerate(cmd):
+                    if arg == "--run-dir" and i + 1 < len(cmd):
+                        run_dir_target = cmd[i + 1]
+                    if arg == "--out-file" and i + 1 < len(cmd):
+                        out_file_target = cmd[i + 1]
+                if out_file_target and run_dir_target:
+                    out_path = os.path.join(run_dir_target, out_file_target)
+                    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+                    with open(out_path, "w") as rf:
+                        json.dump({
+                            "overall_assessment": "EXCELLENT",
+                            "executive_summary": "All good",
+                            "findings": []
+                        }, rf)
+
+            proc.wait.return_value = 0
+            proc.poll.return_value = 0
+            proc.returncode = 0
+            return proc
+
+        test_args = [
+            "orchestrator.py",
+            "--workdir", workdir,
+            "--global-dir", global_dir,
+            "--prd-file", prd_file,
+            "--force-replan", "false",
+            "--enable-exec-from-workspace",
+            "--channel", "test",
+            "--max-prs-to-process", "1",
+            "--coder-session-strategy", "always",
+            "--engine", "openclaw",
+        ]
+
+        with patch("sys.argv", test_args), \
+             patch("orchestrator.drun", side_effect=fake_drun), \
+             patch("orchestrator.dpopen", side_effect=fake_dpopen), \
+             patch("orchestrator.safe_git_checkout"), \
+             patch("orchestrator.notify_channel"), \
+             patch("git_utils.check_git_boundary"), \
+             patch("agent_driver.send_ignition_handshake"), \
+             patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+            exit_code = 0
+            try:
+                orchestrator.main()
+            except SystemExit as e:
+                exit_code = e.code or 0
+
+        # Core assertions
+        # spawn_coder.py must have been invoked
+        coder_calls = [c for c in dpopen_calls if "spawn_coder.py" in " ".join(c["cmd"])]
+        assert len(coder_calls) > 0, "spawn_coder.py should have been invoked for openclaw native"
+
+        # spawn_reviewer.py must have been invoked
+        reviewer_calls = [c for c in dpopen_calls if "spawn_reviewer.py" in " ".join(c["cmd"])]
+        assert len(reviewer_calls) > 0, "spawn_reviewer.py should have been invoked"
+
+        # For stateful engines, reviewer retry should NOT use --inline-alert
+        inline_alert_calls = [c for c in reviewer_calls if "--inline-alert" in c["cmd"]]
+        assert len(inline_alert_calls) == 0, (
+            "stateful engines should not use --inline-alert for reviewer retry"
+        )
+
+        # Normal exit (not FATAL)
+        assert exit_code == 0, f"Orchestrator should exit 0, got {exit_code}"
+
+
+# ---------------------------------------------------------------------------
+# TC: run_manifest.json schema validation
 # ---------------------------------------------------------------------------
 def test_manifest_json_schema():
     """

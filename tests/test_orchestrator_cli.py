@@ -94,6 +94,60 @@ class TestOrchestratorCLI(unittest.TestCase):
     import pytest
     
     
+    @patch.dict(os.environ, {"SDLC_BYPASS_BRANCH_CHECK": "1", "SDLC_TEST_MODE": "true"}, clear=False)
+    @patch("agent_driver._resolve_engine_spec")
+    def test_disabled_gemini_does_not_use_legacy_provider_branch(self, mock_resolve_engine_spec):
+        """PR-006 TC3: When gemini_direct_cli is absent/disabled in registry
+        fixture and LLM_DRIVER=gemini, execution fails closed with a clear
+        config/engine resolution error; no subprocess named 'gemini' is
+        launched through legacy code."""
+        import tempfile
+        import orchestrator
+        import agent_driver
+
+        # Simulate gemini_direct_cli NOT being in the registry (disabled/absent)
+        mock_resolve_engine_spec.side_effect = SystemExit(1)
+
+        with tempfile.TemporaryDirectory() as td:
+            workdir = os.path.join(td, "workdir")
+            global_dir = os.path.join(td, "global")
+            os.makedirs(workdir)
+            os.makedirs(os.path.join(workdir, ".git"))
+            os.makedirs(global_dir)
+            prd_file = os.path.join(td, "dummy.md")
+            with open(prd_file, "w") as f:
+                f.write("# Dummy PRD")
+
+            test_args = [
+                "orchestrator.py",
+                "--force-replan", "false",
+                "--enable-exec-from-workspace",
+                "--workdir", workdir,
+                "--prd-file", prd_file,
+                "--channel", "test",
+                "--global-dir", global_dir,
+                "--engine", "gemini",
+            ]
+
+            with patch("sys.argv", test_args), \
+                 patch("orchestrator.subprocess.run") as mock_run, \
+                 patch("orchestrator.subprocess.Popen") as mock_popen, \
+                 patch("orchestrator.safe_git_checkout"), \
+                 patch("orchestrator.glob.glob"), \
+                 patch("orchestrator.set_pr_status"), \
+                 patch("git_utils.check_git_boundary"), \
+                 patch("agent_driver.send_ignition_handshake"):
+                mock_run.return_value = MagicMock(returncode=0, stdout="deadbeef\n", stderr="")
+
+                with self.assertRaises(SystemExit) as cm:
+                    orchestrator.main()
+
+                # Must exit non-zero (fail closed)
+                self.assertNotEqual(cm.exception.code, 0)
+
+                # No subprocess.Popen should have been called at all (fail before subprocess)
+                mock_popen.assert_not_called()
+
     @patch("os.path.exists")
     @patch("subprocess.run")
     @patch("orchestrator.parse_affected_projects", return_value=[])
