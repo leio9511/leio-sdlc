@@ -81,59 +81,68 @@ def _mock_subprocess_run_for_strategy(spawn_coder_returncode=0):
 def _run_strategy_test(strategy: str, spawn_coder_returncode: int):
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
+    # Isolate from leaked LLM_DRIVER/SDLC_MODEL from other tests
+    saved_driver = os.environ.pop("LLM_DRIVER", None)
+    saved_model = os.environ.pop("SDLC_MODEL", None)
     import orchestrator
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        workdir = temp_dir
-        global_dir = temp_dir
-        os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
-        seeded = seed_planner_success_artifacts(
-            workdir,
-            global_dir,
-            prd_filename="dummy.md",
-            pr_slice_content="status: in_progress\n",
-        )
-
-        with patch("orchestrator.teardown_coder_session") as mock_teardown, \
-             patch("orchestrator.subprocess.run") as mock_run, \
-             patch("orchestrator.safe_git_checkout"), \
-             patch("orchestrator.glob.glob") as mock_glob, \
-             patch("orchestrator.set_pr_status"), \
-             patch("git_utils.check_git_boundary"), \
-             patch("agent_driver.send_ignition_handshake"), \
-             patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
-            mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
-            mock_run.side_effect = _mock_subprocess_run_for_strategy(
-                spawn_coder_returncode=spawn_coder_returncode
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workdir = temp_dir
+            global_dir = temp_dir
+            os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+            seeded = seed_planner_success_artifacts(
+                workdir,
+                global_dir,
+                prd_filename="dummy.md",
+                pr_slice_content="status: in_progress\n",
             )
 
-            with patch(
-                "sys.argv",
-                [
-                    "orchestrator.py",
-                    "--force-replan",
-                    "false",
-                    "--enable-exec-from-workspace",
-                    "--workdir",
-                    workdir,
-                    "--prd-file",
-                    "dummy.md",
-                    "--channel",
-                    "test",
-                    "--global-dir",
-                    global_dir,
-                    "--coder-session-strategy",
-                    strategy,
-                    "--max-prs-to-process",
-                    "1",
-                ],
-            ):
-                try:
-                    orchestrator.main()
-                except SystemExit:
-                    pass
+            with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+                 patch("orchestrator.subprocess.run") as mock_run, \
+                 patch("orchestrator.safe_git_checkout"), \
+                 patch("orchestrator.glob.glob") as mock_glob, \
+                 patch("orchestrator.set_pr_status"), \
+                 patch("git_utils.check_git_boundary"), \
+                 patch("agent_driver.send_ignition_handshake"), \
+                 patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
+                mock_run.side_effect = _mock_subprocess_run_for_strategy(
+                    spawn_coder_returncode=spawn_coder_returncode
+                )
 
-        mock_teardown.assert_called_with(workdir, ANY, engine_mode="stateful")
+                with patch(
+                    "sys.argv",
+                    [
+                        "orchestrator.py",
+                        "--force-replan",
+                        "false",
+                        "--enable-exec-from-workspace",
+                        "--workdir",
+                        workdir,
+                        "--prd-file",
+                        "dummy.md",
+                        "--channel",
+                        "test",
+                        "--global-dir",
+                        global_dir,
+                        "--coder-session-strategy",
+                        strategy,
+                        "--max-prs-to-process",
+                        "1",
+                    ],
+                ):
+                    try:
+                        orchestrator.main()
+                    except SystemExit:
+                        pass
+
+            mock_teardown.assert_called_with(workdir, ANY, engine_mode="stateful")
+    finally:
+        if saved_driver is not None:
+            os.environ["LLM_DRIVER"] = saved_driver
+        if saved_model is not None:
+            os.environ["SDLC_MODEL"] = saved_model
 
 
 @patch("fcntl.flock")
@@ -167,68 +176,76 @@ def test_stateless_coder_retry_does_not_teardown_or_create_coder_session(
     removed, or created during retry."""
     os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
     os.environ["SDLC_TEST_MODE"] = "true"
+    # Isolate from leaked LLM_DRIVER/SDLC_MODEL from other tests
+    saved_driver = os.environ.pop("LLM_DRIVER", None)
+    saved_model = os.environ.pop("SDLC_MODEL", None)
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workdir = tmp_dir
+            global_dir = tmp_dir
+            os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+            seeded = seed_planner_success_artifacts(
+                workdir, global_dir, prd_filename="dummy.md", pr_slice_content="status: in_progress\n"
+            )
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        workdir = tmp_dir
-        global_dir = tmp_dir
-        os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
-        seeded = seed_planner_success_artifacts(
-            workdir, global_dir, prd_filename="dummy.md", pr_slice_content="status: in_progress\n"
-        )
+            with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+                 patch("orchestrator.subprocess.run") as mock_run, \
+                 patch("orchestrator.subprocess.Popen") as mock_popen, \
+                 patch("orchestrator.safe_git_checkout"), \
+                 patch("orchestrator.glob.glob") as mock_glob, \
+                 patch("orchestrator.set_pr_status"), \
+                 patch("git_utils.check_git_boundary"), \
+                 patch("agent_driver.send_ignition_handshake"), \
+                 patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+                mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
+                mock_run.return_value = MagicMock(returncode=0, stdout="deadbeef\n", stderr="")
+                mock_popen.return_value = MagicMock()
+                mock_popen.return_value.wait.return_value = 0
+                mock_popen.return_value.poll.return_value = 0
 
-        with patch("orchestrator.teardown_coder_session") as mock_teardown, \
-             patch("orchestrator.subprocess.run") as mock_run, \
-             patch("orchestrator.subprocess.Popen") as mock_popen, \
-             patch("orchestrator.safe_git_checkout"), \
-             patch("orchestrator.glob.glob") as mock_glob, \
-             patch("orchestrator.set_pr_status"), \
-             patch("git_utils.check_git_boundary"), \
-             patch("agent_driver.send_ignition_handshake"), \
-             patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
-            mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
-            mock_run.return_value = MagicMock(returncode=0, stdout="deadbeef\n", stderr="")
-            mock_popen.return_value = MagicMock()
-            mock_popen.return_value.wait.return_value = 0
-            mock_popen.return_value.poll.return_value = 0
+                # Override region: mock the continuity_mode to be stateless
+                mock_run.side_effect = _mock_subprocess_run_for_strategy(spawn_coder_returncode=0)
 
-            # Override region: mock the continuity_mode to be stateless
-            mock_run.side_effect = _mock_subprocess_run_for_strategy(spawn_coder_returncode=0)
-
-            with patch("orchestrator.load_engine_registry", return_value={
-                "engines": {
-                    "openclaw_native": {
-                        "engine_id": "openclaw_native",
-                        "cli_alias": "openclaw",
-                        "continuity_mode": "stateless",
+                with patch("orchestrator.load_engine_registry", return_value={
+                    "engines": {
+                        "openclaw_native": {
+                            "engine_id": "openclaw_native",
+                            "cli_alias": "openclaw",
+                            "continuity_mode": "stateless",
+                        }
                     }
-                }
-            }):
-                with patch(
-                    "sys.argv",
-                    [
-                        "orchestrator.py",
-                        "--force-replan", "false",
-                        "--enable-exec-from-workspace",
-                        "--workdir", workdir,
-                        "--prd-file", "dummy.md",
-                        "--channel", "test",
-                        "--global-dir", global_dir,
-                        "--coder-session-strategy", "always",
-                        "--max-prs-to-process", "1",
-                    ],
-                ):
-                    try:
-                        orchestrator.main()
-                    except SystemExit:
-                        pass
+                }):
+                    with patch(
+                        "sys.argv",
+                        [
+                            "orchestrator.py",
+                            "--force-replan", "false",
+                            "--enable-exec-from-workspace",
+                            "--workdir", workdir,
+                            "--prd-file", "dummy.md",
+                            "--channel", "test",
+                            "--global-dir", global_dir,
+                            "--coder-session-strategy", "always",
+                            "--max-prs-to-process", "1",
+                        ],
+                    ):
+                        try:
+                            orchestrator.main()
+                        except SystemExit:
+                            pass
 
-            # For stateless engines, teardown_coder_session should be called with
-            # engine_mode='stateless', which is a no-op internally.
-            # We verify that the call uses engine_mode='stateless'.
-            for call_arg in mock_teardown.call_args_list:
-                kwargs = call_arg[1] if len(call_arg) > 1 else {}
-                if kwargs.get("engine_mode"):
-                    assert kwargs["engine_mode"] == "stateless"
+                # For stateless engines, teardown_coder_session should be called with
+                # engine_mode='stateless', which is a no-op internally.
+                # We verify that the call uses engine_mode='stateless'.
+                for call_arg in mock_teardown.call_args_list:
+                    kwargs = call_arg[1] if len(call_arg) > 1 else {}
+                    if kwargs.get("engine_mode"):
+                        assert kwargs["engine_mode"] == "stateless"
+    finally:
+        if saved_driver is not None:
+            os.environ["LLM_DRIVER"] = saved_driver
+        if saved_model is not None:
+            os.environ["SDLC_MODEL"] = saved_model
 
 
 @patch("fcntl.flock")
