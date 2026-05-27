@@ -2,20 +2,22 @@
   "engines": {
     "openclaw_native": {
       "engine_id": "openclaw_native",
+      "cli_alias": "openclaw",
       "display_name": "OpenClaw Native",
       "runtime_mode": "openclaw_native",
       "registration_visibility": "public",
-      "continuity_mode": "authoritative_resume",
+      "continuity_mode": "stateful",
       "handle_acquisition_strategy": "unavailable",
       "fallback_policy": "none",
       "capability_surface": "runtime_managed"
     },
     "gemini_direct_cli": {
       "engine_id": "gemini_direct_cli",
+      "cli_alias": "gemini",
       "display_name": "Gemini Direct CLI",
       "runtime_mode": "direct_cli",
       "registration_visibility": "public",
-      "continuity_mode": "unsupported",
+      "continuity_mode": "stateless",
       "handle_acquisition_strategy": "unavailable",
       "fallback_policy": "legacy_direct_cli",
       "capability_surface": "engine_managed"
@@ -25,7 +27,7 @@
       "display_name": "Gemini ACP Reference",
       "runtime_mode": "acp",
       "registration_visibility": "public",
-      "continuity_mode": "authoritative_resume",
+      "continuity_mode": "stateful",
       "handle_acquisition_strategy": "protocol_native",
       "fallback_policy": "fail_closed_until_prerequisite_ready",
       "capability_surface": "client_mediated"

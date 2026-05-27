@@ -216,6 +216,11 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
         
     # Determine LLM driver
         llm_driver = os.environ.get("LLM_DRIVER", "openclaw").lower()
+        llm_driver_aliases = {
+            "openclaw_native": "openclaw",
+            "gemini_direct_cli": "gemini",
+        }
+        llm_driver = llm_driver_aliases.get(llm_driver, llm_driver)
         
         # Check session map
         session_map_file = os.path.join(temp_dir, f".session_map_{session_key}.json")

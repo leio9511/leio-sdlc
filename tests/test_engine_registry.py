@@ -16,20 +16,22 @@ def get_default_config():
         "engines": {
             "openclaw_native": {
                 "engine_id": "openclaw_native",
+                "cli_alias": "openclaw",
                 "display_name": "OpenClaw Native",
                 "runtime_mode": "openclaw_native",
                 "registration_visibility": "public",
-                "continuity_mode": "authoritative_resume",
+                "continuity_mode": "stateful",
                 "handle_acquisition_strategy": "unavailable",
                 "fallback_policy": "none",
                 "capability_surface": "runtime_managed"
             },
             "gemini_direct_cli": {
                 "engine_id": "gemini_direct_cli",
+                "cli_alias": "gemini",
                 "display_name": "Gemini Direct CLI",
                 "runtime_mode": "direct_cli",
                 "registration_visibility": "public",
-                "continuity_mode": "unsupported",
+                "continuity_mode": "stateless",
                 "handle_acquisition_strategy": "unavailable",
                 "fallback_policy": "legacy_direct_cli",
                 "capability_surface": "engine_managed"
@@ -70,7 +72,7 @@ def test_pure_default_loading(tmp_path):
     registry = load_engine_registry(sdlc_root)
     assert "engines" in registry
     assert "openclaw_native" in registry["engines"]
-    assert registry["engines"]["openclaw_native"]["continuity_mode"] == "authoritative_resume"
+    assert registry["engines"]["openclaw_native"]["continuity_mode"] == "stateful"
 
 def test_shallow_merge_overrides(tmp_path):
     sdlc_root = str(tmp_path)
@@ -85,7 +87,7 @@ def test_shallow_merge_overrides(tmp_path):
                 "engine_id": "private_claw",
                 "display_name": "Private Claw",
                 "runtime_mode": "acp",
-                "continuity_mode": "unsupported",
+                "continuity_mode": "stateless",
                 "handle_acquisition_strategy": "explicit_returned_handle",
                 "fallback_policy": "none",
                 "capability_surface": "private_surface"
@@ -99,7 +101,7 @@ def test_shallow_merge_overrides(tmp_path):
     # Overridden field
     assert registry["engines"]["openclaw_native"]["capability_surface"] == "overridden_surface"
     # Inherited field
-    assert registry["engines"]["openclaw_native"]["continuity_mode"] == "authoritative_resume"
+    assert registry["engines"]["openclaw_native"]["continuity_mode"] == "stateful"
     
     # New engine
     assert "private_claw" in registry["engines"]
@@ -144,7 +146,7 @@ def test_outer_key_mismatch(tmp_path):
                 "engine_id": "private_claw",
                 "display_name": "Private Claw",
                 "runtime_mode": "acp",
-                "continuity_mode": "unsupported",
+                "continuity_mode": "stateless",
                 "handle_acquisition_strategy": "explicit_returned_handle",
                 "fallback_policy": "none",
                 "capability_surface": "private_surface"
@@ -183,7 +185,7 @@ def test_visibility_constraints(tmp_path):
                 "display_name": "Private Claw",
                 "runtime_mode": "acp",
                 "registration_visibility": "public",
-                "continuity_mode": "unsupported",
+                "continuity_mode": "stateless",
                 "handle_acquisition_strategy": "explicit_returned_handle",
                 "fallback_policy": "none",
                 "capability_surface": "private_surface"
@@ -297,6 +299,44 @@ def test_malformed_json_escaped_quotes(tmp_path):
     error_msg = str(exc_info.value)
     assert "/secret_corp/\\\"escaped\\\"" not in error_msg
     assert "[REDACTED]" in error_msg
+
+
+def test_continuity_mode_accepts_only_stateful_or_stateless(tmp_path):
+    sdlc_root = str(tmp_path)
+    for valid_mode in ("stateful", "stateless"):
+        cfg = get_default_config()
+        cfg["engines"]["openclaw_native"]["continuity_mode"] = valid_mode
+        create_config(sdlc_root, "engines.default.json", cfg)
+        registry = load_engine_registry(sdlc_root)
+        assert registry["engines"]["openclaw_native"]["continuity_mode"] == valid_mode
+
+    for legacy_mode in ("mapped_resume", "degraded_resume", "authoritative_resume", "unsupported"):
+        cfg = get_default_config()
+        cfg["engines"]["openclaw_native"]["continuity_mode"] = legacy_mode
+        create_config(sdlc_root, "engines.default.json", cfg)
+        with pytest.raises(RegistryValidationError) as exc_info:
+            load_engine_registry(sdlc_root)
+        assert str(exc_info.value).startswith("[FATAL] Engine Registry validation failed.")
+        assert legacy_mode in str(exc_info.value)
+
+
+def test_default_engine_registry_uses_new_continuity_modes():
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    registry = load_engine_registry(repo_root)
+    legacy_modes = {"mapped_resume", "degraded_resume", "authoritative_resume", "unsupported"}
+    modes = {entry["continuity_mode"] for entry in registry["engines"].values()}
+    assert modes <= {"stateful", "stateless"}
+    assert not modes & legacy_modes
+
+
+def test_fallback_policy_accepts_fail_closed(tmp_path):
+    sdlc_root = str(tmp_path)
+    cfg = get_default_config()
+    cfg["engines"]["gemini_direct_cli"]["fallback_policy"] = "fail_closed"
+    create_config(sdlc_root, "engines.default.json", cfg)
+    registry = load_engine_registry(sdlc_root)
+    assert registry["engines"]["gemini_direct_cli"]["fallback_policy"] == "fail_closed"
+
 
 def test_malformed_json_unquoted(tmp_path):
     sdlc_root = str(tmp_path)

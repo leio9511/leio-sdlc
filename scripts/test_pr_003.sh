@@ -53,8 +53,8 @@ set +e
 unset LLM_DRIVER
 OUTPUT=$("$DEV_PYTHON" "${PROJECT_ROOT}/scripts/orchestrator.py" --enable-exec-from-workspace --workdir "$(pwd)" --prd-file docs/PRDs/dummy.md --force-replan false --channel "valid:id" 2>&1)
 set -e
-if ! echo "$OUTPUT" | grep -q 'Engine: gemini'; then
-    echo "❌ Test Case 3 Failed: Engine didn't default to gemini."
+if ! echo "$OUTPUT" | grep -q 'Engine: openclaw'; then
+    echo "❌ Test Case 3 Failed: Engine didn't default to openclaw."
     exit 1
 fi
 

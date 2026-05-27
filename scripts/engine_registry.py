@@ -75,9 +75,13 @@ REQUIRED_ENGINE_FIELDS = [
 
 ALLOWED_REGISTRATION_VISIBILITY_VALUES = {"public", "local_private"}
 ALLOWED_RUNTIME_MODE_VALUES = {"openclaw_native", "direct_cli", "acp"}
-ALLOWED_CONTINUITY_MODE_VALUES = {"authoritative_resume", "unsupported"}
+# continuity_mode (str): "stateful" - engine natively returns a stable, authoritative,
+# non-heuristic continuation handle with contractual guarantees.
+# "stateless" - every invocation is independent one-shot; any continuation is
+# provided by the orchestrator through explicit context injection.
+ALLOWED_CONTINUITY_MODE_VALUES = {"stateful", "stateless"}
 ALLOWED_HANDLE_ACQUISITION_STRATEGY_VALUES = {"protocol_native", "explicit_returned_handle", "unavailable"}
-ALLOWED_FALLBACK_POLICY_VALUES = {"none", "legacy_direct_cli", "fail_closed_until_prerequisite_ready"}
+ALLOWED_FALLBACK_POLICY_VALUES = {"none", "legacy_direct_cli", "fail_closed_until_prerequisite_ready", "fail_closed"}
 
 def _scrub_config(data):
     if isinstance(data, dict):

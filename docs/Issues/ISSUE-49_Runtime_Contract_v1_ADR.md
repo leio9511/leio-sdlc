@@ -51,7 +51,7 @@ These belong in local registry or adapter configuration layers, not in the core 
   "registration_mode": "public_builtin | local_override_only",
   "runtime_mode": "openclaw_native | direct_cli | acp",
 
-  "continuity_mode": "authoritative_resume | mapped_resume | degraded_resume | stateless_only",
+  "continuity_mode": "stateful | stateless",
   "resume_requires_same_runtime_state": true,
 
   "fallback_policy": "fail_closed | fallback_to_stateless | fallback_to_legacy_runtime | disallowed",
@@ -77,11 +77,9 @@ These belong in local registry or adapter configuration layers, not in the core 
   - `direct_cli`: launched as a direct CLI/subprocess integration.
   - `acp`: integrated through ACP/protocol-style adapter flow.
 - `continuity_mode`
-  - Declares the strength of continuation semantics.
-  - `authoritative_resume`: runtime provides a first-class, trusted resume mechanism.
-  - `mapped_resume`: resume works via external/local mapping rather than purely native continuity.
-  - `degraded_resume`: some continuation is possible, but semantics are weaker or lossy.
-  - `stateless_only`: no meaningful resume/continuation guarantee.
+  - Declares whether continuation is contractually native or supplied explicitly by orchestrator context.
+  - `stateful`: engine natively returns a stable, authoritative, non-heuristic continuation handle with contractual guarantees.
+  - `stateless`: every invocation is an independent one-shot; continuation must be supplied explicitly by orchestrator context.
 - `resume_requires_same_runtime_state`
   - Whether resume depends on retained local/runtime state beyond merely possessing a handle.
 - `fallback_policy`

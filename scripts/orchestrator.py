@@ -25,11 +25,14 @@ from runtime_launch_guard import is_authorized_runtime_launch
 from utils_json import extract_and_parse_json
 
 MAX_RUNTIME = int(os.environ.get("SDLC_TIMEOUT", 3600)) # 60 minutes default
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(MODULE_DIR)
 
 import json
 from resume_state import read_resume_state, write_resume_state, get_baseline_commit
 import config
 from config import load_or_merge_config
+from engine_registry import load_engine_registry
 from utils_path import resolve_global_dir, get_canonical_job_dir
 
 
@@ -309,6 +312,41 @@ class SanityContext:
             print("[FATAL_METADATA] Current Git HEAD is not reachable from the baseline hash.")
             sys.exit(1)
 
+def load_engine_registry_for_orchestrator(sdlc_root):
+    try:
+        return load_engine_registry(sdlc_root)
+    except Exception:
+        repo_root = REPO_ROOT
+        if os.path.abspath(repo_root) == os.path.abspath(sdlc_root):
+            raise
+        return load_engine_registry(repo_root)
+
+
+def build_engine_cli_alias_map(engine_registry):
+    alias_map = {}
+    for engine_id, entry in engine_registry.get("engines", {}).items():
+        if not isinstance(entry, dict):
+            continue
+        resolved_engine_id = entry.get("engine_id", engine_id)
+        cli_name = entry.get("cli_alias") or resolved_engine_id
+        alias_map[cli_name] = resolved_engine_id
+    return alias_map
+
+
+def build_engine_cli_choices(engine_registry):
+    return list(build_engine_cli_alias_map(engine_registry).keys())
+
+
+def resolve_engine_id(engine_value, engine_registry):
+    return build_engine_cli_alias_map(engine_registry).get(engine_value, engine_value)
+
+
+def resolve_engine_cli_alias(engine_value, engine_registry):
+    engine_id = resolve_engine_id(engine_value, engine_registry)
+    entry = engine_registry.get("engines", {}).get(engine_id, {})
+    return entry.get("cli_alias") or engine_id
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--workdir", required=True)
@@ -332,7 +370,12 @@ def main():
     parser.add_argument("--split", action="store_true", help="Split the current blocked PR into smaller tasks as defined by the active PR state.")
     parser.add_argument("--withdraw", action="store_true", help="Atomic State Restoration and Withdrawal. Use this flag if the user's intent is to 'withdraw', 'rollback', or 'cancel' the entire PRD execution.")
     parser.add_argument("--debug", action="store_true", help="Enable debug trace logs")
-    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
+    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
+    sdlc_root = os.path.dirname(RUNTIME_DIR)
+    engine_registry = load_engine_registry_for_orchestrator(sdlc_root)
+    engine_choices = build_engine_cli_choices(engine_registry)
+    default_engine = resolve_engine_cli_alias(os.environ.get("LLM_DRIVER", "openclaw"), engine_registry)
+    parser.add_argument("--engine", choices=engine_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
     args = parser.parse_args()
     from thinking_resolver import resolve_thinking
@@ -342,19 +385,17 @@ def main():
         print(HandoffPrompter.get_prompt("startup_validation_failed"))
         sys.exit(1)
     
-    if isinstance(args.engine, str) and args.engine != os.environ.get("LLM_DRIVER"):
-        os.environ["LLM_DRIVER"] = args.engine
+    resolved_engine_id = resolve_engine_id(args.engine, engine_registry)
+    os.environ["LLM_DRIVER"] = args.engine
     if isinstance(args.model, str) and args.model != os.environ.get("SDLC_MODEL"):
         os.environ["SDLC_MODEL"] = args.model
 
-    execution_log_msg = f"Orchestrator Engine Configured -> Engine: {args.engine}, Model: {args.model}"
+    execution_log_msg = f"Orchestrator Engine Configured -> Engine: {args.engine} ({resolved_engine_id}), Model: {args.model}"
     print(execution_log_msg)
 
     # Store debug mode in the application's configuration state
     os.environ["SDLC_DEBUG_MODE"] = "1" if args.debug else "0"
 
-    RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
-    sdlc_root = os.path.dirname(RUNTIME_DIR)
     app_config = load_or_merge_config(sdlc_root)
     gemini_api_keys = app_config.get('gemini_api_keys', [])
     

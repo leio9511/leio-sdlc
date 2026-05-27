@@ -32,6 +32,31 @@ class TestOrchestratorCLI(unittest.TestCase):
             orchestrator.main()
         self.assertNotEqual(cm.exception.code, 0)
 
+    def test_engine_choices_are_built_from_registry_aliases(self):
+        import orchestrator
+        registry = {
+            "engines": {
+                "openclaw_native": {"engine_id": "openclaw_native", "cli_alias": "openclaw"},
+                "gemini_direct_cli": {"engine_id": "gemini_direct_cli", "cli_alias": "gemini"},
+                "custom_direct_cli": {"engine_id": "custom_direct_cli"},
+            }
+        }
+        choices = orchestrator.build_engine_cli_choices(registry)
+        self.assertEqual(choices, ["openclaw", "gemini", "custom_direct_cli"])
+
+    def test_engine_alias_resolves_to_engine_id(self):
+        import orchestrator
+        registry = {
+            "engines": {
+                "openclaw_native": {"engine_id": "openclaw_native", "cli_alias": "openclaw"},
+                "gemini_direct_cli": {"engine_id": "gemini_direct_cli", "cli_alias": "gemini"},
+                "custom_direct_cli": {"engine_id": "custom_direct_cli"},
+            }
+        }
+        self.assertEqual(orchestrator.resolve_engine_id("openclaw", registry), "openclaw_native")
+        self.assertEqual(orchestrator.resolve_engine_id("gemini", registry), "gemini_direct_cli")
+        self.assertEqual(orchestrator.resolve_engine_id("custom_direct_cli", registry), "custom_direct_cli")
+
     @patch("agent_driver.notify_channel")
     def test_notify_channel_parsing(self, mock_notify):
         import orchestrator
