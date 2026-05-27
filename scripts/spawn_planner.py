@@ -11,7 +11,13 @@ import subprocess
 import uuid
 import re
 
+from engine_registry import load_engine_registry, build_spawner_engine_choices
+
 def main():
+    SDLC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    engine_reg = load_engine_registry(SDLC_ROOT)
+    dynamic_choices, engine_alias_map, default_engine = build_spawner_engine_choices(engine_reg)
+
     parser = argparse.ArgumentParser(description="Spawn Planner Agent")
     parser.add_argument("--prd-file", required=True, help="Path to the PRD file")
     parser.add_argument("--run-dir", required=False, default=None, help="Absolute path to the isolated execution directory")
@@ -20,8 +26,8 @@ def main():
     parser.add_argument("--slice-failed-pr", required=False, default=None, help="Path to a failed PR file to slice")
     parser.add_argument("--replan-uat-failures", required=False, default=None, help="Path to a UAT report JSON file")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates")
-    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
-    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
+    parser.add_argument("--engine", choices=dynamic_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model override for the selected engine (default: {config.DEFAULT_GEMINI_MODEL})")
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument(
         "--thinking",
@@ -204,7 +210,7 @@ def main():
         import time
         print("Calling OpenClaw real API...")
         session_id = f"subtask-{uuid.uuid4().hex[:8]}"
-        result = invoke_agent(task_string, session_key=session_id, role="planner", thinking=resolved_thinking)
+        result = invoke_agent(task_string, session_key=session_id, role="planner", run_dir=args.run_dir or args.out_dir, workdir=workdir, thinking=resolved_thinking)
 
 if __name__ == "__main__":
     main()

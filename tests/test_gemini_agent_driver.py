@@ -404,7 +404,7 @@ class TestGeminiAgentDriver(unittest.TestCase):
                         side_effect=fake_popen_factory("agy success", "", 0, popen_calls),
                     ):
                         with stdlib_tempfile.TemporaryDirectory() as workdir:
-                            result = invoke_agent("test task", session_key="test-agy", run_dir=workdir)
+                            result = invoke_agent("test task", session_key="test-agy", run_dir=workdir, workdir=workdir)
 
         self.assertIsInstance(result, AgentResult)
         self.assertEqual(result.stdout, "agy success")
@@ -436,7 +436,7 @@ class TestGeminiAgentDriver(unittest.TestCase):
                             "agent_driver.subprocess.Popen",
                             side_effect=fake_popen_factory("agy ok", "", 0, popen_calls),
                         ):
-                            invoke_agent("test task", session_key="capture-agy", run_dir=run_dir)
+                            invoke_agent("test task", session_key="capture-agy", run_dir=run_dir, workdir=run_dir)
 
             # No session_map_* files
             tmp_dir = os.path.join(run_dir, ".tmp")

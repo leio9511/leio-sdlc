@@ -45,13 +45,13 @@
       "execution": {
         "executable": "agy",
         "one_shot_args": ["--print"],
-        "model_arg": {"flag": "--model", "value": "{model}"},
+        "model_arg": null,
         "workspace_arg": {"flag": "--add-dir", "value": "{workdir}"},
         "permission_args": ["--dangerously-skip-permissions"],
         "sandbox_args": ["--sandbox"],
         "timeout_seconds": 300,
         "env_extra": {},
-        "default_model": "auto"
+        "default_model": null
       }
     },
     "gemini_acp_reference": {

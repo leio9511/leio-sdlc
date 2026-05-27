@@ -15,14 +15,20 @@ from agent_driver import invoke_agent, build_prompt
 import envelope_assembler
 from thinking_resolver import resolve_thinking
 
+from engine_registry import load_engine_registry, build_spawner_engine_choices
+
 def main():
+    SDLC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    engine_reg = load_engine_registry(SDLC_ROOT)
+    dynamic_choices, engine_alias_map, default_engine = build_spawner_engine_choices(engine_reg)
+    
     parser = argparse.ArgumentParser(description="Spawn an Auditor agent.")
     parser.add_argument("--prd-file", required=True, help="Path to the PRD file")
     parser.add_argument("--workdir", required=True, help="Working directory lock")
     parser.add_argument("--channel", required=True, help="Notification channel")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
-    parser.add_argument("--engine", choices=["openclaw", "gemini"], default=os.environ.get("LLM_DRIVER", config.DEFAULT_LLM_ENGINE), help=f"Execution engine to use for the agent driver (default: {config.DEFAULT_LLM_ENGINE})")
-    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
+    parser.add_argument("--engine", choices=dynamic_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model override for the selected engine (default: {config.DEFAULT_GEMINI_MODEL})")
     parser.add_argument(
         "--thinking",
         choices=["low", "medium", "high", "xhigh"],
@@ -95,7 +101,7 @@ def main():
         print("REJECTED: The PRD mentions specific text/messages but fails to list them in 'Section 7. Hardcoded Content'. Ensure Coder has no room for hallucination.")
         sys.exit(0)
 
-    SDLC_ROOT = os.path.dirname(current_dir)
+    SDLC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     run_dir = os.environ.get("SDLC_RUN_DIR")
     if not run_dir:
         from utils_path import resolve_global_dir, get_canonical_job_dir
@@ -149,7 +155,7 @@ def main():
     else:
         print(f"🚀 Launching Agentic PRD Auditor on {args.prd_file}...")
         session_id = f"prd_auditor_{int(time.time())}"
-        result = invoke_agent(task_string, session_key=session_id, role="auditor", thinking=resolved_thinking)
+        result = invoke_agent(task_string, session_key=session_id, role="auditor", run_dir=run_dir, workdir=workdir, thinking=resolved_thinking)
         output = result.stdout
 
     stdout_status = "UNKNOWN"

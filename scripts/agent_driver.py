@@ -300,7 +300,7 @@ def _assemble_direct_cli_command(engine_spec, secure_msg, workdir, model):
 # Core agent invocation
 # ---------------------------------------------------------------------------
 
-def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinking: str | None = None):
+def invoke_agent(task_string, session_key=None, role=None, run_dir=None, workdir=None, thinking: str | None = None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
     Uses the engine registry to route between openclaw_native (stateful) and direct_cli (stateless).
@@ -322,10 +322,8 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
 
     if run_dir and os.path.exists(run_dir):
         temp_dir = os.path.join(run_dir, ".tmp")
-        workdir = run_dir
     else:
         temp_dir = tempfile.gettempdir()
-        workdir = temp_dir
     os.makedirs(temp_dir, exist_ok=True)
 
     fd, path = tempfile.mkstemp(suffix=".txt", prefix=f"sdlc_prompt_{session_key}_", dir=temp_dir, text=True)
@@ -352,13 +350,21 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
         engine_spec = _resolve_engine_spec(sdlc_root, llm_driver_raw)
         runtime_mode = engine_spec["runtime_mode"]
 
+        execution = engine_spec.get("execution", {}) if isinstance(engine_spec, dict) else {}
+        workspace_arg = execution.get("workspace_arg") if isinstance(execution, dict) else None
+        if runtime_mode == "direct_cli" and workspace_arg and not workdir:
+            print("[FATAL] direct_cli engine with workspace_arg requires explicit workdir", file=sys.stderr)
+            sys.exit(1)
+
+        cli_workdir = workdir or temp_dir
+
         session_map_file = os.path.join(temp_dir, f".session_map_{session_key}.json")
 
         if runtime_mode == "direct_cli":
             # Stateless: no session map read/write, no session discovery
             model = _resolve_direct_cli_model(engine_spec)
             cmd, env_extra, timeout_seconds = _assemble_direct_cli_command(
-                engine_spec, secure_msg, workdir, model
+                engine_spec, secure_msg, cli_workdir, model
             )
             actual_id = None
 
