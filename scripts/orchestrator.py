@@ -375,8 +375,11 @@ def main():
     engine_registry = load_engine_registry_for_orchestrator(sdlc_root)
     engine_choices = build_engine_cli_choices(engine_registry)
     default_engine = resolve_engine_cli_alias(os.environ.get("LLM_DRIVER", "openclaw"), engine_registry)
-    parser.add_argument("--engine", choices=engine_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
-    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model to use when --engine is gemini (default: {config.DEFAULT_GEMINI_MODEL})")
+    alias_map = build_engine_cli_alias_map(engine_registry)
+    alias_map_str = ", ".join(f"{k}→{v}" for k, v in sorted(alias_map.items()))
+    parser.add_argument("--engine", choices=engine_choices, default=default_engine,
+                        help=f"Execution engine to use for the agent driver. Available (alias→engine_id): {alias_map_str}. Default: {default_engine}.")
+    parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model override for the selected engine (default: {config.DEFAULT_GEMINI_MODEL})")
     args = parser.parse_args()
     from thinking_resolver import resolve_thinking
     resolved_thinking = resolve_thinking(getattr(args, "thinking", None))
