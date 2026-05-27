@@ -42,16 +42,6 @@ RETRY_RECOVERY_CONFIG_KEYS = (
     "max_uat_recovery_attempts",
 )
 
-REVIEWER_RETRY_ALERT = (
-    "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. "
-    "You MUST return ONLY a strict JSON object matching the required schema. "
-    "No markdown formatting, no conversational text. "
-    "Below is your previous raw output for reference. "
-    "Do NOT repeat it. Produce a corrected JSON output.\n\n"
-    "## PREVIOUS OUTPUT (NON-JSON)\n{previous_output}\n\n"
-    "## REQUIRED SCHEMA\n{output_schema}"
-)
-
 NULL_OUTPUT_SYSTEM_ALERT = """SYSTEM ALERT: Your previous coder round produced no implementation artifacts.
 
 Detected state:
@@ -1087,7 +1077,7 @@ def main():
                         # For stateless engines, inject previous coder stdout as retry context
                         if is_stateless_engine:
                             pr_id_for_stdout = os.path.splitext(os.path.basename(current_pr))[0]
-                            coder_stdout_file = os.path.join(run_dir, f".coder_stdout_{pr_id_for_stdout}.txt")
+                            coder_stdout_file = os.path.join(run_dir, ".tmp", f".coder_stdout_{pr_id_for_stdout}.txt")
                             if os.path.exists(coder_stdout_file):
                                 coder_cmd.extend(["--previous-output", coder_stdout_file])
                     if system_alert_text:
@@ -1231,13 +1221,7 @@ def main():
                                 break
                                 
                             sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            if is_stateless_engine:
-                                # Stateless: full re-prompt with alert inline (no session dependency)
-                                reviewer_retry_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--alert-inline", sys_alert]
-                            else:
-                                # Stateful: session-based system alert
-                                reviewer_retry_cmd = [sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert]
-                            proc = dpopen(reviewer_retry_cmd, start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
                             proc.wait()
                                 
                     if verdict == "APPROVED":

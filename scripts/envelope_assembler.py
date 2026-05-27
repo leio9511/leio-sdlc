@@ -169,6 +169,15 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
 
     if mode == "revision_bootstrap_v2":
         continuation_constraints.append("The reviewer feedback below is the immediate action target.")
+        inline_action_target = {
+            "heading": "## REVIEWER FEEDBACK",
+            "kind": "reviewer_feedback",
+            "path": references.get("feedback_file"),
+            "content": _read_text_file(references.get("feedback_file")),
+        }
+        # Inject previous_output if provided
+        if contract_params.get("previous_output"):
+            inline_action_target["previous_output"] = contract_params["previous_output"]
         envelope = {
             "role": "coder",
             "mode": "revision_bootstrap",
@@ -179,12 +188,7 @@ def build_coder_v2_envelope(workdir, out_dir, references, contract_params, mode)
                 "content": playbook_text,
             },
             "reference_index": reference_index,
-            "inline_action_target": {
-                "heading": "## REVIEWER FEEDBACK",
-                "kind": "reviewer_feedback",
-                "path": references.get("feedback_file"),
-                "content": _read_text_file(references.get("feedback_file")),
-            },
+            "inline_action_target": inline_action_target,
             "continuation_constraints": continuation_constraints,
             "start_instruction": START_WORK_CTA.format(role_upper="CODER"),
         }
@@ -326,6 +330,12 @@ def render_coder_v1_bootstrap_prompt(envelope):
             envelope.get("inline_review_json", ""),
             "",
         ]
+        # Inject previous_output if present in the execution_contract
+        exec_contract = envelope.get("execution_contract", [])
+        for item in exec_contract:
+            if isinstance(item, str) and "## PREVIOUS CODER OUTPUT" in item:
+                prompt_lines.append(item)
+                prompt_lines.append("")
         _append_coder_v1_supporting_context(prompt_lines, envelope)
         return "\n".join(prompt_lines)
 
@@ -385,8 +395,17 @@ def render_coder_v2_prompt(envelope):
         envelope.get("inline_action_target", {}).get("heading", "## ACTION TARGET"),
         envelope.get("inline_action_target", {}).get("content", ""),
         "",
-        "## CONTINUATION CONSTRAINTS",
     ]
+    # Inject previous_output after the action target if present
+    previous_output = envelope.get("inline_action_target", {}).get("previous_output")
+    if previous_output:
+        prompt_lines.extend([
+            CODER_RETRY_PREVIOUS_OUTPUT_HEADER.format(previous_stdout=previous_output),
+            "",
+        ])
+    prompt_lines.extend([
+        "## CONTINUATION CONSTRAINTS",
+    ])
     for constraint in envelope.get("continuation_constraints", []):
         prompt_lines.append(f"- {constraint}")
     prompt_lines.extend(
@@ -494,12 +513,6 @@ def _build_reviewer_envelope(workdir, references, contract_params):
         "You are explicitly forbidden from manually editing the markdown file's status field.",
         "Follow the REVIEWER PLAYBOOK methodologies.",
     ]
-
-    if contract_params.get("alert_inline"):
-        execution_contract.insert(
-            1,
-            contract_params["alert_inline"],
-        )
 
     reference_index = [
         {

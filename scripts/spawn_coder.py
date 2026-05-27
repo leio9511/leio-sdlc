@@ -442,17 +442,7 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
     review_report_json = read_text_file(feedback_file)
 
     # Resolve engine continuity mode
-    try:
-        eng_reg = load_engine_registry(SDLC_ROOT)
-        llm_driver = os.environ.get("LLM_DRIVER", "openclaw")
-        eng_entry = None
-        for eid, entry in eng_reg.get("engines", {}).items():
-            if isinstance(entry, dict) and (entry.get("cli_alias") == llm_driver or entry.get("engine_id") == llm_driver):
-                eng_entry = entry
-                break
-        is_stateless = eng_entry.get("continuity_mode") == "stateless" if eng_entry else False
-    except Exception:
-        is_stateless = False
+    is_stateless = _resolve_is_stateless()
 
     # Read previous output for stateless retry context
     previous_output = None
@@ -549,10 +539,19 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
 
 
 def _write_coder_stdout(run_dir, pr_id, stdout):
-    """Write coder agent stdout to a known file for stateless retry context injection."""
-    stdout_file = os.path.join(run_dir, f".coder_stdout_{pr_id}.txt")
+    """Write coder agent stdout to a known location for stateless retry context injection.
+
+    The file is placed in the .tmp subdirectory (not root run_dir) as a transient
+    cross-process artifact consumed within a single orchestrator loop iteration.
+    This is a pragmatic necessity for orchestrator→spawn_coder stdout propagation
+    across process boundaries and does not constitute a persistent session artifact.
+    """
+    tmp_dir = os.path.join(run_dir, ".tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    stdout_file = os.path.join(tmp_dir, f".coder_stdout_{pr_id}.txt")
+    safe_stdout = stdout if stdout is not None else ""
     with open(stdout_file, "w") as f:
-        f.write(stdout)
+        f.write(safe_stdout)
 
 
 def _resolve_is_stateless():

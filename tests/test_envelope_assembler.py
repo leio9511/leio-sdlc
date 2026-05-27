@@ -653,6 +653,63 @@ class TestEnvelopeAssembler(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(debug_dir, "scaffold_contract.txt")))
         self.assertTrue(os.path.exists(os.path.join(debug_dir, "startup_packet.json")))
 
+    def test_coder_retry_includes_previous_output_header(self):
+        """TC1: Coder retry envelope with previous_output contains 
+        ## PREVIOUS CODER OUTPUT, the exact previous stdout, and the PRD/PR references."""
+        sample_stdout = "mock coder output from previous round"
+        # revision_bootstrap mode needs feedback_file in references
+        fb_path = os.path.join(self.temp_dir, "feedback.json")
+        with open(fb_path, "w") as f:
+            f.write('{"overall_assessment": "NEEDS_ATTENTION"}')
+        envelope = build_startup_envelope(
+            role="coder",
+            workdir=self.temp_dir,
+            out_dir=self.temp_dir,
+            references={
+                "prd_file": os.path.join(self.temp_dir, "prd.md"),
+                "pr_contract_file": os.path.join(self.temp_dir, "pr.md"),
+                "playbook_path": os.path.join(self.temp_dir, "playbook.md"),
+                "feedback_file": fb_path,
+            },
+            contract_params={"previous_output": sample_stdout},
+            mode="revision_bootstrap",
+        )
+        # Create the reference files so _build_coder_v1_bootstrap_envelope can read them
+        for ref in ["prd.md", "pr.md", "playbook.md"]:
+            rf = os.path.join(self.temp_dir, ref)
+            with open(rf, "w") as f:
+                f.write("placeholder")
+        prompt = render_envelope_to_prompt(envelope)
+        self.assertIn("## PREVIOUS CODER OUTPUT", prompt)
+        self.assertIn(sample_stdout, prompt)
+        self.assertIn("prd.md", prompt)
+        self.assertIn("pr.md", prompt)
+
+    def test_coder_retry_without_previous_output_leaves_prompt_unchanged(self):
+        """Regression: coder envelope without previous_output does not inject the header."""
+        fb_path = os.path.join(self.temp_dir, "feedback.json")
+        with open(fb_path, "w") as f:
+            f.write('{"overall_assessment": "NEEDS_ATTENTION"}')
+        for ref in ["prd.md", "pr.md", "playbook.md"]:
+            rf = os.path.join(self.temp_dir, ref)
+            with open(rf, "w") as f:
+                f.write("placeholder")
+        envelope = build_startup_envelope(
+            role="coder",
+            workdir=self.temp_dir,
+            out_dir=self.temp_dir,
+            references={
+                "prd_file": os.path.join(self.temp_dir, "prd.md"),
+                "pr_contract_file": os.path.join(self.temp_dir, "pr.md"),
+                "playbook_path": os.path.join(self.temp_dir, "playbook.md"),
+                "feedback_file": fb_path,
+            },
+            contract_params={},
+            mode="revision_bootstrap",
+        )
+        prompt = render_envelope_to_prompt(envelope)
+        self.assertNotIn("## PREVIOUS CODER OUTPUT", prompt)
+
     def test_auditor_prologue_exact_match(self):
         expected = (
             "你是本系统的首席架构师 (Principal Architect)，拥有极高的代码审美和架构洁癖。"

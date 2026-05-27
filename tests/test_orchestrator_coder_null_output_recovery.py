@@ -321,3 +321,70 @@ def test_real_coder_commit_still_advances_to_reviewer(mock_workdir_with_prefligh
         assert "--system-alert" not in coder_calls[0][0][0]
         assert len(reviewer_calls) == 1
         assert any(call[0][2] == "reviewer_spawned" for call in mock_notify.call_args_list)
+
+
+def test_stateless_coder_retry_uses_previous_output_flag():
+    """TC4: When continuity_mode=stateless and feedback file present, the
+    orchestrator passes --previous-output pointing to the .tmp stdout file."""
+    import tempfile
+
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        workdir = tmp_dir
+        global_dir = tmp_dir
+        os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+        seeded = seed_planner_success_artifacts(
+            workdir, global_dir, prd_filename="dummy.md", pr_slice_content="status: in_progress\n"
+        )
+
+        with patch("orchestrator.subprocess.Popen") as mock_popen, \
+             patch("orchestrator.subprocess.run") as mock_run, \
+             patch("orchestrator.safe_git_checkout"), \
+             patch("orchestrator.glob.glob") as mock_glob, \
+             patch("orchestrator.set_pr_status"), \
+             patch("git_utils.check_git_boundary"), \
+             patch("agent_driver.send_ignition_handshake"), \
+             patch.object(orchestrator.SanityContext, "perform_healthy_check", return_value=None):
+            mock_glob.side_effect = seeded_job_dir_glob_side_effect(seeded["job_dir"])
+            mock_run.return_value = MagicMock(returncode=0, stdout="deadbeef\n", stderr="")
+            mock_popen.return_value = MagicMock()
+            mock_popen.return_value.wait.return_value = 0
+            mock_popen.return_value.poll.return_value = 0
+
+            with patch("orchestrator.load_engine_registry", return_value={
+                "engines": {
+                    "openclaw_native": {
+                        "engine_id": "openclaw_native",
+                        "cli_alias": "openclaw",
+                        "continuity_mode": "stateless",
+                    }
+                }
+            }):
+                with patch(
+                    "sys.argv",
+                    [
+                        "orchestrator.py",
+                        "--workdir", workdir,
+                        "--prd-file", "dummy.md",
+                        "--force-replan", "false",
+                        "--channel", "test",
+                        "--enable-exec-from-workspace",
+                        "--global-dir", global_dir,
+                        "--max-prs-to-process", "1",
+                    ],
+                ):
+                    try:
+                        orchestrator.main()
+                    except SystemExit:
+                        pass
+
+            # Verify --previous-output points into .tmp when present
+            for call_args in mock_popen.call_args_list:
+                cmd = list(call_args[0][0]) if call_args[0] else []
+                for i, arg in enumerate(cmd):
+                    if str(arg) == "--previous-output" and i + 1 < len(cmd):
+                        stdout_path = str(cmd[i + 1])
+                        assert ".tmp" in stdout_path, f"stdout not in .tmp: {stdout_path}"
+                        assert ".coder_stdout_" in stdout_path

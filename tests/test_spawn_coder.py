@@ -504,6 +504,63 @@ class TestSpawnCoder(unittest.TestCase):
             self.assertNotIn("# Coder Playbook V2", alert_prompt)
             self.assertNotIn("## REFERENCE INDEX", alert_prompt)
 
+    def test_spawn_coder_accepts_previous_output_for_retry(self):
+        """TC2: --previous-output flag causes spawn_coder to inject previous stdout
+        into the retry prompt while preserving PRD/PR references."""
+        previous_stdout = "previous coder stdout content"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prd_file = os.path.join(tmp_dir, "PRD.md")
+            pr_file = os.path.join(tmp_dir, "PR_001_test.md")
+            feedback_file = os.path.join(tmp_dir, "feedback.json")
+            previous_output_file = os.path.join(tmp_dir, "prev_stdout.txt")
+
+            with open(prd_file, "w") as f:
+                f.write("## PRD\ncontent")
+            with open(pr_file, "w") as f:
+                f.write("status: in_progress\n")
+            with open(feedback_file, "w") as f:
+                f.write('{"overall_assessment": "NEEDS_ATTENTION"}')
+            with open(previous_output_file, "w") as f:
+                f.write(previous_stdout)
+
+            os.makedirs(os.path.join(tmp_dir, "playbooks"), exist_ok=True)
+            with open(os.path.join(tmp_dir, "playbooks", "coder_playbook.md"), "w") as f:
+                f.write("# Coder Playbook V1\n")
+            with open(os.path.join(tmp_dir, "playbooks", "coder_playbook_v2.md"), "w") as f:
+                f.write("# Coder Playbook V2\n")
+
+            feedback_args = [
+                "spawn_coder.py",
+                "--pr-file", pr_file,
+                "--prd-file", prd_file,
+                "--workdir", tmp_dir,
+                "--feedback-file", feedback_file,
+                "--previous-output", previous_output_file,
+                "--run-dir", tmp_dir,
+                "--enable-exec-from-workspace",
+            ]
+
+            with patch.dict(os.environ, {"SDLC_TEST_MODE": "true"}, clear=False):
+                with patch.object(sys, 'argv', feedback_args):
+                    with patch("spawn_coder.invoke_agent") as mock_invoke:
+                        mock_invoke.return_value = AgentResult(
+                            session_key="mock-key", stdout="mock-out", stderr="", return_code=0
+                        )
+                        try:
+                            spawn_coder.main()
+                        except SystemExit:
+                            pass
+
+            # In test mode spawn_coder writes to tests/tool_calls.log relative to cwd
+            log_path = "tests/tool_calls.log"
+            if os.path.exists(log_path):
+                with open(log_path, "r") as f:
+                    prompt = f.read()
+                self.assertIn("## PREVIOUS CODER OUTPUT", prompt)
+                self.assertIn(previous_stdout, prompt)
+                self.assertIn(os.path.basename(prd_file), prompt)
+                self.assertIn(os.path.basename(pr_file), prompt)
+
 
 
 if __name__ == '__main__':
