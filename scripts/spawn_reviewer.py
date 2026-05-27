@@ -295,7 +295,15 @@ def main():
             with open(session_file, "w") as sf:
                 sf.write(session_id)
             
-        result = invoke_agent(task_string, session_key=session_id, role="reviewer", thinking=resolved_thinking)
+        # Explicitly propagate run_dir and workdir to satisfy the direct_cli workspace contract
+        result = invoke_agent(
+            task_string,
+            session_key=session_id,
+            role="reviewer",
+            run_dir=args.run_dir,
+            workdir=workdir,
+            thinking=resolved_thinking
+        )
 
     # Removed stdout overwrite as agent writes directly to file
 
