@@ -55,8 +55,6 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
         if not test_mode:
             subprocess.run(cmd, capture_output=True)
     else:
-        # New Strategy Layer: Delegate routing and delivery to NotificationRouter.
-        # Ensure routing failures propagate as a fatal runtime error.
         from utils_notification import NotificationRouter
         try:
             NotificationRouter.send(effective_channel, msg)
@@ -69,7 +67,6 @@ def notify_channel(effective_channel, msg, event_type=None, context=None):
 def send_ignition_handshake(channel: str) -> None:
     import config
     if getattr(config, "SDLC_NOTIFICATION_VERSION", 2) == 1:
-        # Legacy Handshake (as it was in orchestrator.py/spawn_auditor.py)
         msg = format_notification("sdlc_handshake", {})
         notify_channel(channel, msg)
     else:
@@ -83,7 +80,6 @@ def send_ignition_handshake(channel: str) -> None:
             sys.exit(1)
 
 def resolve_cmd(cmd_name):
-    # Dynamic path resolution with $AGENT_SKILLS_DIR fallback
     cmd_path = shutil.which(cmd_name)
     if cmd_path:
         return cmd_path
@@ -153,9 +149,6 @@ def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model:
             agent_block.append(line)
             continue
         if found:
-            # If we hit another agent block (starts with "- ") or any other 
-            # non-indented line that isn't empty, we stop.
-            # In practice, agents list output is indented after the "- id" line.
             if stripped.startswith("- "):
                 break
             agent_block.append(line)
@@ -175,9 +168,136 @@ def validate_openclaw_agent_model(cmd_exec: str, agent_id: str, requested_model:
         )
         sys.exit(1)
 
+
+# ---------------------------------------------------------------------------
+# Engine registry integration helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_sdlc_root():
+    """Resolve the SDLC project root for engine registry loading."""
+    return os.environ.get("SDLC_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _resolve_engine_spec(sdlc_root, llm_driver):
+    """Resolve LLM_DRIVER env var to an engine spec from the registry.
+
+    Uses cli_alias first, then falls back to engine_id exact match.
+    Fails closed if no matching engine is found.
+    """
+    from engine_registry import load_engine_registry
+    registry = load_engine_registry(sdlc_root)
+    for entry in registry["engines"].values():
+        if entry.get("cli_alias") == llm_driver:
+            return entry
+    for entry in registry["engines"].values():
+        if entry.get("engine_id") == llm_driver:
+            return entry
+    print(f"[FATAL] No engine registered for LLM_DRIVER '{llm_driver}'", file=sys.stderr)
+    sys.exit(1)
+
+
+def _resolve_direct_cli_model(engine_spec):
+    """Resolve model for direct CLI engines.
+
+    Priority: SDLC_MODEL > TEST_MODEL > execution.default_model > config.DEFAULT_GEMINI_MODEL
+    """
+    model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL")
+    if not model:
+        execution = engine_spec.get("execution", {})
+        model = execution.get("default_model")
+    if not model:
+        from config import DEFAULT_GEMINI_MODEL
+        model = DEFAULT_GEMINI_MODEL
+    return model
+
+
+def _assemble_direct_cli_command(engine_spec, secure_msg, workdir, model):
+    """Assemble a CLI command from a direct_cli engine spec's execution subsection.
+
+    Returns (cmd, env_extra_dict, timeout_seconds) tuple.
+    """
+    execution = engine_spec.get("execution", {})
+
+    executable = execution.get("executable")
+    if not executable:
+        print("[FATAL] direct_cli engine spec missing required 'execution.executable'", file=sys.stderr)
+        sys.exit(1)
+
+    cmd_exec = resolve_cmd(executable)
+    cmd = [cmd_exec]
+
+    # workspace_arg
+    workspace_arg = execution.get("workspace_arg")
+    if workspace_arg is not None:
+        if isinstance(workspace_arg, dict):
+            flag = workspace_arg["flag"]
+            value = str(workspace_arg.get("value", "")).replace("{workdir}", workdir or "")
+            cmd.extend([flag, value])
+        elif isinstance(workspace_arg, list):
+            for arg in workspace_arg:
+                cmd.append(str(arg).replace("{workdir}", workdir or ""))
+        else:
+            cmd.append(str(workspace_arg).replace("{workdir}", workdir or ""))
+
+    # permission_args
+    permission_args = execution.get("permission_args", [])
+    if permission_args:
+        cmd.extend(permission_args)
+
+    # sandbox_args
+    sandbox_args = execution.get("sandbox_args", [])
+    if sandbox_args:
+        cmd.extend(sandbox_args)
+
+    # one_shot_args + prompt
+    one_shot_args = list(execution.get("one_shot_args", []))
+    prompt_inserted = False
+    for i, arg in enumerate(one_shot_args):
+        if "{prompt}" in str(arg):
+            one_shot_args[i] = str(arg).replace("{prompt}", secure_msg)
+            prompt_inserted = True
+            break
+    cmd.extend(one_shot_args)
+    if not prompt_inserted:
+        cmd.append(secure_msg)
+
+    # model_arg
+    model_arg = execution.get("model_arg")
+    if model_arg is not None and model:
+        if isinstance(model_arg, dict):
+            flag = model_arg["flag"]
+            value = str(model_arg.get("value", "")).replace("{model}", model)
+            cmd.extend([flag, value])
+        elif isinstance(model_arg, list):
+            for arg in model_arg:
+                cmd.append(str(arg).replace("{model}", model))
+        else:
+            cmd.append(str(model_arg).replace("{model}", model))
+
+    # env_extra — validate string-only keys/values, fatal on non-string
+    env_extra = execution.get("env_extra", {})
+    for k, v in env_extra.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            print(
+                f"[FATAL] direct_cli env_extra key '{k}' (type {type(k).__name__}) "
+                f"or value '{v}' (type {type(v).__name__}) is not a string",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    timeout_seconds = execution.get("timeout_seconds")
+
+    return cmd, env_extra, timeout_seconds
+
+
+# ---------------------------------------------------------------------------
+# Core agent invocation
+# ---------------------------------------------------------------------------
+
 def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinking: str | None = None):
     """
     Core router that dynamically selects the CLI driver and flags based on the active LLM_DRIVER.
+    Uses the engine registry to route between openclaw_native (stateful) and direct_cli (stateless).
     Supports dynamic path resolution and isolated E2E testing integration.
     """
     from thinking_resolver import resolve_thinking
@@ -196,8 +316,10 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
 
     if run_dir and os.path.exists(run_dir):
         temp_dir = os.path.join(run_dir, ".tmp")
+        workdir = run_dir
     else:
         temp_dir = tempfile.gettempdir()
+        workdir = temp_dir
     os.makedirs(temp_dir, exist_ok=True)
 
     fd, path = tempfile.mkstemp(suffix=".txt", prefix=f"sdlc_prompt_{session_key}_", dir=temp_dir, text=True)
@@ -213,41 +335,40 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
                 perms = oct(os.stat(path).st_mode)[-3:]
                 print(f"FILE:{path}:PERMS:{perms}")
             return AgentResult(session_key=session_key, stdout=os.environ["SDLC_MOCK_LLM_RESPONSE"], return_code=0)
-        
-    # Determine LLM driver
-        llm_driver = os.environ.get("LLM_DRIVER", "openclaw").lower()
-        llm_driver_aliases = {
-            "openclaw_native": "openclaw",
-            "gemini_direct_cli": "gemini",
-        }
-        llm_driver = llm_driver_aliases.get(llm_driver, llm_driver)
-        
-        # Check session map
-        session_map_file = os.path.join(temp_dir, f".session_map_{session_key}.json")
-        actual_id = None
-        if os.path.exists(session_map_file):
-            try:
-                with open(session_map_file, "r") as f:
-                    mapping = json.load(f)
-                    actual_id = mapping.get("actual_id")
-            except Exception:
-                pass
 
-        if llm_driver == "gemini":
-            from config import DEFAULT_GEMINI_MODEL
-            # --yolo is CRITICAL: prevents interactive Y/n prompt blocking in headless/CI environments
-            model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL") or DEFAULT_GEMINI_MODEL
-            cmd_exec = resolve_cmd("gemini")
-            if actual_id:
-                cmd = [cmd_exec, "--yolo", "-p", secure_msg, "-r", actual_id]
-            else:
-                cmd = [cmd_exec, "--yolo", "-p", secure_msg, "--model", model]
-        else:
+        # --- Engine registry routing ---
+        llm_driver_raw = os.environ.get("LLM_DRIVER", "openclaw").lower()
+        sdlc_root = _resolve_sdlc_root()
+        engine_spec = _resolve_engine_spec(sdlc_root, llm_driver_raw)
+        runtime_mode = engine_spec["runtime_mode"]
+
+        session_map_file = os.path.join(temp_dir, f".session_map_{session_key}.json")
+
+        if runtime_mode == "direct_cli":
+            # Stateless: no session map read/write, no session discovery
+            model = _resolve_direct_cli_model(engine_spec)
+            cmd, env_extra, timeout_seconds = _assemble_direct_cli_command(
+                engine_spec, secure_msg, workdir, model
+            )
+            actual_id = None
+
+        elif runtime_mode == "openclaw_native":
+            # Stateful: existing OpenClaw-native path (unchanged)
             from config import DEFAULT_GEMINI_MODEL
             model = os.environ.get("SDLC_MODEL") or os.environ.get("TEST_MODEL") or DEFAULT_GEMINI_MODEL
             cmd_exec = resolve_cmd("openclaw")
             agent_id = get_openclaw_agent_id(model)
-            
+
+            # Check session map for resume
+            actual_id = None
+            if os.path.exists(session_map_file):
+                try:
+                    with open(session_map_file, "r") as f:
+                        mapping = json.load(f)
+                        actual_id = mapping.get("actual_id")
+                except Exception:
+                    pass
+
             list_cmd = [cmd_exec, "agents", "list"]
             list_res = subprocess.run(list_cmd, capture_output=True, text=True)
             agent_exists = openclaw_agent_exists(list_res.stdout, agent_id)
@@ -257,18 +378,18 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
                 os.makedirs(agent_ws, exist_ok=True)
                 create_cmd = [cmd_exec, "agents", "add", agent_id, "--non-interactive", "--model", model, "--workspace", agent_ws]
                 subprocess.run(create_cmd, capture_output=True)
-                
+
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 templates_dir = os.path.join(base_dir, "TEMPLATES", "openclaw_execution_agent")
                 if os.path.exists(templates_dir):
-                    import shutil
+                    import shutil as _shutil
                     for item in os.listdir(templates_dir):
                         s = os.path.join(templates_dir, item)
                         d = os.path.join(agent_ws, item)
                         if os.path.isdir(s):
-                            shutil.copytree(s, d, dirs_exist_ok=True)
+                            _shutil.copytree(s, d, dirs_exist_ok=True)
                         else:
-                            shutil.copy2(s, d)
+                            _shutil.copy2(s, d)
             else:
                 validate_openclaw_agent_model(cmd_exec, agent_id, model)
 
@@ -276,14 +397,23 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
                 cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", actual_id, "--thinking", resolved_thinking, "-m", secure_msg]
             else:
                 cmd = [cmd_exec, "agent", "--agent", agent_id, "--session-id", session_key, "--thinking", resolved_thinking, "-m", secure_msg]
-            
+
+            env_extra = {}
+            timeout_seconds = None
+
+        else:
+            print(f"[FATAL] Unsupported runtime_mode '{runtime_mode}' for engine '{engine_spec.get('engine_id')}'", file=sys.stderr)
+            sys.exit(1)
+
         print(f"[{role or 'system'}] Invoking agent driver: {' '.join(cmd)}")
-        
+
         for attempt in range(3):
-            # Native inheritance: Ensure GEMINI_API_KEY is natively inherited for stateless execution
+            # Build run environment: inherit everything, then merge env_extra
             run_env = os.environ.copy()
             if os.environ.get("GEMINI_API_KEY"):
                 run_env["GEMINI_API_KEY"] = os.environ.get("GEMINI_API_KEY")
+            for k, v in env_extra.items():
+                run_env[k] = v
 
             stdout_fd = None
             stderr_fd = None
@@ -309,7 +439,15 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
                         start_new_session=True,
                         env=run_env,
                     )
-                    return_code = process.wait()
+                    try:
+                        if timeout_seconds and timeout_seconds > 0:
+                            return_code = process.wait(timeout=timeout_seconds)
+                        else:
+                            return_code = process.wait()
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                        return_code = -1
 
                 with open(stdout_path, "r") as stdout_file:
                     stdout = stdout_file.read()
@@ -331,22 +469,9 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
 
             if return_code == 0:
                 print(stdout)
-                
-                # Session Mapping anti-race capture
-                if llm_driver == "gemini" and not actual_id:
-                    list_cmd = [cmd_exec, "--list-sessions", "-o", "json"]
-                    list_res = subprocess.run(list_cmd, capture_output=True, text=True)
-                    if list_res.returncode == 0:
-                        try:
-                            sessions = json.loads(list_res.stdout)
-                            for s in sessions:
-                                if "prompt" in s and path in s["prompt"]:
-                                    with open(session_map_file, "w") as f:
-                                        json.dump({"actual_id": s["id"]}, f)
-                                    break
-                        except Exception as e:
-                            print(f"Error parsing session list: {e}", file=sys.stderr)
-                elif llm_driver == "openclaw" and not actual_id:
+
+                # Session mapping: only for stateful (openclaw_native) engines
+                if runtime_mode == "openclaw_native" and not actual_id:
                     with open(session_map_file, "w") as f:
                         json.dump({"actual_id": session_key}, f)
 
@@ -362,13 +487,13 @@ def invoke_agent(task_string, session_key=None, role=None, run_dir=None, thinkin
     finally:
         if os.path.exists(path):
             os.remove(path)
-            
+
     return None
+
 
 RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def build_prompt(role, **kwargs):
-    # Support dual-source prompt loading
     import inspect
     caller_frame = inspect.currentframe().f_back
     caller_file = caller_frame.f_globals.get('__file__') if caller_frame else sys.argv[0]

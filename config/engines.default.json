@@ -19,8 +19,18 @@
       "registration_visibility": "public",
       "continuity_mode": "stateless",
       "handle_acquisition_strategy": "unavailable",
-      "fallback_policy": "legacy_direct_cli",
-      "capability_surface": "engine_managed"
+      "fallback_policy": "fail_closed",
+      "capability_surface": "client_mediated",
+      "execution": {
+        "executable": "gemini",
+        "one_shot_args": ["--yolo", "-p"],
+        "model_arg": {"flag": "--model", "value": "{model}"},
+        "workspace_arg": null,
+        "permission_args": [],
+        "sandbox_args": [],
+        "timeout_seconds": 3600,
+        "env_extra": {}
+      }
     },
     "gemini_acp_reference": {
       "engine_id": "gemini_acp_reference",

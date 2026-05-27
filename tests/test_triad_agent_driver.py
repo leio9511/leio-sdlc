@@ -16,7 +16,33 @@ else:
     # Fallback to relative if somehow root is different
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'skills/pm-skill/scripts')))
 
-from agent_driver import build_prompt, AgentResult
+from agent_driver import build_prompt, AgentResult, invoke_agent
+
+
+def fake_popen_factory(stdout_text="", stderr_text="", return_code=0, calls=None):
+    def _fake_popen(cmd, stdout=None, stderr=None, start_new_session=None, env=None, **kwargs):
+        if calls is not None:
+            calls.append(
+                {
+                    "cmd": cmd,
+                    "start_new_session": start_new_session,
+                    "env": env,
+                    "stdout_name": getattr(stdout, "name", None),
+                    "stderr_name": getattr(stderr, "name", None),
+                }
+            )
+        if stdout is not None:
+            stdout.write(stdout_text)
+            stdout.flush()
+        if stderr is not None:
+            stderr.write(stderr_text)
+            stderr.flush()
+        proc = MagicMock()
+        proc.wait.return_value = return_code
+        return proc
+
+    return _fake_popen
+
 
 class TestAgentDriverTriad(unittest.TestCase):
     def setUp(self):
@@ -88,7 +114,6 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertTrue(mock_agent_call.called, "invoke_agent was not called")
         args, kwargs = mock_agent_call.call_args
     
-        # Revision bootstrap must inline the exact reviewer feedback as the primary recovery input.
         self.assertIn("## REVIEWER FEEDBACK", args[0])
         self.assertIn("```json", args[0])
         self.assertIn('"overall_assessment": "NEEDS_ATTENTION"', args[0])
@@ -214,9 +239,6 @@ class TestAgentDriverTriad(unittest.TestCase):
         self.assertEqual(kwargs.get("role"), "manager")
         mock_setup_key.assert_called()
 
-
-
-
     def test_spawn_scripts_keep_runtime_aware_prompt_resolution(self):
         from agent_driver import build_prompt
 
@@ -224,6 +246,68 @@ class TestAgentDriverTriad(unittest.TestCase):
 
         self.assertNotEqual(prompt, "")
         self.assertIn("/tmp/test", prompt)
+
+    def test_direct_cli_env_extra_is_merged(self):
+        """TC4: configured env_extra reaches the subprocess environment."""
+        popen_calls = []
+
+        helper_body = """
+import os
+import sys
+
+for key in sorted(os.environ):
+    if key.startswith("SDLC_EXTRA_"):
+        print(f"{key}={os.environ[key]}")
+"""
+        helper_path = os.path.join(self.workdir, "env_extra_helper.py")
+        script = "#!/usr/bin/env python3\n" + helper_body
+        with open(helper_path, "w", encoding="utf-8") as handle:
+            handle.write(script)
+        os.chmod(helper_path, 0o700)
+
+        import scripts.engine_registry as er
+        real_sdlc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        registry = er.load_engine_registry(real_sdlc_root)
+        spec = registry["engines"]["gemini_direct_cli"].copy()
+        spec["execution"] = dict(spec.get("execution", {}))
+        spec["execution"]["env_extra"] = {
+            "SDLC_EXTRA_A": "value_a",
+            "SDLC_EXTRA_B": "value_b",
+        }
+
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}, clear=False):
+            with patch("agent_driver.resolve_cmd", return_value=helper_path):
+                with patch("agent_driver._resolve_engine_spec", return_value=spec):
+                    with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="[]", stderr="")):
+                        with patch(
+                            "agent_driver.subprocess.Popen",
+                            side_effect=fake_popen_factory(
+                                "SDLC_EXTRA_A=value_a\nSDLC_EXTRA_B=value_b\n", "", 0, popen_calls
+                            ),
+                        ):
+                            result = invoke_agent("test env", session_key="env-test")
+
+        self.assertEqual(result.return_code, 0)
+        self.assertIn("SDLC_EXTRA_A=value_a", result.stdout)
+        self.assertIn("SDLC_EXTRA_B=value_b", result.stdout)
+
+    def test_direct_cli_env_extra_non_string_fail_closed(self):
+        """TC4 extension: non-string env_extra value fails with FATAL error."""
+        import scripts.engine_registry as er
+        real_sdlc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        registry = er.load_engine_registry(real_sdlc_root)
+        spec = registry["engines"]["gemini_direct_cli"].copy()
+        spec["execution"] = dict(spec.get("execution", {}))
+        spec["execution"]["env_extra"] = {
+            "VALID_KEY": 12345,
+        }
+
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}, clear=False):
+            with patch("agent_driver.resolve_cmd", return_value="/mock/bin/gemini"):
+                with patch("agent_driver._resolve_engine_spec", return_value=spec):
+                    with self.assertRaises(SystemExit):
+                        invoke_agent("test env", session_key="bad-env-test")
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -269,6 +269,49 @@ sys.stderr.flush()
         finally:
             run_dir.cleanup()
 
+    def test_direct_cli_timeout_uses_engine_execution_timeout(self):
+        """TC3: renderer passes or enforces execution.timeout_seconds
+        without regressing stdout/stderr capture."""
+        session_key = "timeout-session"
+        run_dir, temp_dir = self._prepare_run_dir(session_key=session_key)
+
+        helper_path = self._write_helper_script(
+            run_dir.name,
+            "timeout_helper.py",
+            """
+import sys
+import time
+
+sys.stdout.write("partial output\\n")
+sys.stdout.flush()
+time.sleep(30)
+sys.stdout.write("should never appear\\n")
+""",
+        )
+
+        try:
+            import scripts.engine_registry as er
+            real_sdlc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            registry = er.load_engine_registry(real_sdlc_root)
+            spec = registry["engines"]["gemini_direct_cli"].copy()
+            spec["execution"] = dict(spec.get("execution", {}))
+            spec["execution"]["timeout_seconds"] = 2
+
+            with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}, clear=False):
+                with patch("agent_driver.resolve_cmd", return_value=helper_path):
+                    with patch("agent_driver._resolve_engine_spec", return_value=spec):
+                        with patch("agent_driver.time.sleep", return_value=None):
+                            with self.assertRaises(SystemExit):
+                                agent_driver.invoke_agent(
+                                    "task",
+                                    session_key=session_key,
+                                    run_dir=run_dir.name,
+                                )
+
+            self.assertEqual(self._capture_files(temp_dir), [])
+        finally:
+            run_dir.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()

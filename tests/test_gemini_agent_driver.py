@@ -224,7 +224,8 @@ class TestGeminiAgentDriver(unittest.TestCase):
         prompt_arg = cmd[p_idx + 1]
         self.assertEqual(prompt_arg, f"Read your complete task instructions from {prompt_path}. Do not modify this file.")
 
-    def test_lock_free_session_resume(self):
+    def test_direct_cli_does_not_resume_from_session_map(self):
+        """TC5 partial: direct_cli engines ignore existing session_map files (stateless)."""
         popen_calls = []
 
         with stdlib_tempfile.TemporaryDirectory() as run_dir:
@@ -244,49 +245,88 @@ class TestGeminiAgentDriver(unittest.TestCase):
                             invoke_agent("test task", session_key="test-session", run_dir=run_dir)
 
         cmd = popen_calls[0]["cmd"]
-        self.assertIn("-r", cmd)
-        r_idx = cmd.index("-r")
-        self.assertEqual(cmd[r_idx + 1], "RESUMED_UUID_456")
+        # Stateless: no -r flag for resume
+        self.assertNotIn("-r", cmd)
+        # No --list-sessions invocation
         mock_run.assert_not_called()
 
-    def test_session_uuid_capture(self):
+    def test_direct_cli_does_not_write_session_map_file(self):
+        """TC5: after a successful Gemini direct CLI invocation, no .session_map_<session_key>.json is created."""
         popen_calls = []
-        mkstemp_calls = []
-
-        def fake_mkstemp(*args, **kwargs):
-            fd, path = REAL_MKSTEMP(*args, **kwargs)
-            mkstemp_calls.append(path)
-            return fd, path
-
-        def run_side_effect(cmd, *args, **kwargs):
-            prompt_path = mkstemp_calls[0]
-            payload = json.dumps(
-                [
-                    {"id": "IGNORE_ME", "prompt": "some other prompt"},
-                    {
-                        "id": "CAPTURED_UUID_789",
-                        "prompt": f"Read your complete task instructions from {prompt_path}. Do not modify this file.",
-                    },
-                ]
-            )
-            return MagicMock(returncode=0, stdout=payload)
 
         with stdlib_tempfile.TemporaryDirectory() as run_dir:
             with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}, clear=False):
                 with patch("agent_driver.resolve_cmd", return_value="/mock/bin/gemini"):
-                    with patch("agent_driver.tempfile.mkstemp", side_effect=fake_mkstemp):
-                        with patch("agent_driver.subprocess.run", side_effect=run_side_effect):
-                            with patch(
-                                "agent_driver.subprocess.Popen",
-                                side_effect=fake_popen_factory("success", "", 0, popen_calls),
-                            ):
-                                invoke_agent("test task", session_key="capture-session", run_dir=run_dir)
+                    with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="[]", stderr="")):
+                        with patch(
+                            "agent_driver.subprocess.Popen",
+                            side_effect=fake_popen_factory("success", "", 0, popen_calls),
+                        ):
+                            invoke_agent("test task", session_key="capture-session", run_dir=run_dir)
 
             session_map_file = os.path.join(run_dir, ".tmp", ".session_map_capture-session.json")
+            self.assertFalse(os.path.exists(session_map_file))
+
+    def test_gemini_uses_generic_direct_cli_renderer(self):
+        """TC1: with LLM_DRIVER=gemini, command is assembled from gemini_direct_cli.execution;
+        no Gemini-specific --list-sessions or resume command is invoked."""
+        popen_calls = []
+        run_calls = []
+
+        def track_run(cmd, *args, **kwargs):
+            run_calls.append(cmd)
+            return MagicMock(returncode=0, stdout="[]", stderr="")
+
+        with patch.dict(os.environ, {"LLM_DRIVER": "gemini"}, clear=False):
+            with patch("agent_driver.resolve_cmd", return_value="/mock/bin/gemini"):
+                with patch("agent_driver.subprocess.run", side_effect=track_run):
+                    with patch(
+                        "agent_driver.subprocess.Popen",
+                        side_effect=fake_popen_factory("success", "", 0, popen_calls),
+                    ):
+                        invoke_agent("test task", session_key="test-session")
+
+        cmd = popen_calls[0]["cmd"]
+        # Command contains executable from execution spec
+        self.assertEqual(cmd[0], "/mock/bin/gemini")
+        self.assertIn("--yolo", cmd)
+        self.assertIn("-p", cmd)
+        self.assertIn("--model", cmd)
+        # No --list-sessions in the Popen command
+        self.assertNotIn("--list-sessions", cmd)
+        # No subprocess.run calls should invoke --list-sessions
+        for run_cmd in run_calls:
+            self.assertNotIn("--list-sessions", run_cmd)
+
+    def test_openclaw_path_does_not_use_generic_direct_cli_renderer(self):
+        """TC6: LLM_DRIVER=openclaw still executes through the existing
+        OpenClaw-native command construction and writes stateful session mapping."""
+        popen_calls = []
+
+        with stdlib_tempfile.TemporaryDirectory() as run_dir:
+            with patch.dict(os.environ, {"LLM_DRIVER": "openclaw"}, clear=False):
+                with patch("agent_driver.resolve_cmd", return_value="/mock/bin/openclaw"):
+                    with patch("agent_driver.subprocess.run", return_value=MagicMock(returncode=0, stdout="", stderr="")):
+                        with patch("agent_driver.openclaw_agent_exists", return_value=True):
+                            with patch("agent_driver.validate_openclaw_agent_model", return_value=None):
+                                with patch(
+                                    "agent_driver.subprocess.Popen",
+                                    side_effect=fake_popen_factory("success", "", 0, popen_calls),
+                                ):
+                                    invoke_agent("test task", session_key="test-openclaw", run_dir=run_dir)
+
+            cmd = popen_calls[0]["cmd"]
+            # OpenClaw uses "agent" subcommand, not one_shot_args
+            self.assertIn("agent", cmd)
+            self.assertIn("--agent", cmd)
+            self.assertIn("--session-id", cmd)
+            self.assertIn("-m", cmd)
+            # Verify session_map is written for stateful openclaw_native
+            session_map_file = os.path.join(run_dir, ".tmp", ".session_map_test-openclaw.json")
+            self.assertTrue(os.path.exists(session_map_file))
             with open(session_map_file, "r", encoding="utf-8") as handle:
                 mapping = json.load(handle)
-
-        self.assertEqual(mapping["actual_id"], "CAPTURED_UUID_789")
+            self.assertEqual(mapping["actual_id"], "test-openclaw")
 
     @patch("utils_notification.shutil.which")
     @patch("agent_driver.logger.info")
