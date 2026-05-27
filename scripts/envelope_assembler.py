@@ -514,6 +514,10 @@ def _build_reviewer_envelope(workdir, references, contract_params):
         "Follow the REVIEWER PLAYBOOK methodologies.",
     ]
 
+    inline_alert = contract_params.get("inline_alert")
+    if inline_alert:
+        execution_contract.insert(0, inline_alert)
+
     reference_index = [
         {
             "id": "prd",

@@ -301,3 +301,192 @@ def test_stateful_openclaw_coder_session_behavior_preserved(
                 kwargs = call_arg[1] if len(call_arg) > 1 else {}
                 if kwargs.get("engine_mode"):
                     assert kwargs["engine_mode"] == "stateful"
+
+
+@patch("fcntl.flock")
+@patch("shutil.rmtree")
+@patch("shutil.copytree")
+def test_stateless_reviewer_retry_does_not_create_reviewer_session(
+    _mock_copytree, _mock_rmtree, _mock_flock
+):
+    """TC4: No .reviewer_session appears after normal stateless reviewer
+    invocation or JSON retry."""
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        workdir = tmp_dir
+        global_dir = tmp_dir
+        os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+        seeded = seed_planner_success_artifacts(
+            workdir,
+            global_dir,
+            prd_filename="dummy.md",
+            pr_slice_content="status: in_progress\n",
+        )
+
+        with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+             patch("orchestrator.subprocess.run") as mock_run, \
+             patch("orchestrator.subprocess.Popen") as mock_popen, \
+             patch("orchestrator.safe_git_checkout"), \
+             patch("orchestrator.glob.glob") as mock_glob, \
+             patch("orchestrator.set_pr_status"), \
+             patch("git_utils.check_git_boundary"), \
+             patch("agent_driver.send_ignition_handshake"), \
+             patch.object(
+                 orchestrator.SanityContext, "perform_healthy_check", return_value=None
+             ):
+            mock_glob.side_effect = seeded_job_dir_glob_side_effect(
+                seeded["job_dir"]
+            )
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="deadbeef\n", stderr=""
+            )
+            mock_popen.return_value = MagicMock()
+            mock_popen.return_value.wait.return_value = 0
+            mock_popen.return_value.poll.return_value = 0
+
+            with patch(
+                "orchestrator.load_engine_registry",
+                return_value={
+                    "engines": {
+                        "gemini_direct_cli": {
+                            "engine_id": "gemini_direct_cli",
+                            "cli_alias": "gemini",
+                            "continuity_mode": "stateless",
+                        }
+                    }
+                },
+            ):
+                with patch(
+                    "sys.argv",
+                    [
+                        "orchestrator.py",
+                        "--force-replan",
+                        "false",
+                        "--enable-exec-from-workspace",
+                        "--workdir",
+                        workdir,
+                        "--prd-file",
+                        "dummy.md",
+                        "--channel",
+                        "test",
+                        "--global-dir",
+                        global_dir,
+                        "--coder-session-strategy",
+                        "always",
+                        "--max-prs-to-process",
+                        "1",
+                        "--engine",
+                        "gemini",
+                    ],
+                ):
+                    try:
+                        orchestrator.main()
+                    except SystemExit:
+                        pass
+
+            # .reviewer_session should NOT exist in the run_dir after stateless run
+            run_dir = seeded["job_dir"]
+            reviewer_session = os.path.join(run_dir, ".reviewer_session")
+            assert not os.path.exists(reviewer_session), (
+                ".reviewer_session should not be created for stateless engines"
+            )
+
+
+@patch("fcntl.flock")
+@patch("shutil.rmtree")
+@patch("shutil.copytree")
+def test_stateful_reviewer_session_behavior_preserved(
+    _mock_copytree, _mock_rmtree, _mock_flock
+):
+    """TC5: OpenClaw/stateful reviewer behavior remains compatible with existing
+    session semantics. The --system-alert path is used for stateful retry."""
+    os.environ["SDLC_BYPASS_BRANCH_CHECK"] = "1"
+    os.environ["SDLC_TEST_MODE"] = "true"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        workdir = tmp_dir
+        global_dir = tmp_dir
+        os.makedirs(os.path.join(workdir, ".git"), exist_ok=True)
+        seeded = seed_planner_success_artifacts(
+            workdir,
+            global_dir,
+            prd_filename="dummy.md",
+            pr_slice_content="status: in_progress\n",
+        )
+
+        with patch("orchestrator.teardown_coder_session") as mock_teardown, \
+             patch("orchestrator.subprocess.run") as mock_run, \
+             patch("orchestrator.subprocess.Popen") as mock_popen, \
+             patch("orchestrator.safe_git_checkout"), \
+             patch("orchestrator.glob.glob") as mock_glob, \
+             patch("orchestrator.set_pr_status"), \
+             patch("git_utils.check_git_boundary"), \
+             patch("agent_driver.send_ignition_handshake"), \
+             patch.object(
+                 orchestrator.SanityContext, "perform_healthy_check", return_value=None
+             ):
+            mock_glob.side_effect = seeded_job_dir_glob_side_effect(
+                seeded["job_dir"]
+            )
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="deadbeef\n", stderr=""
+            )
+            mock_popen.return_value = MagicMock()
+            mock_popen.return_value.wait.return_value = 0
+            mock_popen.return_value.poll.return_value = 0
+
+            # Use stateful engine (openclaw_native)
+            with patch(
+                "orchestrator.load_engine_registry",
+                return_value={
+                    "engines": {
+                        "openclaw_native": {
+                            "engine_id": "openclaw_native",
+                            "cli_alias": "openclaw",
+                            "continuity_mode": "stateful",
+                        }
+                    }
+                },
+            ):
+                with patch(
+                    "sys.argv",
+                    [
+                        "orchestrator.py",
+                        "--force-replan",
+                        "false",
+                        "--enable-exec-from-workspace",
+                        "--workdir",
+                        workdir,
+                        "--prd-file",
+                        "dummy.md",
+                        "--channel",
+                        "test",
+                        "--global-dir",
+                        global_dir,
+                        "--coder-session-strategy",
+                        "always",
+                        "--max-prs-to-process",
+                        "1",
+                    ],
+                ):
+                    try:
+                        orchestrator.main()
+                    except SystemExit:
+                        pass
+
+            # For stateful engines, retry should use --system-alert, not --inline-alert
+            dpopen_calls = mock_popen.call_args_list
+            reviewer_calls = [
+                call
+                for call in dpopen_calls
+                if "spawn_reviewer.py"
+                in " ".join(call[0][0]) if isinstance(call[0][0], list)
+            ]
+            inline_alert_calls = [
+                call for call in reviewer_calls if "--inline-alert" in call[0][0]
+            ]
+            assert len(inline_alert_calls) == 0, (
+                "No --inline-alert calls expected for stateful engine"
+            )

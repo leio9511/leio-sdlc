@@ -157,5 +157,77 @@ class TestSpawnReviewerAligned(unittest.TestCase):
                     
         self.assertTrue(mock_invoke_agent.called)
 
+
+class TestSpawnReviewerStatelessAlert(unittest.TestCase):
+    def test_spawn_reviewer_does_not_require_reviewer_session_for_stateless_alert(self):
+        """TC3: stateless retry/full prompt path does not read .reviewer_session."""
+        import spawn_reviewer
+        from agent_driver import AgentResult
+
+        workdir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        run_dir = tempfile.mkdtemp()
+        pr_file = os.path.join(run_dir, "PR_002_dummy.md")
+        with open(pr_file, "w") as f:
+            f.write("Dummy PR Content")
+        diff_file = os.path.join(run_dir, "dummy.diff")
+        with open(diff_file, "w") as f:
+            f.write("+++ b/dummy.py")
+
+        out_file = "review_report.json"
+        report_path = os.path.join(run_dir, out_file)
+
+        # Ensure no .reviewer_session exists — this is the key assertion
+        session_file = os.path.join(run_dir, ".reviewer_session")
+        if os.path.exists(session_file):
+            os.remove(session_file)
+
+        def side_effect(*args, **kwargs):
+            with open(report_path, "w") as f:
+                f.write(
+                    '{"overall_assessment": "APPROVED", "executive_summary": "Mock", "findings": []}'
+                )
+            return AgentResult(
+                session_key="subtask-reviewer",
+                stdout="Some unrelated conversational text",
+            )
+
+        with patch("spawn_reviewer.invoke_agent", side_effect=side_effect), \
+             patch("utils_api_key.setup_spawner_api_key"):
+            test_args = [
+                "spawn_reviewer.py",
+                "--enable-exec-from-workspace",
+                "--workdir", workdir,
+                "--pr-file", pr_file,
+                "--diff-target", "HEAD",
+                "--override-diff-file", diff_file,
+                "--run-dir", run_dir,
+                "--out-file", out_file,
+                "--inline-alert", "Retry alert text",
+                "--engine", "gemini",
+            ]
+
+            with patch.object(sys, "argv", test_args):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "SDLC_TEST_MODE": "false",
+                        "LLM_DRIVER": "gemini",
+                    },
+                ):
+                    try:
+                        spawn_reviewer.main()
+                    except SystemExit as e:
+                        self.assertEqual(
+                            e.code,
+                            0,
+                            "spawn_reviewer should exit 0 with --inline-alert",
+                        )
+
+            # .reviewer_session should NOT be created for stateless engines
+            self.assertFalse(
+                os.path.exists(session_file),
+                ".reviewer_session should not be created for stateless engine with --inline-alert",
+            )
+
 if __name__ == "__main__":
     unittest.main()

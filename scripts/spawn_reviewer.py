@@ -66,6 +66,7 @@ def main():
     parser.add_argument("--global-dir", required=False, help="Global directory for templates/playbooks")
     parser.add_argument("--run-dir", default=".", help="Run directory for artifacts")
     parser.add_argument("--system-alert", help="Send a system alert to the existing reviewer session", default=None)
+    parser.add_argument("--inline-alert", help="Inline alert text to inject into the reviewer prompt for stateless retry", default=None)
     parser.add_argument(
         "--thinking",
         choices=["low", "medium", "high", "xhigh"],
@@ -226,6 +227,9 @@ def main():
             ]
         }
     }
+
+    if args.inline_alert:
+        contract_params["inline_alert"] = args.inline_alert
 
     envelope = envelope_assembler.build_startup_envelope(
         role="reviewer",

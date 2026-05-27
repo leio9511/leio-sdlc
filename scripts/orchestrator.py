@@ -42,6 +42,31 @@ RETRY_RECOVERY_CONFIG_KEYS = (
     "max_uat_recovery_attempts",
 )
 
+REVIEWER_RETRY_ALERT = (
+    "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. "
+    "You MUST return ONLY a strict JSON object matching the required schema. "
+    "No markdown formatting, no conversational text. "
+    "Below is your previous raw output for reference. "
+    "Do NOT repeat it. Produce a corrected JSON output.\n\n"
+    "## PREVIOUS OUTPUT (NON-JSON)\n{previous_output}\n\n"
+    "## REQUIRED SCHEMA\n{output_schema}"
+)
+
+REVIEWER_OUTPUT_SCHEMA_TEXT = """{
+  "overall_assessment": "EXCELLENT | GOOD_WITH_MINOR_SUGGESTIONS | NEEDS_ATTENTION | NEEDS_IMMEDIATE_REWORK",
+  "executive_summary": "<string summary>",
+  "findings": [
+    {
+      "file_path": "<string>",
+      "line_number": <integer>,
+      "category": "Correctness | PlanAlignmentViolation | ArchAlignmentViolation | Efficiency | Readability | Maintainability | DesignPattern | Security | Standard | PotentialBug | Documentation",
+      "severity": "CRITICAL | MAJOR | MINOR | SUGGESTION | INFO",
+      "description": "<string>",
+      "recommendation": "<string>"
+    }
+  ]
+}"""
+
 NULL_OUTPUT_SYSTEM_ALERT = """SYSTEM ALERT: Your previous coder round produced no implementation artifacts.
 
 Detected state:
@@ -1220,9 +1245,18 @@ def main():
                             if json_retry_count >= max_json_retries:
                                 break
                                 
-                            sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
-                            proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
-                            proc.wait()
+                            if is_stateless_engine:
+                                # Stateless retry: full fresh reviewer invocation with inline alert
+                                retry_alert = REVIEWER_RETRY_ALERT.format(
+                                    previous_output=review_content,
+                                    output_schema=REVIEWER_OUTPUT_SCHEMA_TEXT,
+                                )
+                                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--inline-alert", retry_alert, "--engine", args.engine], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                                proc.wait()
+                            else:
+                                sys_alert = "SYSTEM ALERT: Your previous output could not be parsed as valid JSON. Please return ONLY a strict JSON object matching the required schema. No markdown formatting, no conversational text."
+                                proc = dpopen([sys.executable, os.path.join(RUNTIME_DIR, "spawn_reviewer.py")] + (["--enable-exec-from-workspace"] if getattr(args, "enable_exec_from_workspace", False) else []) + [ "--thinking", resolved_thinking, "--prd-file", args.prd_file, "--pr-file", current_pr, "--diff-target", get_mainline_branch(workdir), "--workdir", workdir, "--global-dir", global_dir, "--out-file", review_artifact, "--run-dir", run_dir, "--system-alert", sys_alert], start_new_session=True, env=get_env_with_gemini_key(f"{base_filename}_reviewer", gemini_api_keys, global_dir))
+                                proc.wait()
                                 
                     if verdict == "APPROVED":
                         drun(["git", "reset", "--hard", "HEAD"])
