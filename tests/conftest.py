@@ -38,9 +38,8 @@ def init_git_test_sandbox(target_dir: str | Path, baseline_commit: bool = False)
         has_git = (str(target) == resolved_top)
     except subprocess.CalledProcessError:
         has_git = False
-
     if not has_git:
-        subprocess.run(["git", "-C", str(target), "init"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(target), "init", "-b", "master"], check=True, capture_output=True)
 
     subprocess.run(["git", "-C", str(target), "config", "--local", "user.name", "SDLC Test Sandbox"], check=True)
     subprocess.run(["git", "-C", str(target), "config", "--local", "user.email", "sdlc-test-sandbox@example.invalid"], check=True)

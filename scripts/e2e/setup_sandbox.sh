@@ -56,7 +56,7 @@ init_git_test_sandbox() {
     mkdir -p "$target_dir"
 
     if ! _sandbox_has_git_repo "$target_dir"; then
-        git -C "$target_dir" init >/dev/null 2>&1
+        git -C "$target_dir" init -b master >/dev/null 2>&1
     fi
 
     git -C "$target_dir" config --local user.name "SDLC Test Sandbox"
