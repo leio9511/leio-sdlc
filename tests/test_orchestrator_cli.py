@@ -5,11 +5,18 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import git_utils
+from test_path_helpers import exists_except_engine_local, static_root
 # mock check_git_boundary on the module if it's missing
 if not hasattr(git_utils, 'check_git_boundary'):
     git_utils.check_git_boundary = MagicMock()
+
+
+def _orchestrator_repo_root():
+    import orchestrator
+    return orchestrator.REPO_ROOT
 
 class TestOrchestratorCLI(unittest.TestCase):
     def test_missing_force_replan_exits(self):
@@ -157,13 +164,7 @@ class TestOrchestratorCLI(unittest.TestCase):
         import subprocess
         import tempfile
 
-        # Setup mock behavior
-        def mock_exists_side_effect(path):
-            if path == os.path.abspath("untracked.md"):
-                return True
-            return True
-
-        mock_exists.side_effect = mock_exists_side_effect
+        mock_exists.side_effect = exists_except_engine_local(static_root(_orchestrator_repo_root()))
 
         def mock_run_side_effect(*args, **kwargs):
             if args[0] == ["git", "ls-files", "--error-unmatch", os.path.abspath("untracked.md")]:
@@ -194,12 +195,7 @@ class TestOrchestratorCLI(unittest.TestCase):
         import subprocess
         import tempfile
 
-        def mock_exists_side_effect(path):
-            if path == os.path.abspath("modified.md"):
-                return True
-            return True
-
-        mock_exists.side_effect = mock_exists_side_effect
+        mock_exists.side_effect = exists_except_engine_local(static_root(_orchestrator_repo_root()))
 
         def mock_run_side_effect(*args, **kwargs):
             if args[0] == ["git", "rev-parse", "--show-toplevel"]:
@@ -238,12 +234,7 @@ class TestOrchestratorCLI(unittest.TestCase):
         import subprocess
         import tempfile
 
-        def mock_exists_side_effect(path):
-            if path == os.path.abspath("clean.md"):
-                return True
-            return True
-
-        mock_exists.side_effect = mock_exists_side_effect
+        mock_exists.side_effect = exists_except_engine_local(static_root(_orchestrator_repo_root()))
 
         def mock_run_side_effect(*args, **kwargs):
             if args[0] == ["git", "rev-parse", "--show-toplevel"]:

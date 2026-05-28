@@ -9,8 +9,10 @@ import pytest
 
 # Add scripts directory to path to allow import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import spawn_auditor
+from test_path_helpers import exists_except_engine_local, static_root
 
 
 VALID_PRD_CONTENT = (
@@ -188,7 +190,7 @@ def test_spawn_auditor_fails_fast_on_handshake_failure():
 @patch("spawn_auditor.config")
 @patch("runtime_launch_guard.config")
 @patch("sys.argv", ["/custom_runtime_dir/spawn_auditor.py", "--prd-file", "dummy", "--workdir", "dummy", "--channel", "dummy"])
-def test_spawn_auditor_startup_validation_uses_allowed_runtime_roots(mock_runtime_guard_config, mock_config):
+def test_spawn_auditor_startup_validation_uses_allowed_runtime_roots(mock_runtime_guard_config, mock_config, tmp_path):
     for cfg in (mock_config, mock_runtime_guard_config):
         cfg.ALLOWED_RUNTIME_ROOTS_CONFIG_KEY = "ALLOWED_RUNTIME_ROOTS"
         cfg.DEFAULT_ALLOWED_RUNTIME_ROOTS = ["/custom_runtime_dir"]
@@ -199,19 +201,29 @@ def test_spawn_auditor_startup_validation_uses_allowed_runtime_roots(mock_runtim
         }
         cfg.get_allowed_runtime_roots.return_value = ["/custom_runtime_dir"]
 
-    try:
-        with patch("spawn_auditor.invoke_agent"), \
-             patch("spawn_auditor.os.makedirs"), \
-             patch("spawn_auditor.os.chdir"), \
-             patch("spawn_auditor.os.path.exists", return_value=True), \
-             patch("spawn_auditor.open", create=True), \
-             patch("agent_driver.send_ignition_handshake"), \
-             patch("agent_driver.notify_channel"), \
-             patch("utils_api_key.setup_spawner_api_key"):
-            spawn_auditor.main()
-    except SystemExit as e:
-        if e.code == 1:
-            pytest.fail("spawn_auditor exited fatally, meaning startup validation failed unexpectedly")
+    prd_file = tmp_path / "dummy_prd.md"
+    _write_valid_prd(prd_file)
+
+    with patch.object(sys, "argv", ["spawn_auditor.py", "--prd-file", str(prd_file.resolve()), "--workdir", str(tmp_path), "--channel", "dummy", "--enable-exec-from-workspace"]):
+        try:
+            prd_file_abs = str(prd_file.resolve())
+
+            def _spawn_auditor_exists(path):
+                return path == prd_file_abs
+
+            with patch("spawn_auditor.invoke_agent", side_effect=SystemExit(0)), \
+                 patch("spawn_auditor.os.makedirs"), \
+                 patch("spawn_auditor.os.chdir"), \
+                 patch("spawn_auditor.envelope_assembler.save_envelope_artifacts"), \
+                 patch("engine_registry.os.path.exists", return_value=False), \
+                 patch("spawn_auditor.os.path.exists", side_effect=_spawn_auditor_exists), \
+                 patch("agent_driver.send_ignition_handshake"), \
+                 patch("agent_driver.notify_channel"), \
+                 patch("utils_api_key.setup_spawner_api_key"):
+                spawn_auditor.main()
+        except SystemExit as e:
+            if e.code == 1:
+                pytest.fail("spawn_auditor exited fatally, meaning startup validation failed unexpectedly")
 
 
 @patch("spawn_auditor.config")

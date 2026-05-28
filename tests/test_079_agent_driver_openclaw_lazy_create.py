@@ -5,7 +5,9 @@ from unittest.mock import patch, MagicMock
 
 # Add scripts directory to path to import agent_driver
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import agent_driver
+from test_path_helpers import exists_except_engine_local
 
 class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
     def setUp(self):
@@ -111,7 +113,7 @@ class TestAgentDriverOpenclawLazyCreate(unittest.TestCase):
         # Mock os.listdir to trigger file copy
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}):
             with patch('os.listdir', return_value=['AGENTS.md']):
-                with patch('os.path.exists', return_value=True):
+                with patch('os.path.exists', side_effect=exists_except_engine_local(agent_driver._resolve_sdlc_root)):
                     with patch('os.path.isdir', return_value=False):
                         with patch('os.makedirs'):
                             agent_driver.invoke_agent("test task", session_key="session-123")

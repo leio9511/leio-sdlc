@@ -4,7 +4,9 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import agent_driver
+from test_path_helpers import exists_except_engine_local
 
 
 class TestOpenClawModelAwareRouting(unittest.TestCase):
@@ -92,7 +94,7 @@ class TestOpenClawModelAwareRouting(unittest.TestCase):
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gemini-3.1-pro-preview"}, clear=False):
             with patch("os.listdir", return_value=["AGENTS.md"]):
-                with patch("os.path.exists", side_effect=lambda p: True):
+                with patch("os.path.exists", side_effect=exists_except_engine_local(agent_driver._resolve_sdlc_root)):
                     with patch("os.path.isdir", return_value=False):
                         with patch("os.makedirs"):
                             agent_driver.invoke_agent("task", session_key="session-123")

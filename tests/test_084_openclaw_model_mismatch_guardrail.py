@@ -4,8 +4,10 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import agent_driver
 from config import OPENCLAW_MODEL_MISMATCH_ERROR
+from test_path_helpers import exists_except_engine_local
 
 
 class TestOpenClawModelMismatchGuardrail(unittest.TestCase):
@@ -89,7 +91,7 @@ class TestOpenClawModelMismatchGuardrail(unittest.TestCase):
 
         with patch.dict(os.environ, {"SDLC_MODEL": "gpt"}, clear=False):
             with patch("os.listdir", return_value=["AGENTS.md"]):
-                with patch("os.path.exists", return_value=True):
+                with patch("os.path.exists", side_effect=exists_except_engine_local(agent_driver._resolve_sdlc_root)):
                     with patch("os.path.isdir", return_value=False):
                         with patch("os.makedirs"):
                             result = agent_driver.invoke_agent("task", session_key="session-123")
