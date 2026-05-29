@@ -129,6 +129,13 @@ def isolated_repo_env(source_repo: str | os.PathLike[str]):
         env["HOME_MOCK"] = str(mock_home)
         env["HOME"] = str(mock_home)
 
+        # Create transient mock-bin for gemini stub
+        mock_bin_dir = Path(parent_dir) / "mock-bin"
+        mock_bin_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(source_root / "tests" / "trap_stub_gemini.sh", mock_bin_dir / "gemini")
+        (mock_bin_dir / "gemini").chmod(0o755)
+        env["PATH"] = f"{mock_bin_dir}:{env.get('PATH', '')}"
+
         yield {
             "repo_root": str(repo_root),
             "mock_home": str(mock_home),

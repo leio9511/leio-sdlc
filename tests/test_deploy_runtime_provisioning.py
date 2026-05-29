@@ -211,3 +211,14 @@ def test_deploy_retries_with_public_pypi_fallback_when_permitted():
         assert len(pip_lines) == 2
 
 
+def test_deploy_intercepts_gemini_cli_and_exits_zero():
+    with isolated_repo_env(REPO_ROOT) as isolated:
+        install_fake_python_toolchain(isolated["repo_root"], isolated["env"])
+
+        result = _run_deploy(isolated["repo_root"], isolated["env"])
+
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert "🔗 Gemini CLI detected. Linking skill for dual compatibility..." in result.stdout
+
+
+
