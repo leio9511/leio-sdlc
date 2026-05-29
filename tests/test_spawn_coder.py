@@ -19,6 +19,15 @@ real_exists = os.path.exists
 
 
 class TestSpawnCoder(unittest.TestCase):
+    def setUp(self):
+        self.old_env = os.environ.copy()
+        if "LLM_DRIVER" in os.environ:
+            del os.environ["LLM_DRIVER"]
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.old_env)
+
     def test_extract_pr_id(self):
         self.assertEqual(spawn_coder.extract_pr_id("docs/PR_001_Test.md"), "PR_001")
         self.assertEqual(spawn_coder.extract_pr_id("PR_123_Something.md"), "PR_123")

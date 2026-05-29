@@ -676,7 +676,7 @@ def main():
     parser.add_argument(
         "--engine",
         choices=dynamic_choices,
-        default=default_engine,
+        default=os.environ.get("LLM_DRIVER", default_engine),
         help=f"Execution engine to use for the agent driver (default: {default_engine})",
     )
     parser.add_argument(

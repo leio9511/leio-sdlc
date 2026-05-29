@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--slice-failed-pr", required=False, default=None, help="Path to a failed PR file to slice")
     parser.add_argument("--replan-uat-failures", required=False, default=None, help="Path to a UAT report JSON file")
     parser.add_argument("--global-dir", required=False, help="Global directory for templates")
-    parser.add_argument("--engine", choices=dynamic_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
+    parser.add_argument("--engine", choices=dynamic_choices, default=os.environ.get("LLM_DRIVER", default_engine), help=f"Execution engine to use for the agent driver (default: {default_engine})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL", config.DEFAULT_GEMINI_MODEL), help=f"Model override for the selected engine (default: {config.DEFAULT_GEMINI_MODEL})")
     RUNTIME_DIR = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument(

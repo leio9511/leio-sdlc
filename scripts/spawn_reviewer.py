@@ -82,7 +82,7 @@ def main():
         print("[WARN] Could not load engine registry. Using fallback choices.", file=_sys.stderr)
         engine_reg = {"engines": {}}
     dynamic_choices, engine_alias_map, default_engine = build_spawner_engine_choices(engine_reg)
-    parser.add_argument("--engine", choices=dynamic_choices, default=default_engine, help=f"Execution engine to use for the agent driver (default: {default_engine})")
+    parser.add_argument("--engine", choices=dynamic_choices, default=os.environ.get("LLM_DRIVER", default_engine), help=f"Execution engine to use for the agent driver (default: {default_engine})")
     parser.add_argument("--model", default=os.environ.get("SDLC_MODEL"), help="Model override for the selected engine. When unset the engine's default_model is used.")
     parser.add_argument("--enable-exec-from-workspace", action="store_true", help="Bypass the workspace path check")
     args = parser.parse_args()
