@@ -1,4 +1,5 @@
 {
+  "allow_public_fallback": false,
   "engines": {
     "openclaw_native": {
       "engine_id": "openclaw_native",

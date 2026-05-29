@@ -177,3 +177,37 @@ def test_deploy_preserves_engines_local_json():
         assert deployed_engines_local.exists()
         assert deployed_engines_local.read_text(encoding="utf-8") == '{"mock": "config"}'
 
+
+def test_deploy_fails_closed_on_pip_failure_when_fallback_forbidden():
+    with isolated_repo_env(REPO_ROOT) as isolated:
+        repo_root = Path(isolated["repo_root"])
+        log_path = install_fake_python_toolchain(repo_root, isolated["env"], fail_step="pip")
+
+        result = _run_deploy(repo_root, isolated["env"])
+
+        assert result.returncode != 0
+        lines = _log_lines(log_path)
+        pip_lines = [line for line in lines if line.startswith("pip:")]
+        assert len(pip_lines) == 1
+
+
+def test_deploy_retries_with_public_pypi_fallback_when_permitted():
+    with isolated_repo_env(REPO_ROOT) as isolated:
+        repo_root = Path(isolated["repo_root"])
+        
+        config_dir = repo_root / "config"
+        config_dir.mkdir(exist_ok=True)
+        engines_local = config_dir / "engines.local.json"
+        engines_local.write_text('{"allow_public_fallback": true}', encoding="utf-8")
+
+        log_path = install_fake_python_toolchain(repo_root, isolated["env"], fail_step="pip")
+
+        result = _run_deploy(repo_root, isolated["env"])
+
+        assert result.returncode == 0, result.stderr + result.stdout
+
+        lines = _log_lines(log_path)
+        pip_lines = [line for line in lines if line.startswith("pip:")]
+        assert len(pip_lines) == 2
+
+
