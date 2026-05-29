@@ -107,6 +107,13 @@ perform_hard_copy_deployment() {
         cp -a TEMPLATES/openclaw_execution_agent/* "$TMP_DIR/TEMPLATES/openclaw_execution_agent/"
     fi
 
+    # Copy config/engines.local.json if it exists
+    if [ -f "config/engines.local.json" ]; then
+        echo "💾 Preserving workstation config/engines.local.json..."
+        mkdir -p "$TMP_DIR/config"
+        cp "config/engines.local.json" "$TMP_DIR/config/engines.local.json"
+    fi
+
     # Provision and validate the deployed runtime before production promotion.
     echo "🐍 Provisioning runtime Python in staging release..."
     bash "$TMP_DIR/scripts/provision_runtime.sh" "$TMP_DIR"

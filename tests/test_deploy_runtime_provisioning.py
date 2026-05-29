@@ -157,3 +157,23 @@ def test_deploy_does_not_provision_or_mutate_other_skills():
         assert result.returncode == 0, result.stderr + result.stdout
         assert sentinel.exists()
         assert sentinel.read_text(encoding="utf-8") == "untouched"
+
+
+def test_deploy_preserves_engines_local_json():
+    with isolated_repo_env(REPO_ROOT) as isolated:
+        repo_root = Path(isolated["repo_root"])
+        config_dir = repo_root / "config"
+        config_dir.mkdir(exist_ok=True)
+        engines_local = config_dir / "engines.local.json"
+        engines_local.write_text('{"mock": "config"}', encoding="utf-8")
+
+        install_fake_python_toolchain(repo_root, isolated["env"])
+
+        result = _run_deploy(repo_root, isolated["env"])
+
+        assert result.returncode == 0, result.stderr + result.stdout
+        prod_dir = Path(canonical_skill_dir(isolated["mock_home"], "leio-sdlc"))
+        deployed_engines_local = prod_dir / "config" / "engines.local.json"
+        assert deployed_engines_local.exists()
+        assert deployed_engines_local.read_text(encoding="utf-8") == '{"mock": "config"}'
+

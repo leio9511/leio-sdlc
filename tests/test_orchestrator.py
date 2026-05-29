@@ -59,6 +59,11 @@ def test_orchestrator_json_retry_framework_success(mock_workdir):
             pass
             
         assert mock_extract.call_count == 2
+        
+        # Assert git clean was called with exclusion
+        clean_calls = [call for call in mock_drun.call_args_list if isinstance(call[0][0], list) and "clean" in call[0][0]]
+        assert len(clean_calls) > 0
+        assert any("-e" in call[0][0] and "config/engines.local.json" in call[0][0] for call in clean_calls)
 
 def test_orchestrator_json_retry_framework_failure(mock_workdir):
     with patch('orchestrator.SanityContext.perform_healthy_check'), patch('orchestrator.teardown_coder_session') as mock_teardown, \
@@ -124,7 +129,8 @@ def test_orchestrator_system_alert_invocation(mock_workdir):
          patch('orchestrator.notify_channel'), \
          patch('orchestrator.glob.glob') as mock_glob, \
          patch('orchestrator.set_pr_status'), \
-         patch('orchestrator.extract_and_parse_json') as mock_extract:
+         patch('orchestrator.extract_and_parse_json') as mock_extract, \
+         patch.dict(os.environ, {"LLM_DRIVER": "openclaw"}):
          
         def dummy_drun(cmd, *args, **kwargs):
             mock_res = MagicMock()

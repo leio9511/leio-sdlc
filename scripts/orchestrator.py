@@ -1301,7 +1301,7 @@ def main():
                                 
                     if verdict == "APPROVED":
                         drun(["git", "reset", "--hard", "HEAD"])
-                        drun(["git", "clean", "-fd"])
+                        drun(["git", "clean", "-fd", "-e", "config/engines.local.json"])
                         safe_git_checkout(get_mainline_branch(workdir))
                         merge_result = drun([sys.executable, os.path.join(RUNTIME_DIR, "merge_code.py"), "--branch", branch_name, "--review-file", review_report_path])
                         if merge_result.returncode == 0:
@@ -1351,7 +1351,7 @@ def main():
                         dlog(f"State 5 Escalation: Tier 1 reset triggered. Resetting {branch_name}")
                         dlog(f"State 5 Escalation: Red Path reset triggered. Resetting {branch_name}")
                         drun(["git", "reset", "--hard"], check=False)
-                        drun(["git", "clean", "-fd"], check=False)
+                        drun(["git", "clean", "-fd", "-e", "config/engines.local.json"], check=False)
                         safe_git_checkout(get_mainline_branch(workdir))
                         drun(["git", "branch", "-D", branch_name], check=False)
                         
