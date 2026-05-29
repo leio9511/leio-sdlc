@@ -74,6 +74,7 @@ def test_spawn_auditor_valid_channel_success(mock_handshake, mock_notify, capsys
     _write_valid_prd(prd_file)
 
     monkeypatch.setenv("SDLC_TEST_MODE", "true")
+    monkeypatch.setenv("SDLC_RUN_DIR", str(tmp_path))
     monkeypatch.setenv("MOCK_AUDIT_RESULT", "APPROVE")
 
     with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", str(prd_file), "--workdir", ".", "--channel", "test_channel"]):
@@ -94,6 +95,7 @@ def test_auditor_rejected_returns_exit_0(mock_handshake, mock_notify, capsys, mo
     _write_valid_prd(prd_file)
 
     monkeypatch.setenv("SDLC_TEST_MODE", "true")
+    monkeypatch.setenv("SDLC_RUN_DIR", str(tmp_path))
     monkeypatch.setenv("MOCK_AUDIT_RESULT", "REJECT")
 
     with patch.object(sys, "argv", ["spawn_auditor.py", "--enable-exec-from-workspace", "--prd-file", str(prd_file), "--workdir", ".", "--channel", "test_channel"]):
@@ -164,6 +166,7 @@ def test_auditor_uses_shared_key_utility(mock_invoke_agent, mock_assign_api_key,
     _write_valid_prd(prd_file)
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("SDLC_RUN_DIR", str(tmp_path))
 
     args = ["--enable-exec-from-workspace", "--prd-file", str(prd_file), "--workdir", str(tmp_path), "--channel", "slack:C123"]
     with patch("sys.argv", ["spawn_auditor.py"] + args):
