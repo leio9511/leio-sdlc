@@ -3,7 +3,7 @@ Affected_Projects: [leio-sdlc]
 Context_Workdir: <Project_Root>
 ---
 
-# PRD v3.0: Environment Hardening and Configuration Decoupling
+# PRD v3.1: Environment Hardening and Configuration Decoupling
 
 ## 1. Context & Problem (业务背景与核心痛点)
 The LEIO-SDLC platform relies heavily on sandboxed environment testing, configuration-driven engine invocation, and local-to-production rollouts. However, the platform currently exhibits critical environmental vulnerabilities and workspace coupling issues:
@@ -12,8 +12,9 @@ The LEIO-SDLC platform relies heavily on sandboxed environment testing, configur
 3. **External Headless Dependencies**: E2E deployment tests require live linking to the `gemini` CLI. In headless staging or continuous integration (CI) environments, executing `gemini skills link` without user inputs or access credentials causes hanging states, timeout failures, and non-hermetic builds.
 4. **Compliance Registry Violations**: When running secure, enterprise-internal pipelines, runtime python provisioning scripts automatically fallback to public PyPI registries on install failures. This poses a compliance risk by bypassing policy-controlled corporate repositories.
 5. **Configuration Preservation Gaps**: Git-based state recovery mechanisms (`git clean -fd`) and staging rsync strategies aggressively purge local development overrides (specifically `config/engines.local.json`). This wipes out custom workstation-specific configurations whenever the orchestrator triggers error recovery or performs an atomic release swap.
+6. **CLI Parameter-Parsing & Option Collisions**: Decoupled environment parameters, specifically execution timeouts like `print-timeout` for engine CLI runners, have historically been treated as raw CLI positional arguments or embedded within `one_shot_args`. This practice causes parsing collisions and breaks the isolation of environment variables from engine invocation signatures.
 
-This PRD establishes the v3.0 product requirements to eliminate workspace blast radius side-effects, safely propagate spawner context, mock headless dependencies, enforce compliant fallback boundaries, and safeguard custom environment overlays.
+This PRD establishes the v3.1 product requirements to eliminate workspace blast radius side-effects, safely propagate spawner context, mock headless dependencies, enforce compliant fallback boundaries, safeguard custom environment overlays, and completely decouple runtime environment overrides from engine invocation parameters.
 
 ---
 
@@ -42,11 +43,13 @@ This PRD establishes the v3.0 product requirements to eliminate workspace blast 
   - `deploy.sh` must check for the existence of `config/engines.local.json` and copy it directly to `$TMP_DIR/config/engines.local.json` prior to provisioning, bypassing general rsync/gitignore blocks.
   - Orchestrator recovery runs must preserve workstation configs by executing hard resets with explicit exclusion parameters.
 
-### FR-5: Workspace-Bound Process Management (Auditor correction)
-* **Description**: Background process termination must be bound strictly to the local workspace directory.
+### FR-5: Workspace-Bound Process Management & Print-Timeout Environment Decoupling (Issue #66 / Auditor correction)
+* **Description**: Background process termination must be bound strictly to the local workspace directory, and execution timeout behaviors must be decoupled to isolate environment variables from raw CLI signatures.
 * **Requirements**:
-  - Background process PIDs spawned by the orchestrator must be appended to `.sdlc_runs/pids/sdlc_pids.txt`.
-  - During preflight/cleanup phases, the orchestrator must read this file, terminate only the PIDs listed, and wipe the file. Global commands like `pkill` are strictly prohibited.
+  - **Workspace-Bound Process Management**: Background process PIDs spawned by the orchestrator must be appended to `.sdlc_runs/pids/sdlc_pids.txt`. During preflight/cleanup phases, the orchestrator must read this file, terminate only the PIDs listed, and wipe the file. Global commands like `pkill` are strictly prohibited.
+  - **Print-Timeout Environment Decoupling**: The `print-timeout` flag configuration for direct command execution must be decoupled from CLI positional arguments.
+    - In `config/engines.default.json`, the `"--print-timeout"`, `"3600s"` flags must not remain in `one_shot_args`. Instead, the configuration must utilize the `"env_extra"` dictionary to declare the print-timeout key-value argument directly: `"env_extra": { "print-timeout": "3600s" }`.
+    - In `scripts/agent_driver.py`, during `direct_cli` command assembly, the spawner must dynamically extract the `"print-timeout"` value from `"env_extra"` and safely prepend `["--print-timeout", <value>]` directly to the assembled `cmd` list before extending it with any `one_shot_args` (like `--print`).
 
 ---
 
@@ -59,6 +62,7 @@ graph TD
         DEV[scripts/dev_python.sh]
         CFG[config/engines.default.json]
         LCFG[config/engines.local.json]
+        DRV[scripts/agent_driver.py]
     end
 
     subgraph Isolated Staging Env
@@ -73,10 +77,13 @@ graph TD
     PROV -- Reads Merged Config --> LCFG
     ORC -- Writes background process PIDs --> PID
     ORC -- Read and Reap targeted PIDs --> PID
+    DRV -- Reads merged engines overlay --> LCFG
+    DRV -- Extracts print-timeout & prepends CLI flags --> DRV
 ```
 - **Registry Decoupling**: Registry engine lookups load `engines.default.json` and optionally merge `engines.local.json`. The root property `allow_public_fallback` controls fallback safety checks.
-- **PID Blast Radius Isolation**: The directory `.sdlc_runs/pids/` acts as the state directory for active processes in the workspace workspace context.
+- **PID Blast Radius Isolation**: The directory `.sdlc_runs/pids/` acts as the state directory for active processes in the workspace context.
 - **Sandboxed PATH Injection**: The test driver context manager copies the mock shell script into a sandboxed path prior to execution, guaranteeing no external CLI commands escape the sandbox.
+- **Parameter-Parsing Hardening**: Moving options from positional CLI lists to structured `env_extra` mappings decouples environmental runtime properties from static spawner call signatures.
 
 ---
 
@@ -123,7 +130,7 @@ graph TD
   * **When** it performs a `git clean` to restore the workspace state
   * **Then** it must execute with an explicit exclusion parameter for `config/engines.local.json`.
 
-### FR-5: Workspace-Bound Process Management
+### FR-5: Workspace-Bound Process Management & Print-Timeout Decoupling
 * **Scenario: Workspace-Bound Reaping**
   * **Given** the orchestrator spawns three background processes
   * **When** the processes are initialized
@@ -131,6 +138,14 @@ graph TD
   * **And** when process cleanup is executed
   * **Then** only the PIDs listed in `.sdlc_runs/pids/sdlc_pids.txt` are reaped
   * **And** `.sdlc_runs/pids/sdlc_pids.txt` is completely cleared.
+
+* **Scenario: Dynamic print-timeout prepending for direct_cli engine**
+  * **Given** the `agy_direct_cli` engine specification has `"print-timeout"` configured as `"3600s"` in `"env_extra"`
+  * **And** `"one_shot_args"` contains only `["--print"]`
+  * **When** `_assemble_direct_cli_command` executes direct CLI command assembly
+  * **Then** it must extract `"print-timeout"` from `"env_extra"`
+  * **And** it must prepend `["--print-timeout", "3600s"]` directly to the CLI command arguments before extending with `"one_shot_args"`
+  * **And** the final assembled command list must have `"--print-timeout"` and `"3600s"` positioned before the `--print` one-shot flag.
 
 ---
 
@@ -152,13 +167,14 @@ The preflight pipeline must run in a fast, non-blocking cycle to guarantee high 
 
 ## 6. Framework Modifications (框架防篡改声明)
 The Coder is authorized to modify the following files:
-- `config/engines.default.json` (Set default fallback parameter)
+- `config/engines.default.json` (Set default fallback parameter, update default engine env_extra configurations)
 - `scripts/spawn_verifier.py` (Propagate `workdir` context)
 - `tests/deploy_test_support.py` (Inject sandboxed mock stub)
 - `deploy.sh` (Staging copy bridge)
 - `scripts/provision_runtime.sh` (Fallback error capture)
 - `scripts/dev_python.sh` (Fallback error capture)
 - `scripts/orchestrator.py` (Exclude overlay during cleanup, track local process PIDs)
+- `scripts/agent_driver.py` (Dynamically extract print-timeout from env_extra and prepend arguments)
 
 ---
 
@@ -241,13 +257,15 @@ exit 0
       "capability_surface": "client_mediated",
       "execution": {
         "executable": "agy",
-        "one_shot_args": ["--print-timeout", "3600s", "--print"],
+        "one_shot_args": ["--print"],
         "model_arg": null,
         "workspace_arg": {"flag": "--add-dir", "value": "{workdir}"},
         "permission_args": ["--dangerously-skip-permissions"],
         "sandbox_args": ["--sandbox"],
         "timeout_seconds": 3600,
-        "env_extra": {},
+        "env_extra": {
+          "print-timeout": "3600s"
+        },
         "default_model": null
       }
     },
@@ -276,7 +294,15 @@ drun(["git", "clean", "-fd", "-e", "config/engines.local.json"], check=False)
 .sdlc_runs/pids/sdlc_pids.txt
 ```
 
-#### 5. Spawn Verifier Signature Update
+#### 5. Agent Driver Spawner Parameter Extraction (scripts/agent_driver.py)
+```python
+env_extra = execution.get("env_extra", {})
+print_timeout_val = env_extra.get("print-timeout")
+if print_timeout_val:
+    cmd.extend(["--print-timeout", str(print_timeout_val)])
+```
+
+#### 6. Spawn Verifier Signature Update
 ```python
         result = invoke_agent(
             task_string,
@@ -304,3 +330,5 @@ This section logs historical iterations and architectural critiques of the envir
   - Dedicated copy bridge introduced in `deploy.sh` specifically carrying over `engines.local.json` to the temporary staging directory before execution.
   - Explicitly decoupled `pm-skill` deployments from virtualenv/pip requirements.
   - Transitioned from global `pkill` side-effects to a workspace-local, file-bound process tracking system (`.sdlc_runs/pids/sdlc_pids.txt`).
+- **v3.1 Architectural Decisions**:
+  - Transitioned the print-timeout configuration from `one_shot_args` to `env_extra` to completely eliminate CLI flag-parsing parameter collisions and isolate option bindings.
