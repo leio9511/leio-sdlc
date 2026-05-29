@@ -352,8 +352,9 @@ def test_agy_direct_cli_default_entry_validates():
     assert agy["cli_alias"] == "agy"
     assert agy["capability_surface"] == "client_mediated"
     assert agy["execution"]["timeout_seconds"] == 3600
-    assert "--print-timeout" in agy["execution"]["one_shot_args"]
-    assert "3600s" in agy["execution"]["one_shot_args"]
+    assert agy["execution"]["env_extra"]["print-timeout"] == "3600s"
+    assert "--print-timeout" not in agy["execution"]["one_shot_args"]
+    assert "3600s" not in agy["execution"]["one_shot_args"]
 
 
 def test_future_direct_cli_fixture_validates_as_stateless(tmp_path):

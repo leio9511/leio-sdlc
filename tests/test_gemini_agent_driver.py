@@ -414,6 +414,13 @@ class TestGeminiAgentDriver(unittest.TestCase):
         self.assertIn("--dangerously-skip-permissions", cmd)
         self.assertIn("--sandbox", cmd)
         self.assertIn("--print", cmd)
+        self.assertIn("--print-timeout", cmd)
+        self.assertIn("3600s", cmd)
+
+        print_timeout_idx = cmd.index("--print-timeout")
+        print_idx = cmd.index("--print")
+        self.assertLess(print_timeout_idx, print_idx)
+
         # Find the prompt argument (it contains "Read your complete task instructions")
         prompt_arg = next(arg for arg in cmd if "Read your complete task instructions" in arg)
         # Prompt must be a non-empty string; file-indirection mode writes a path reference

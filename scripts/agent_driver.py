@@ -255,6 +255,11 @@ def _assemble_direct_cli_command(engine_spec, secure_msg, workdir, model):
     if sandbox_args:
         cmd.extend(sandbox_args)
 
+    env_extra = execution.get("env_extra", {})
+    print_timeout_val = env_extra.get("print-timeout")
+    if print_timeout_val:
+        cmd.extend(["--print-timeout", str(print_timeout_val)])
+
     # one_shot_args + prompt
     one_shot_args = list(execution.get("one_shot_args", []))
     prompt_inserted = False
