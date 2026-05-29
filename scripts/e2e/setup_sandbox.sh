@@ -59,6 +59,12 @@ init_git_test_sandbox() {
         git -C "$target_dir" init -b master >/dev/null 2>&1
     fi
 
+    mkdir -p "$target_dir/.git/info"
+    echo ".sdlc_runs/pids/" >> "$target_dir/.git/info/exclude"
+    echo ".coder_session" >> "$target_dir/.git/info/exclude"
+    echo ".sdlc_repo.lock" >> "$target_dir/.git/info/exclude"
+    echo ".sdlc_lock_manifest.json" >> "$target_dir/.git/info/exclude"
+
     git -C "$target_dir" config --local user.name "SDLC Test Sandbox"
     git -C "$target_dir" config --local user.email "sdlc-test-sandbox@example.invalid"
 

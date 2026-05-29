@@ -144,7 +144,46 @@ def dpopen(cmd, **kwargs):
     import logging
     logger = logging.getLogger("sdlc_orchestrator")
     logger.debug(f"DEBUG [Subprocess Popen]: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
-    return subprocess.Popen(cmd, **kwargs)
+    proc = subprocess.Popen(cmd, **kwargs)
+    try:
+        workdir = os.getcwd()
+        pids_dir = os.path.join(workdir, ".sdlc_runs", "pids")
+        os.makedirs(pids_dir, exist_ok=True)
+        pids_file = os.path.join(pids_dir, "sdlc_pids.txt")
+        with open(pids_file, "a") as f:
+            f.write(f"{proc.pid}\n")
+    except Exception as e:
+        logger.error(f"Failed to track PID {proc.pid}: {e}")
+    return proc
+
+def cleanup_tracked_processes(workdir):
+    import logging
+    logger = logging.getLogger("sdlc_orchestrator")
+    pids_file = os.path.join(workdir, ".sdlc_runs", "pids", "sdlc_pids.txt")
+    if not os.path.exists(pids_file):
+        return
+    
+    logger.info(f"Cleaning up tracked processes from {pids_file}")
+    try:
+        with open(pids_file, "r") as f:
+            pids = [line.strip() for line in f if line.strip()]
+        
+        for pid_str in pids:
+            try:
+                pid = int(pid_str)
+                logger.info(f"Terminating process group for PID {pid}")
+                os.killpg(pid, signal.SIGTERM)
+            except ValueError:
+                logger.warning(f"Invalid PID in track file: {pid_str}")
+            except OSError as e:
+                logger.debug(f"Failed to kill process group {pid}: {e}")
+    except Exception as e:
+        logger.error(f"Error reading PIDs file: {e}")
+    finally:
+        try:
+            os.remove(pids_file)
+        except OSError:
+            pass
 
 
 import hashlib
@@ -460,6 +499,8 @@ def main():
         except (BlockingIOError, IOError):
             print("[FATAL_LOCK] Cannot clean up while another SDLC pipeline is active.")
             sys.exit(1)
+        
+        cleanup_tracked_processes(args.workdir)
         
         # 2-7. Quarantine logic: Stage, WIP commit, rename, checkout master
         os.chdir(args.workdir)
@@ -1364,6 +1405,8 @@ def main():
         print(HandoffPrompter.get_prompt("fatal_crash"))
         raise
     finally:
+        if 'workdir' in locals() and workdir:
+            cleanup_tracked_processes(workdir)
         if 'proc' in locals() and proc is not None and proc.poll() is None:
             try:
                 os.killpg(os.getpgid(proc.pid), signal.SIGTERM)

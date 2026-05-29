@@ -40,6 +40,7 @@ echo "__pycache__/" >> .gitignore
 echo "*.pyc" >> .gitignore
 echo "*.log" >> .gitignore
 echo "config/" >> .gitignore
+echo ".sdlc_runs/" >> .gitignore
 git add .gitignore scripts playbooks
 git commit -m "setup" > /dev/null 2>&1
 
