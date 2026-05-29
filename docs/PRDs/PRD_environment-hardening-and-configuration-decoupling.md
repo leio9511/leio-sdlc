@@ -3,165 +3,211 @@ Affected_Projects: [leio-sdlc]
 Context_Workdir: <Project_Root>
 ---
 
-# PRD: environment-hardening-and-configuration-decoupling (v2.0 Master)
+# PRD v3.0: Environment Hardening and Configuration Decoupling
 
 ## 1. Context & Problem (业务背景与核心痛点)
+The LEIO-SDLC platform relies heavily on sandboxed environment testing, configuration-driven engine invocation, and local-to-production rollouts. However, the platform currently exhibits critical environmental vulnerabilities and workspace coupling issues:
+1. **Global Side-Effects (Cloudtop Conflict)**: Process cleanup commands have traditionally used global `pkill` actions, which clean up server or socket processes across the entire workstation. This causes concurrent developers on shared platforms or Cloudtops to terminate each other's active pipelines.
+2. **Context Propagation Gaps**: Spawner scripts (specifically `spawn_verifier.py`) do not propagate the parsed absolute working directory (`workdir`) to downstream registry invocation drivers. This results in authorization bypass warnings and failure to verify directories properly under strict CLI registry checks.
+3. **External Headless Dependencies**: E2E deployment tests require live linking to the `gemini` CLI. In headless staging or continuous integration (CI) environments, executing `gemini skills link` without user inputs or access credentials causes hanging states, timeout failures, and non-hermetic builds.
+4. **Compliance Registry Violations**: When running secure, enterprise-internal pipelines, runtime python provisioning scripts automatically fallback to public PyPI registries on install failures. This poses a compliance risk by bypassing policy-controlled corporate repositories.
+5. **Configuration Preservation Gaps**: Git-based state recovery mechanisms (`git clean -fd`) and staging rsync strategies aggressively purge local development overrides (specifically `config/engines.local.json`). This wipes out custom workstation-specific configurations whenever the orchestrator triggers error recovery or performs an atomic release swap.
 
-As the LEIO SDLC framework evolves toward multi-engine orchestration, the reliability of local development workstations (Cloudtop) and CI/CD environment runtimes becomes paramount. Currently, the framework suffers from a series of environment pollution and coupling issues that block headless executions, cause deadlocks, and damage developer productivity:
-
-1. **Verifier Spawner workdir Mismatch**: Stateless direct CLI engines (e.g., `gemini_direct_cli`, `agy_direct_cli`) require a working directory (`workdir`) to resolve workspace arguments dynamically (e.g., `--add-dir {workdir}`). Currently, `spawn_verifier.py` fails to pass the parsed `workdir` context to `invoke_agent()`, causing fatal startup failures for direct CLI engines.
-2. **LOAS SSO deadlocks in E2E Deploy Tests**: E2E deployment tests run in sandboxed, network-isolated directories. When a host has the `gemini` CLI installed, the deploy script attempts to run `gemini skills link` during E2E tests. Since E2E tests are non-interactive, this triggers LOAS SSO authentication prompts that stall indefinitely, deadlocking the CI pipeline.
-3. **Brittle Dependency Bootstrapping**: Secure enterprise pip package registries or secure corporate mirrors occasionally lack common open-source packages like `PyYAML` or fail due to network limitations. This makes dependency installation during staging runtime provisioning fragile and blocks successful deployment.
-4. **Overlay Erasure on Git Resets**: To support custom setups without committing them, the framework uses a two-tier system: `engines.default.json` (base defaults) and `engines.local.json` (user-specific local overlay, git-ignored). During orchestrator failure recovery or merging, `git clean -fd` is invoked, which completely wipes the uncommitted `engines.local.json` file from the developer's workstation.
-5. **Workstation Port & Process Pollution**: Leftover zombie model API proxies and background server engines (like `gemini_api_prox` or `node_for_gemini`) from aborted runs consume workstation memory and lock network ports, causing subsequent pipeline runs to fail due to port collisions or state poisoning.
+This PRD establishes the v3.0 product requirements to eliminate workspace blast radius side-effects, safely propagate spawner context, mock headless dependencies, enforce compliant fallback boundaries, and safeguard custom environment overlays.
 
 ---
 
 ## 2. Requirements & User Stories (需求定义)
 
-### FR-1: Verifier Spawner workdir Propagation
-- **Description**: Update `scripts/spawn_verifier.py` to forward the parsed `workdir` argument directly to `invoke_agent()`. This ensures that stateless direct CLI engines can successfully resolve their workspace parameters and run without throwing missing-workdir fatal errors.
-- **User Story**: As a developer running stateless direct CLI engines, I want the UAT verifier spawner to correctly propagate the working directory context so that my local/CI tests do not abort due to missing workspace configurations.
+### FR-1: Verifier Spawner workdir Propagation (Issue #71)
+* **Description**: The UAT verifier spawner script `scripts/spawn_verifier.py` must explicitly propagate the absolute `workdir` parameter to `invoke_agent()`.
+* **Rationale**: DOWNSTREAM registries perform strict path verification to ensure the agent executes within an authorized sandbox directory. Ensuring explicit propagation prevents permission/registry bypass alerts.
 
-### FR-2: Hermetic E2E Deploy Tests via Gemini CLI Mock Stub
-- **Description**: Introduce a dedicated mock stub script `tests/trap_stub_gemini.sh` that intercepts `skills link` commands and exits `0` immediately. Update `tests/deploy_test_support.py` to inject this stub as `gemini` into the sandboxed environment's `PATH` during `isolated_repo_env` execution. This permanently isolates E2E tests from host-installed CLI binaries and eliminates SSO/LOAS deadlocks.
-- **User Story**: As a release engineer, I want sandboxed E2E deployment tests to bypass the host's `gemini` CLI and its authentication prompts so that our CI pipeline runs 100% offline and never deadlocks.
+### FR-2: Hermetic E2E Deploy Tests via gemini CLI Mock Stub (Issue #69)
+* **Description**: Deployment testing must be hermetic and network-free. E2E deployment runs must intercept any system calls to the `gemini` CLI and automatically route them to a custom mock stub `tests/trap_stub_gemini.sh`.
+* **Rationale**: Intercepting `gemini skills link` calls and exiting 0 ensures headless sandboxes do not hang or require terminal interaction.
 
-### FR-3: Self-healing Pip Registry Fallbacks
-- **Description**: Update `deploy.sh` (via `scripts/provision_runtime.sh`), `skills/pm-skill/deploy.sh`, and `scripts/dev_python.sh` to catch `pip install` failures and automatically retry the installation with `--extra-index-url https://pypi.org/simple` to bypass primary secure mirror outages or package gaps (e.g., missing `PyYAML`).
-- **User Story**: As a developer, I want python environment bootstrapping to automatically fall back to standard public indices if the secure mirror lacks critical packages so that my workstation setup is self-healing and resilient.
+### FR-3: Compliance-Safe Pip Registry Fallbacks (Issue #70 & Auditor correction)
+* **Description**: Virtualenv bootstrap actions must fail closed on package installation failure unless explicit permission is granted.
+* **Requirements**:
+  - Config parameter `"allow_public_fallback": false` must be defined as the default at the root level of `config/engines.default.json`.
+  - If a pip install fails during `scripts/provision_runtime.sh` or `scripts/dev_python.sh`:
+    - If `"allow_public_fallback"` evaluates to `false`, the installation must immediately abort with a clear compliance warning.
+    - If evaluated to `true` (via a local workspace overlay), the script may fallback to the public PyPI registry.
+  - **Exclusion**: This policy does not apply to `pm-skill` deployments as they do not manage Python virtual environments or runtime bootstrapping.
 
-### FR-4: Template-driven Configuration Overlay & Reset Safeguard
-- **Description**: Establish `config/engines.default.json` as the base template. Update `deploy.sh` to copy `config/engines.default.json` to `config/engines.local.json` as an overlay initial setup if the local config does not exist. Update `scripts/orchestrator.py` to use `git clean -fd -e config/engines.local.json` instead of `git clean -fd` during failure recovery or merge resets to permanently safeguard developer-specific configuration overlays.
-- **User Story**: As an architect, I want my custom local engine configurations to be preserved across orchestrator failure resets and successful branch merges so that I do not have to recreate my local settings after every run.
+### FR-4: Deployed Overlay Copy Bridge & Reset Safeguard (Auditor correction)
+* **Description**: Custom engine profiles must survive staging pipelines and failure resets.
+* **Requirements**:
+  - `deploy.sh` must check for the existence of `config/engines.local.json` and copy it directly to `$TMP_DIR/config/engines.local.json` prior to provisioning, bypassing general rsync/gitignore blocks.
+  - Orchestrator recovery runs must preserve workstation configs by executing hard resets with explicit exclusion parameters.
 
-### FR-5: Configurable Preflight Cleanup Hooks
-- **Description**: Define a `"preflight_cleanup_processes"` array configuration in `config/engines.default.json` containing `["gemini_api_prox", "node_for_gemini"]`. In `scripts/orchestrator.py` preflight startup, read this configuration and dynamically find and safely terminate/reap active matching PIDs on the workstation (excluding the orchestrator's own PID and parent PID) before starting execution phases.
-- **User Story**: As a system operator, I want active stale proxy or engine server processes to be sterilized before starting a new SDLC run so that port locking or process leaks do not degrade subsequent execution runs.
+### FR-5: Workspace-Bound Process Management (Auditor correction)
+* **Description**: Background process termination must be bound strictly to the local workspace directory.
+* **Requirements**:
+  - Background process PIDs spawned by the orchestrator must be appended to `.sdlc_runs/pids/sdlc_pids.txt`.
+  - During preflight/cleanup phases, the orchestrator must read this file, terminate only the PIDs listed, and wipe the file. Global commands like `pkill` are strictly prohibited.
 
 ---
 
 ## 3. Architecture & Technical Strategy (架构设计与技术路线)
-
 ```mermaid
 graph TD
-    A[Orchestrator Preflight Startup] --> B[Process Sterilization Hook]
-    B -->|Read config/engines.default.json| C[Kill preflight_cleanup_processes PIDs]
-    C --> D[Initialize Sandbox Run]
-    D --> E[Run spawn_verifier.py]
-    E -->|Propagates workdir context| F[invoke_agent with workdir=workdir]
-    
-    G[deploy.sh Execution] --> H[Create engines.local.json overlay template]
-    G --> I[Provision python runtime]
-    I -->|Failed secure pip install| J[Retry with --extra-index-url pypi.org]
-    
-    K[Orchestrator Reset & Merge] --> L[Safe Git Clean]
-    L -->|git clean -fd -e config/engines.local.json| M[Overlay preserved]
+    subgraph Workspace Root
+        ORC[scripts/orchestrator.py]
+        DEP[deploy.sh]
+        DEV[scripts/dev_python.sh]
+        CFG[config/engines.default.json]
+        LCFG[config/engines.local.json]
+    end
+
+    subgraph Isolated Staging Env
+        TMP[SKILLS_DIR/.tmp_leio-sdlc]
+        PROV[scripts/provision_runtime.sh]
+        PID[/.sdlc_runs/pids/sdlc_pids.txt]
+    end
+
+    DEP -- Copy Bridge --> TMP
+    LCFG -- Overlay --> TMP
+    PROV -- Reads Merged Config --> CFG
+    PROV -- Reads Merged Config --> LCFG
+    ORC -- Writes background process PIDs --> PID
+    ORC -- Read and Reap targeted PIDs --> PID
 ```
-
-### 3.1 Decoupled Engine Context Routing
-Stateless direct CLI engines rely entirely on the orchestrator injecting environment variables and workdir paths. When `spawn_verifier.py` executes, it must treat the environment as a decoupled, stateless target, routing UAT commands through the `invoke_agent()` router with full path context.
-
-### 3.2 Sandboxed E2E Environment Isolation
-By prepending a staged directory containing `gemini` mock stubs into the sandboxed `PATH` inside `isolated_repo_env`, we fully decouple the execution of E2E deployment tests from the host's machine state. This represents a robust architectural firewall that stops host-level LOAS SSO requests from polluting or stalling sandboxed executions.
+- **Registry Decoupling**: Registry engine lookups load `engines.default.json` and optionally merge `engines.local.json`. The root property `allow_public_fallback` controls fallback safety checks.
+- **PID Blast Radius Isolation**: The directory `.sdlc_runs/pids/` acts as the state directory for active processes in the workspace workspace context.
+- **Sandboxed PATH Injection**: The test driver context manager copies the mock shell script into a sandboxed path prior to execution, guaranteeing no external CLI commands escape the sandbox.
 
 ---
 
 ## 4. Acceptance Criteria (BDD 黑盒验收标准)
 
-### Scenario 1 (FR-1): Verifier workdir Context Propagation
-- **Given** a stateless direct CLI engine is configured as the active driver (e.g., `LLM_DRIVER=gemini_direct_cli`)
-- **And** a working directory lock is parsed as the `--workdir` command-line argument in `spawn_verifier.py`
-- **When** `spawn_verifier.py` executes the agent invocation phase
-- **Then** `spawn_verifier.py` propagates the `workdir` keyword argument value to `invoke_agent(workdir=workdir)`
-- **And** the execution resolves the workspace arguments successfully without throwing missing-workdir fatal errors.
+### FR-1: Verifier Spawner workdir Propagation
+* **Scenario: UAT Verifier Sandbox Propagation**
+  * **Given** the UAT spawner `spawn_verifier.py` receives a `--workdir "/my/target/workdir"` command parameter
+  * **When** it executes the agent invocation phase
+  * **Then** it must explicitly forward `workdir="/my/target/workdir"` to the `invoke_agent()` execution call.
 
-### Scenario 2 (FR-2): offline Sandboxed E2E Deploy Test Execution
-- **Given** an E2E deployment test runs inside the sandboxed `isolated_repo_env` context
-- **And** the mock stub at `tests/trap_stub_gemini.sh` is injected into the sandboxed `PATH` as `gemini`
-- **When** `deploy.sh` or `skills/pm-skill/deploy.sh` executes the `gemini skills link` command
-- **Then** the command resolves to the mock stub script instead of the host system's `gemini` binary
-- **And** it intercepts the `skills link` arguments, prints `[MOCK] Intercepted gemini skills link`, and exits with status `0`
-- **And** the deployment E2E test finishes successfully with no network interactions or interactive SSO hangs.
+### FR-2: Hermetic E2E Deploy Tests via gemini CLI Mock Stub
+* **Scenario: Sandboxed gemini Interception**
+  * **Given** an E2E test executes inside `isolated_repo_env`
+  * **When** the deployment run invokes the `gemini` CLI link routine
+  * **Then** the command must be captured by the injected mock stub `gemini` located in the isolated `PATH`
+  * **And** the stub must exit immediately with `0` on capturing `skills link`.
 
-### Scenario 3 (FR-3): Self-healing Pip Installation Recovery
-- **Given** a staging runtime python environment is being provisioned via `scripts/provision_runtime.sh` or `scripts/dev_python.sh`
-- **And** the primary secure package registry lacks `PyYAML` or is temporarily down
-- **When** the primary `pip install` command fails (returns a non-zero exit status)
-- **Then** the bootstrap runner captures the failure and automatically retries the command:
-  `pip install --extra-index-url https://pypi.org/simple ...`
-- **And** the environment setup successfully completes, allowing runtime execution to proceed cleanly.
+### FR-3: Compliance-Safe Pip Registry Fallbacks
+* **Scenario: Pip failure with fallback forbidden**
+  * **Given** the merged engine configuration has `"allow_public_fallback"` set to `false`
+  * **When** a `pip install` routine fails inside `provision_runtime.sh` or `dev_python.sh`
+  * **Then** the routine must log a compliance violation error
+  * **And** immediately abort execution with exit code `1`.
 
-### Scenario 4 (FR-4): Preservation of Configuration Overlays on Git Clean
-- **Given** a developer has created a customized local overlay at `config/engines.local.json`
-- **When** the Orchestrator triggers a failure recovery reset or a post-merge teardown sequence
-- **Then** the Orchestrator runs the git clean command strictly using:
-  `git clean -fd -e config/engines.local.json`
-- **And** the local config file `config/engines.local.json` is untouched and remains intact on the disk.
+* **Scenario: Pip failure with fallback permitted**
+  * **Given** the merged engine configuration has `"allow_public_fallback"` set to `true`
+  * **When** a secure registry `pip install` routine fails inside `provision_runtime.sh` or `dev_python.sh`
+  * **Then** the routine must log a warning and execute a fallback package installation to public PyPI.
 
-### Scenario 5 (FR-5): Preflight Process Sterilization
-- **Given** zombie `gemini_api_prox` or `node_for_gemini` processes are active from an aborted previous run
-- **When** `orchestrator.py` starts a new execution run and executes the preflight check phase
-- **Then** the Orchestrator resolves `"preflight_cleanup_processes"` from the loaded engines registry config
-- **And** it identifies the active PIDs of matching processes on the workstation (excluding current/parent process PIDs)
-- **And** it forcefully reaps and terminates those PIDs before booting up any sub-agents or verifier runs.
+* **Scenario: pm-skill deployment bypass**
+  * **Given** the staging tool chain deploys a `pm-skill` target
+  * **When** it copies resources
+  * **Then** it must bypass all virtualenv configurations and skip register fallback checks.
+
+### FR-4: Deployed Overlay Copy Bridge & Reset Safeguard
+* **Scenario: Preservation of Engine Overlay during deployment**
+  * **Given** a workstation contains `config/engines.local.json`
+  * **When** `deploy.sh` runs its build/staging routine
+  * **Then** the staging directory must receive a copy of `config/engines.local.json` prior to the python runtime provisioning execution.
+
+* **Scenario: Git clean recovery bypass**
+  * **Given** the orchestrator runs in forensic error recovery mode
+  * **When** it performs a `git clean` to restore the workspace state
+  * **Then** it must execute with an explicit exclusion parameter for `config/engines.local.json`.
+
+### FR-5: Workspace-Bound Process Management
+* **Scenario: Workspace-Bound Reaping**
+  * **Given** the orchestrator spawns three background processes
+  * **When** the processes are initialized
+  * **Then** their Process IDs must be appended to `.sdlc_runs/pids/sdlc_pids.txt`
+  * **And** when process cleanup is executed
+  * **Then** only the PIDs listed in `.sdlc_runs/pids/sdlc_pids.txt` are reaped
+  * **And** `.sdlc_runs/pids/sdlc_pids.txt` is completely cleared.
 
 ---
 
 ## 5. Overall Test Strategy & Quality Goal (测试策略与质量目标)
 
-- **Quality Risks**: 
-  1. Flaky E2E tests on CI due to environment-specific credentials or network access limits.
-  2. Destructive data loss of uncommitted files in local workspaces.
-- **Mocking Strategy**: Avoid real external network dependencies during unit and integration test runs. Use `tests/trap_stub_gemini.sh` exclusively inside the sandboxed `isolated_repo_env` environment to test dual-compatibility integration.
-- **Architectural SLA Speed Goals**:
-  - **Cloudtop Workstation Run**: Preflight checks, sterilization, and startup sequence must resolve in **~2 minutes**.
-  - **CI/CD Pipeline Execution**: Full setup, environment bootstrap, and preflight phases must complete under **~5 minutes**.
-  > [!IMPORTANT]
-  > **Non-functional Quality SLA**: The preflight speed goals (~2 mins Cloudtop, ~5 mins CI) are strictly non-functional quality SLAs and architectural targets. They **MUST NEVER** be hardcoded as assertions inside automated unit tests or integration tests to avoid flaky test suites and fragile build environments.
+### Preflight Execution SLA (Performance Quality Metric)
+The preflight pipeline must run in a fast, non-blocking cycle to guarantee high developer velocity:
+- **Cloudtop Developer Workstations**: Target execution speed of **~2 minutes**.
+- **Continuous Integration (CI) Runners**: Target execution speed of **~5 minutes**.
+
+> [!IMPORTANT]
+> The preflight execution target is strictly an architectural quality SLA. It must **NEVER** be hardcoded as an assertion or timeout limitation inside any unit test, ensuring tests remain robust across heterogeneous runner environments.
+
+### Core Isolation Strategy
+- **Sandbox Path**: All E2E test targets must execute inside the context manager `isolated_repo_env` to prevent workstation contamination.
+- **Registry Override**: Tests must use transient configurations using unique runtime mock directories.
 
 ---
 
 ## 6. Framework Modifications (框架防篡改声明)
-
-The Coder is authorized to make targeted modifications to the following framework files:
-- `scripts/spawn_verifier.py`
-- `tests/deploy_test_support.py`
-- `deploy.sh`
-- `skills/pm-skill/deploy.sh`
-- `scripts/dev_python.sh`
-- `scripts/provision_runtime.sh`
-- `config/engines.default.json`
-- `scripts/orchestrator.py`
+The Coder is authorized to modify the following files:
+- `config/engines.default.json` (Set default fallback parameter)
+- `scripts/spawn_verifier.py` (Propagate `workdir` context)
+- `tests/deploy_test_support.py` (Inject sandboxed mock stub)
+- `deploy.sh` (Staging copy bridge)
+- `scripts/provision_runtime.sh` (Fallback error capture)
+- `scripts/dev_python.sh` (Fallback error capture)
+- `scripts/orchestrator.py` (Exclude overlay during cleanup, track local process PIDs)
 
 ---
 
 ## 7. Hardcoded Content (硬编码内容)
 
-> [!IMPORTANT]
-> **Anti-Hallucination Policy (防幻觉策略):** The Coder must copy-paste the following raw strings, command lines, parameters, and config patterns exactly as written. Do not modify, alter, or expand upon the following values.
+### Exact Text Replacements:
 
-### 7.1 `tests/trap_stub_gemini.sh` Bash Mock Code
+#### 1. Mock Stub `tests/trap_stub_gemini.sh` (Raw Content)
 ```bash
-#!/bin/bash
-# Mock stub for gemini CLI to prevent SSO deadlocks in testing
-if [ "$1" = "skills" ] && [ "$2" = "link" ]; then
-  echo "[MOCK] Intercepted gemini skills link"
+#!/usr/bin/env bash
+# Mock gemini CLI stub for hermetic E2E deploy testing.
+# Intercepts "skills link" subcommands and exits 0.
+
+has_skills=false
+has_link=false
+
+for arg in "$@"; do
+  if [ "$arg" = "skills" ]; then
+    has_skills=true
+  elif [ "$arg" = "link" ]; then
+    has_link=true
+  fi
+done
+
+if [ "$has_skills" = true ] && [ "$has_link" = true ]; then
+  # Intercepted "skills link"
   exit 0
 fi
-echo "[MOCK] Unrecognized gemini stub command: $@"
-exit 1
+
+echo "gemini mock called with: $*"
+exit 0
 ```
 
-### 7.2 `config/engines.default.json` Target Updates
-
+#### 2. Complete, 4-Engine `config/engines.default.json`
 ```json
 {
-  "preflight_cleanup_processes": [
-    "gemini_api_prox",
-    "node_for_gemini"
-  ],
+  "allow_public_fallback": false,
   "engines": {
+    "openclaw_native": {
+      "engine_id": "openclaw_native",
+      "cli_alias": "openclaw",
+      "display_name": "OpenClaw Native",
+      "runtime_mode": "openclaw_native",
+      "registration_visibility": "public",
+      "continuity_mode": "stateful",
+      "handle_acquisition_strategy": "unavailable",
+      "fallback_policy": "none",
+      "capability_surface": "runtime_managed"
+    },
     "gemini_direct_cli": {
       "engine_id": "gemini_direct_cli",
       "cli_alias": "gemini",
@@ -174,7 +220,7 @@ exit 1
       "capability_surface": "client_mediated",
       "execution": {
         "executable": "gemini",
-        "one_shot_args": ["--print-timeout 3600s"],
+        "one_shot_args": ["--yolo", "-p"],
         "model_arg": {"flag": "--model", "value": "{model}"},
         "workspace_arg": null,
         "permission_args": [],
@@ -182,17 +228,79 @@ exit 1
         "timeout_seconds": 3600,
         "env_extra": {}
       }
+    },
+    "agy_direct_cli": {
+      "engine_id": "agy_direct_cli",
+      "cli_alias": "agy",
+      "display_name": "Antigravity CLI (agy)",
+      "runtime_mode": "direct_cli",
+      "registration_visibility": "public",
+      "continuity_mode": "stateless",
+      "handle_acquisition_strategy": "unavailable",
+      "fallback_policy": "fail_closed",
+      "capability_surface": "client_mediated",
+      "execution": {
+        "executable": "agy",
+        "one_shot_args": ["--print-timeout", "3600s", "--print"],
+        "model_arg": null,
+        "workspace_arg": {"flag": "--add-dir", "value": "{workdir}"},
+        "permission_args": ["--dangerously-skip-permissions"],
+        "sandbox_args": ["--sandbox"],
+        "timeout_seconds": 3600,
+        "env_extra": {},
+        "default_model": null
+      }
+    },
+    "gemini_acp_reference": {
+      "engine_id": "gemini_acp_reference",
+      "display_name": "Gemini ACP Reference",
+      "runtime_mode": "acp",
+      "registration_visibility": "public",
+      "continuity_mode": "stateful",
+      "handle_acquisition_strategy": "protocol_native",
+      "fallback_policy": "fail_closed_until_prerequisite_ready",
+      "capability_surface": "client_mediated"
     }
   }
 }
 ```
 
-### 7.3 `git clean` Exclude Override Command
-```text
-git clean -fd -e config/engines.local.json
+#### 3. Git Clean Exclusion Parameters (Raw Signature in orchestrator.py)
+```python
+drun(["git", "clean", "-fd", "-e", "config/engines.local.json"])
+drun(["git", "clean", "-fd", "-e", "config/engines.local.json"], check=False)
 ```
 
-### 7.4 `spawn_verifier.py` Parameter Invocation Update Signature
+#### 4. Workspace-Local Process PID File Path
 ```text
-workdir=workdir
+.sdlc_runs/pids/sdlc_pids.txt
 ```
+
+#### 5. Spawn Verifier Signature Update
+```python
+        result = invoke_agent(
+            task_string,
+            session_key=session_id,
+            role="verifier",
+            run_dir=run_dir,
+            workdir=workdir,
+            thinking=resolved_thinking
+        )
+```
+
+---
+
+## Appendix: Architecture Evolution Trace (架构演进与审查追踪)
+This section logs historical iterations and architectural critiques of the environment isolation & configuration decoupling initiatives:
+
+- **v1.0 Draft (Initial Proposal)**:
+  - Proposed generic sandbox cleanup scripting and basic fallback configuration logic.
+- **Auditor Rejection (v2.0 Review)**:
+  - *catastrophic overwrite risk*: The reset routine utilized unconstrained `git clean -fd` commands, deleting vital workstation engine override configurations (`engines.local.json`) that took time to recreate.
+  - *overlay staging gap*: The release script `deploy.sh` relied on generic `.gitignore` / `.release_ignore` rules during deployment swaps, preventing workspace engine overlays from actually staging to the production directory.
+  - *pm-skill virtualenv pollution*: The original compliance fallback requirements mistakenly included `pm-skill` deployments, polluting light copy/deploy processes with unnecessary virtualenv constraints.
+- **v3.0 Architectural Decisions**:
+  - Explicit exclusion flags (`-e config/engines.local.json`) added to git cleanup processes.
+  - Dedicated copy bridge introduced in `deploy.sh` specifically carrying over `engines.local.json` to the temporary staging directory before execution.
+  - Explicitly decoupled `pm-skill` deployments from virtualenv/pip requirements.
+  - Transitioned from global `pkill` side-effects to a workspace-local, file-bound process tracking system (`.sdlc_runs/pids/sdlc_pids.txt`).
