@@ -298,7 +298,7 @@ def get_head_commit_hash(workdir):
     return head or None
 
 
-def classify_coder_null_output(workdir, attempt_head, coder_returncode):
+def classify_coder_null_output(workdir, attempt_head, coder_returncode, default_branch=None):
     status_output = drun(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=workdir).stdout
     current_head = get_head_commit_hash(workdir)
     is_null_output = (

@@ -503,3 +503,14 @@ def test_reviewer_retry_alert_contains_previous_output_and_schema(
             assert "## REQUIRED SCHEMA" in alert_value
             assert "overall_assessment" in alert_value
             assert "findings" in alert_value
+
+
+def test_classify_coder_null_output_signature():
+    import inspect
+    from orchestrator import classify_coder_null_output
+    sig = inspect.signature(classify_coder_null_output)
+    params = list(sig.parameters.values())
+    assert len(params) == 4
+    assert params[3].name == "default_branch"
+    assert params[3].default is None
+
