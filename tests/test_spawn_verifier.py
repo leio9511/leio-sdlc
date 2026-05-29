@@ -75,6 +75,8 @@ class TestSpawnVerifier(unittest.TestCase):
         rendered_prompt = args[0]
         self.assertTrue(rendered_prompt.startswith("## IDENTITY & PRIMARY GOAL"))
         self.assertEqual(kwargs.get("role"), "verifier")
+        self.assertEqual(kwargs.get("workdir"), os.path.abspath(self.workdir))
+        self.assertEqual(kwargs.get("run_dir"), self.run_dir)
         mock_setup_key.assert_called()
 
         debug_dir = os.path.join(self.run_dir, "uat_debug", "initial")
