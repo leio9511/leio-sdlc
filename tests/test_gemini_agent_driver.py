@@ -414,9 +414,8 @@ class TestGeminiAgentDriver(unittest.TestCase):
         self.assertIn("--dangerously-skip-permissions", cmd)
         self.assertIn("--sandbox", cmd)
         self.assertIn("--print", cmd)
-        # Prompt is after --print
-        print_idx = cmd.index("--print")
-        prompt_arg = cmd[print_idx + 1]
+        # Find the prompt argument (it contains "Read your complete task instructions")
+        prompt_arg = next(arg for arg in cmd if "Read your complete task instructions" in arg)
         # Prompt must be a non-empty string; file-indirection mode writes a path reference
         self.assertIsInstance(prompt_arg, str)
         self.assertGreater(len(prompt_arg), 20)

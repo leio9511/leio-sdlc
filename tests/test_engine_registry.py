@@ -351,6 +351,9 @@ def test_agy_direct_cli_default_entry_validates():
     assert agy["fallback_policy"] == "fail_closed"
     assert agy["cli_alias"] == "agy"
     assert agy["capability_surface"] == "client_mediated"
+    assert agy["execution"]["timeout_seconds"] == 3600
+    assert "--print-timeout" in agy["execution"]["one_shot_args"]
+    assert "3600s" in agy["execution"]["one_shot_args"]
 
 
 def test_future_direct_cli_fixture_validates_as_stateless(tmp_path):
@@ -393,7 +396,7 @@ def test_future_direct_cli_fixture_validates_as_stateless(tmp_path):
     assert future["capability_surface"] == "client_mediated"
 
     # Verify alias resolution works from the registry
-    from engine_registry import build_spawner_engine_choices
+    from scripts.engine_registry import build_spawner_engine_choices
     choices, alias_to_id, default_alias = build_spawner_engine_choices(registry)
     assert "future-cli" in choices
     assert alias_to_id["future-cli"] == "future_direct_cli"

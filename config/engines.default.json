@@ -44,12 +44,12 @@
       "capability_surface": "client_mediated",
       "execution": {
         "executable": "agy",
-        "one_shot_args": ["--print"],
+        "one_shot_args": ["--print", "--print-timeout", "3600s"],
         "model_arg": null,
         "workspace_arg": {"flag": "--add-dir", "value": "{workdir}"},
         "permission_args": ["--dangerously-skip-permissions"],
         "sandbox_args": ["--sandbox"],
-        "timeout_seconds": 300,
+        "timeout_seconds": 3600,
         "env_extra": {},
         "default_model": null
       }
