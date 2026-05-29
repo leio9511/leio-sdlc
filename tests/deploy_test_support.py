@@ -127,6 +127,7 @@ def isolated_repo_env(source_repo: str | os.PathLike[str]):
 
         env = os.environ.copy()
         env["HOME_MOCK"] = str(mock_home)
+        env["HOME"] = str(mock_home)
 
         yield {
             "repo_root": str(repo_root),

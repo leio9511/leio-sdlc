@@ -73,5 +73,5 @@ echo "✅ $SLUG deployed."
 
 if command -v gemini >/dev/null 2>&1; then
     echo "🔗 Gemini CLI detected. Linking skill for dual compatibility..."
-    gemini skills link "$PROD_DIR" --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
+    HOME="$HOME_ROOT" gemini skills link "$PROD_DIR" --consent || echo "⚠️ Gemini link failed, but deployment succeeded."
 fi
