@@ -53,6 +53,7 @@ class TestCoderRevisionRouting(unittest.TestCase):
             mock_invoke.assert_called_once()
             prompt = mock_invoke.call_args[0][0]
             self.assertEqual(mock_invoke.call_args[1]["session_key"], "existing-session")
+            self.assertEqual(mock_invoke.call_args[1]["workdir"], tmp_dir)
             self.assertIn("# REVIEW REPORT JSON", prompt)
             self.assertIn(RAW_REVIEW_JSON, prompt)
             self.assertIn(REVISION_RULE, prompt)
@@ -83,6 +84,7 @@ class TestCoderRevisionRouting(unittest.TestCase):
             self.assertFalse(is_existing)
             self.assertEqual(key, "new-session")
             prompt = mock_invoke.call_args[0][0]
+            self.assertEqual(mock_invoke.call_args[1]["workdir"], tmp_dir)
             self.assertIn("## CODER PLAYBOOK", prompt)
             self.assertIn("# Coder Playbook V2", prompt)
             self.assertIn("## REVIEWER FEEDBACK", prompt)
@@ -144,6 +146,7 @@ class TestCoderRevisionRouting(unittest.TestCase):
                 app_config={config.CODER_PLAYBOOK_VERSION_CONFIG_KEY: config.CODER_PLAYBOOK_V1},
             )
 
+            self.assertEqual(mock_invoke.call_args[1]["workdir"], tmp_dir)
             bootstrap_dir = Path(tmp_dir) / "coder_debug" / "revision_bootstrap_001"
             packet_file = bootstrap_dir / "startup_packet.json"
             prompt_file = bootstrap_dir / "rendered_prompt.txt"

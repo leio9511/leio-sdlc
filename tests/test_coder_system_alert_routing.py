@@ -72,6 +72,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
             mock_invoke.assert_called_once()
             prompt = mock_invoke.call_args[0][0]
             self.assertEqual(mock_invoke.call_args[1]["session_key"], "existing-session")
+            self.assertEqual(mock_invoke.call_args[1]["workdir"], tmp_dir)
             self.assertIn("# SYSTEM ALERT YOU MUST FIX", prompt)
             self.assertIn(SYSTEM_ALERT_TEXT, prompt)
             self.assertIn(SYSTEM_ALERT_CONTINUATION_RULE, prompt)
@@ -100,6 +101,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
             self.assertFalse(is_existing)
             self.assertEqual(key, "new-session")
             prompt = mock_invoke.call_args[0][0]
+            self.assertEqual(mock_invoke.call_args[1]["workdir"], tmp_dir)
             self.assertIn("## CODER PLAYBOOK", prompt)
             self.assertIn("# Coder Playbook V2", prompt)
             self.assertIn("## SYSTEM ALERT", prompt)
@@ -158,6 +160,7 @@ class TestCoderSystemAlertRouting(unittest.TestCase):
             self.assertTrue(is_existing)
             self.assertEqual(key, "existing-session")
             prompt = mock_invoke.call_args[0][0]
+            self.assertEqual(mock_invoke.call_args[1]["workdir"], tmp_dir)
             self.assertIn("# CODER SYSTEM ALERT CONTINUATION", prompt)
             self.assertIn(SYSTEM_ALERT_CONTINUATION_RULE, prompt)
             self.assertIn(NULL_OUTPUT_SYSTEM_ALERT, prompt)

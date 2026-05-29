@@ -39,7 +39,7 @@ class TestSpawnCoder(unittest.TestCase):
     def test_send_feedback(self, mock_call):
         mock_call.return_value = AgentResult(session_key="sdlc_coder_PR_001", stdout="")
         spawn_coder.send_feedback("sdlc_coder_PR_001", "feedback message")
-        mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".", thinking=None)
+        mock_call.assert_called_once_with("feedback message", session_key="sdlc_coder_PR_001", role="coder", run_dir=".", workdir=".", thinking=None)
 
     @patch('spawn_coder.get_current_branch', return_value='feature/test')
     @patch('spawn_coder.get_latest_commit_hash', return_value='abc123')
@@ -67,6 +67,7 @@ class TestSpawnCoder(unittest.TestCase):
         called_msg = mock_invoke.call_args[0][0]
         called_kwargs = mock_invoke.call_args[1]
         self.assertEqual(called_kwargs['session_key'], "sdlc_coder_PR_001")
+        self.assertEqual(called_kwargs['workdir'], "/tmp/work")
         self.assertIn("# REVIEW REPORT JSON", called_msg)
         self.assertIn("Fix the bugs.", called_msg)
         self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, called_msg)
@@ -347,6 +348,7 @@ class TestSpawnCoder(unittest.TestCase):
 
             self.assertTrue(mock_invoke.called)
             task_string = mock_invoke.call_args[0][0]
+            self.assertEqual(mock_invoke.call_args[1]['workdir'], os.path.abspath(tmp_dir))
             self.assertTrue(task_string.startswith("## IDENTITY & PRIMARY GOAL"))
             self.assertIn(os.path.abspath(pr_file), task_string)
             self.assertIn(os.path.abspath(prd_file), task_string)
@@ -395,6 +397,7 @@ class TestSpawnCoder(unittest.TestCase):
 
         mock_invoke.assert_called()
         prompt_sent = mock_invoke.call_args[0][0]
+        self.assertEqual(mock_invoke.call_args[1]['workdir'], "/tmp")
         self.assertIn("## RECOVERY MISSION", prompt_sent)
         self.assertIn("## REVIEWER FEEDBACK", prompt_sent)
         self.assertIn('{"status": "NEEDS_FIX", "comments": "Missing stuff"}', prompt_sent)
@@ -439,6 +442,7 @@ class TestSpawnCoder(unittest.TestCase):
         prompt_sent = mock_invoke.call_args[0][0]
         called_kwargs = mock_invoke.call_args[1]
         self.assertEqual(called_kwargs['session_key'], "sdlc_coder_PR_001_1234abcd")
+        self.assertEqual(called_kwargs['workdir'], "/tmp")
         self.assertIn("# REVIEW REPORT JSON", prompt_sent)
         self.assertIn('{"status": "NEEDS_FIX", "comments": "Missing stuff"}', prompt_sent)
         self.assertIn(spawn_coder.REVISION_CONTINUATION_RULE, prompt_sent)

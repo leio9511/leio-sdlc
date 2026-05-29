@@ -431,7 +431,7 @@ def save_coder_debug_artifacts(run_dir, mode, envelope, rendered_prompt):
 
 
 def send_feedback(session_key, message, workdir=".", run_dir=".", thinking: str | None = None):
-    result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
+    result = invoke_agent(message, session_key=session_key, role="coder", run_dir=run_dir, workdir=workdir, thinking=thinking)
     print(f"Sent feedback to session {result.session_key}")
 
 
@@ -527,7 +527,7 @@ def handle_feedback_routing(workdir, run_dir, pr_file, prd_file, playbook_path, 
         send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir, thinking=thinking)
         return True, session_key
     else:
-        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, workdir=workdir, thinking=thinking)
         # Only write .coder_session for stateful engines
         if not is_stateless:
             with open(session_file, "w") as f:
@@ -643,7 +643,7 @@ def handle_system_alert_routing(workdir, run_dir, pr_file, prd_file, playbook_pa
         send_feedback(session_key, rendered_prompt, workdir=workdir, run_dir=run_dir, thinking=thinking)
         return True, session_key
     else:
-        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, thinking=thinking)
+        result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=run_dir, workdir=workdir, thinking=thinking)
         # Only write .coder_session for stateful engines
         if not is_stateless:
             with open(session_file, "w") as f:
@@ -806,7 +806,7 @@ def main():
     else:
         session_key = f"sdlc_coder_{pr_id}_{uuid.uuid4().hex[:8]}"
 
-    result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir, thinking=resolved_thinking)
+    result = invoke_agent(rendered_prompt, session_key=session_key, role="coder", run_dir=args.run_dir, workdir=workdir, thinking=resolved_thinking)
     # Only write .coder_session for stateful engines
     if not _resolve_is_stateless():
         if not os.path.exists(session_file):
