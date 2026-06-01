@@ -644,6 +644,7 @@ MOCK_EOF
 
     # Assert backup content was restored
     assert_file_exists "$home_dir/.openclaw/skills/$slug/SKILL.md"
+    assert_file_content_equals "$home_dir/.openclaw/skills/$slug/SKILL.md" "# No Gateway Restart Test"
     assert_file_exists "$home_dir/.openclaw/skills/$slug/marker.txt"
     assert_file_content_equals "$home_dir/.openclaw/skills/$slug/marker.txt" "no-restart-marker"
 
