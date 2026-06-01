@@ -4,6 +4,29 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
+# resolve_skill_paths <slug>
+# Resolves all common paths and sets them as global shell variables.
+# Called by both skill_deploy_run and skill_rollback_run.
+# ---------------------------------------------------------------------------
+resolve_skill_paths() {
+    local slug="${1:-}"
+
+    HOME_ROOT="${HOME_MOCK:-$HOME}"
+    OPENCLAW_HOME="$HOME_ROOT/.openclaw"
+
+    if [ -n "${HOME_MOCK:-}" ]; then
+        SKILLS_DIR="$OPENCLAW_HOME/skills"
+    else
+        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
+    fi
+
+    RELEASES_DIR="$OPENCLAW_HOME/.releases/$slug"
+    PROD_DIR="$SKILLS_DIR/$slug"
+    TMP_DIR="$SKILLS_DIR/.tmp_$slug"
+    OLD_DIR="$SKILLS_DIR/.old_$slug"
+}
+
+# ---------------------------------------------------------------------------
 # skill_deploy_run <slug> [--no-restart]
 # ---------------------------------------------------------------------------
 skill_deploy_run() {
@@ -51,18 +74,7 @@ skill_deploy_run() {
     fi
 
     # -- 3.1.3 Path resolution --
-    local HOME_ROOT="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
-    local SKILLS_DIR
-    if [ -n "${HOME_MOCK:-}" ]; then
-        SKILLS_DIR="$OPENCLAW_HOME/skills"
-    else
-        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
-    fi
-    local RELEASES_DIR="$OPENCLAW_HOME/.releases/$slug"
-    local PROD_DIR="$SKILLS_DIR/$slug"
-    local TMP_DIR="$SKILLS_DIR/.tmp_$slug"
-    local OLD_DIR="$SKILLS_DIR/.old_$slug"
+    resolve_skill_paths "$slug"
 
     # Ensure base directories exist
     mkdir -p "$SKILLS_DIR"
@@ -109,9 +121,9 @@ skill_deploy_run() {
     mv -T "$TMP_DIR" "$PROD_DIR"
     rm -rf "$OLD_DIR"
 
-    # -- Backup retention: keep at most 3 latest backups --
+    # -- Backup retention: keep at most 3 latest backups (filename-based sort) --
     local _found_backups
-    _found_backups=$(ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null || true)
+    _found_backups=$(ls -1 "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | sort -r || true)
     if [ -n "$_found_backups" ]; then
         echo "$_found_backups" | tail -n +4 | xargs -r rm -f
     fi
@@ -159,20 +171,17 @@ skill_rollback_run() {
     fi
 
     # -- Path resolution --
-    local HOME_ROOT="${HOME_MOCK:-$HOME}"
-    local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
-    local SKILLS_DIR
-    if [ -n "${HOME_MOCK:-}" ]; then
-        SKILLS_DIR="$OPENCLAW_HOME/skills"
-    else
-        SKILLS_DIR="${SDLC_RUNTIME_DIR:-$OPENCLAW_HOME/skills}"
-    fi
-    local RELEASES_DIR="$OPENCLAW_HOME/.releases/$slug"
-    local PROD_DIR="$SKILLS_DIR/$slug"
+    resolve_skill_paths "$slug"
 
-    # -- Locate latest backup --
+    # -- Validate releases directory exists --
+    if [ ! -d "$RELEASES_DIR" ]; then
+        echo "Error: no releases directory found for '$slug': $RELEASES_DIR" >&2
+        return 1
+    fi
+
+    # -- Locate latest backup (filename-based sort) --
     local LATEST_BACKUP
-    LATEST_BACKUP=$(ls -t "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | head -1 || true)
+    LATEST_BACKUP=$(ls -1 "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | sort -r | head -1 || true)
 
     if [ -z "$LATEST_BACKUP" ]; then
         echo "Error: no backup found for '$slug' in $RELEASES_DIR" >&2
@@ -188,10 +197,6 @@ skill_rollback_run() {
     mkdir -p "$SKILLS_DIR"
     tar -xzf "$LATEST_BACKUP" -C "$SKILLS_DIR"
 
-    # -- Gateway restart (rollback): --no-restart suppresses, HOME_MOCK skips --
-    if [ "$NO_RESTART" != "true" ] && [ -z "${HOME_MOCK:-}" ]; then
-        if command -v openclaw >/dev/null 2>&1; then
-            openclaw gateway restart || echo "Warning: Gateway restart failed." >&2
-        fi
-    fi
+    # --no-restart is accepted as a compatibility no-op for rollback.
+    # Gateway restart is NOT part of the skill rollback substrate (PRD §3.1.6).
 }
