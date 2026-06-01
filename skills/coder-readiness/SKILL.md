@@ -36,7 +36,8 @@ Use a dedicated isolated reviewer (for example, a sub-agent) or equivalent focus
 Recommended settings when the host supports them:
 - reasoning / thinking: high
 - permissions: read-only analysis only
-- working directory / repository context: target repository root
+- session working directory: outside the target repository, to avoid writing agent workspace/context files into the repository
+- repository context: target repository root
 
 ## Recommended output format
 
@@ -52,6 +53,8 @@ Use this template for the read-only review:
 
 ```text
 Perform a strictly read-only coder-readiness review for <PRD_PATH> against the target repository.
+
+Run the review from outside the target repository when possible. Treat the target repository as an explicit path to inspect, not necessarily as the session working directory.
 
 Goal:
 Assess whether the PRD is sufficiently clear for a coder to begin implementation.
