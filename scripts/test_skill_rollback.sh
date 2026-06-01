@@ -305,6 +305,100 @@ test_rollback_with_home_mock_isolation() {
 }
 
 # ---------------------------------------------------------------------------
+# Test Case 8: rollback respects SDLC_RUNTIME_DIR when HOME_MOCK is unset
+# When SDLC_RUNTIME_DIR is set and HOME_MOCK is NOT set, rollback must restore
+# to $SDLC_RUNTIME_DIR/<slug> while reading backups from $HOME/.openclaw/.releases/<slug>.
+# ---------------------------------------------------------------------------
+test_rollback_respects_sdlc_runtime_dir() {
+    echo "--- test_rollback_respects_sdlc_runtime_dir ---"
+    local slug="test-rollback-8"
+    local case_dir="$TEST_ROOT/tc8"
+    local home_dir="$case_dir/home"
+    local runtime_dir="$case_dir/runtime"
+    local repo_dir="$case_dir/repo"
+
+    mkdir -p "$case_dir" "$home_dir/.openclaw" "$runtime_dir"
+
+    create_skill_test_repo "$repo_dir" "$slug"
+
+    # Create backup tarball manually with known marker content
+    # (backup always lives under $HOME/.openclaw/.releases/ regardless of SDLC_RUNTIME_DIR)
+    local releases_dir="$home_dir/.openclaw/.releases/$slug"
+    mkdir -p "$releases_dir"
+    local staging="$case_dir/staging/$slug"
+    mkdir -p "$staging"
+    echo "backed-up-content" > "$staging/marker.txt"
+    echo "# Skill SDLC_RUNTIME_DIR test" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20240101_000000.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # Set SDLC_RUNTIME_DIR, do NOT set HOME_MOCK
+    HOME="$home_dir" SDLC_RUNTIME_DIR="$runtime_dir" PATH="$BASE_PATH" \
+        bash "$repo_dir/scripts/skill_rollback.sh" "$slug" > /dev/null 2>&1
+
+    # Assert restored at SDLC_RUNTIME_DIR/<slug>
+    assert_file_exists "$runtime_dir/$slug/marker.txt"
+    assert_file_content_equals "$runtime_dir/$slug/marker.txt" "backed-up-content"
+    assert_file_exists "$runtime_dir/$slug/SKILL.md"
+
+    # Assert NOT restored at $HOME/.openclaw/skills/<slug>
+    assert_file_not_exists "$home_dir/.openclaw/skills/$slug"
+
+    echo "✅ Passed"
+}
+
+# ---------------------------------------------------------------------------
+# Test Case 9: rollback handles symlink prod directory
+# When PROD_DIR is a symlink (even dangling), rollback must remove it cleanly
+# and restore a real directory from backup.
+# ---------------------------------------------------------------------------
+test_rollback_handles_symlink_prod_dir() {
+    echo "--- test_rollback_handles_symlink_prod_dir ---"
+    local slug="test-rollback-9"
+    local case_dir="$TEST_ROOT/tc9"
+    local home_mock="$case_dir/home"
+    local repo_dir="$case_dir/repo"
+
+    mkdir -p "$case_dir"
+
+    create_skill_test_repo "$repo_dir" "$slug"
+
+    # Create backup tarball with known content
+    local releases_dir="$home_mock/.openclaw/.releases/$slug"
+    mkdir -p "$releases_dir"
+    local staging="$case_dir/staging/$slug"
+    mkdir -p "$staging"
+    echo "symlink-backup-content" > "$staging/marker.txt"
+    echo "# Skill symlink-test" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20240101_000000.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # Create PROD_DIR as a dangling symlink
+    local prod_dir="$home_mock/.openclaw/skills/$slug"
+    mkdir -p "$(dirname "$prod_dir")"
+    ln -s "/tmp/nonexistent-target-$slug" "$prod_dir"
+
+    # Pre-condition: verify it is a symlink
+    [ -L "$prod_dir" ] || fail "Pre-condition failed: PROD_DIR is not a symlink"
+
+    # Run rollback with HOME_MOCK
+    if ! HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
+        bash "$repo_dir/scripts/skill_rollback.sh" "$slug" > /dev/null 2>&1; then
+        fail "Rollback exited with non-zero status"
+    fi
+
+    # Assert PROD_DIR is now a real directory (not a symlink)
+    if [ -L "$prod_dir" ]; then
+        fail "PROD_DIR is still a symlink after rollback"
+    fi
+    [ -d "$prod_dir" ] || fail "PROD_DIR is not a directory after rollback"
+
+    # Assert content matches backup
+    assert_file_content_equals "$prod_dir/marker.txt" "symlink-backup-content"
+    assert_file_exists "$prod_dir/SKILL.md"
+
+    echo "✅ Passed"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 test_generic_rollback_restores_latest_backup
@@ -314,6 +408,8 @@ test_rollback_rejects_slug_with_dotdot
 test_rollback_fails_when_no_releases_dir
 test_rollback_fails_when_no_backups
 test_rollback_with_home_mock_isolation
+test_rollback_respects_sdlc_runtime_dir
+test_rollback_handles_symlink_prod_dir
 
 echo ""
 echo "✅ Skill Rollback Substrate Integration Tests PASSED"
