@@ -81,12 +81,21 @@ class TestKitDeploy(unittest.TestCase):
             self.assertEqual(lines, ["deploy-sdlc --preflight"])
 
     def test_pm_skill_deploy_script_content(self):
+        # pm-skill/deploy.sh is now a thin wrapper delegating to the generic substrate.
+        # Gemini linking logic lives in scripts/skill_deploy_lib.sh.
         deploy_sh_path = os.path.join(self.project_root, "skills", "pm-skill", "deploy.sh")
         with open(deploy_sh_path, "r") as f:
             content = f.read()
 
-        self.assertIn("gemini skills link \"$PROD_DIR\" --consent", content)
+        # Thin wrapper must delegate to the generic mechanism
+        self.assertIn("bash \"$REPO_ROOT/scripts/skill_deploy.sh\" pm-skill", content)
         self.assertNotIn("openclaw gateway restart", content)
+
+        # Gemini linking lives in the shared library
+        lib_path = os.path.join(self.project_root, "scripts", "skill_deploy_lib.sh")
+        with open(lib_path, "r") as f:
+            lib_content = f.read()
+        self.assertIn('gemini skills link "$PROD_DIR" --consent', lib_content)
 
 
 if __name__ == '__main__':

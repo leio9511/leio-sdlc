@@ -77,9 +77,11 @@ class TestDeployBackup(unittest.TestCase):
             )
             self.assertEqual(res1.returncode, 0, f"First deploy failed: {res1.stderr}\n{res1.stdout}")
             self.assertTrue(os.path.exists(prod_dir), "Prod dir not created for pm-skill")
+            # PRD scope: agent_driver.py bundling was removed from the shared skill substrate
+            # because pm-skill does not directly consume it as a runtime dependency.
             self.assertTrue(
-                os.path.exists(os.path.join(prod_dir, "scripts", "agent_driver.py")),
-                "agent_driver.py not bundled properly",
+                os.path.exists(os.path.join(prod_dir, "SKILL.md")),
+                "SKILL.md not deployed properly",
             )
 
             res2 = subprocess.run(

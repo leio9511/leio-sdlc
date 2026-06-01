@@ -157,6 +157,10 @@ def test_rollback_reports_missing_backup_tarballs_for_root_and_pm_skill():
 
             result = _run(["bash", rollback_script, "--no-restart"], env=env, cwd=isolated_root)
             assert result.returncode != 0
-            assert f"No backup tarballs found in {releases_dir}" in result.stdout
-            assert result.stderr == ""
+            # Root rollback (leio-sdlc) still uses old message on stdout.
+            # pm-skill rollback now delegates to generic skill_rollback which reports on stderr.
+            if slug == PM_SLUG:
+                assert f"no backup found for '{slug}'" in result.stderr
+            else:
+                assert f"No backup tarballs found in {releases_dir}" in result.stdout
             assert os.path.isdir(openclaw_home)
