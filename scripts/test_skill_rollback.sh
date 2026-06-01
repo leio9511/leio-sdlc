@@ -520,8 +520,82 @@ test_pm_skill_rollback_wrapper_delegation_only() {
 }
 
 # ---------------------------------------------------------------------------
+# Test Case 12: pm-skill rollback wrapper functional correctness (PR-002_2_3_1)
+# Deploy v1, then deploy v2 (backs up v1), then invoke skills/pm-skill/rollback.sh
+# with HOME_MOCK. Assert v1 is restored with its marker file.
+# Covers PRD Scenario 5 (pm-skill rollback wrapper remains compatible).
+# ---------------------------------------------------------------------------
+test_pm_skill_rollback_wrapper_functional_correctness() {
+    echo "--- test_pm_skill_rollback_wrapper_functional_correctness ---"
+    local slug="pm-skill"
+    local case_dir="$TEST_ROOT/tc_pm_func"
+    local home_mock="$case_dir/home"
+    local repo_dir="$case_dir/repo"
+
+    mkdir -p "$case_dir"
+
+    # Step 1: Create repo with pm-skill v1 content
+    create_skill_test_repo "$repo_dir" "$slug" "# pm-skill v1"
+    # Add v1 marker file
+    echo "v1-pm-marker" > "$repo_dir/skills/$slug/v1_pm_marker.txt"
+
+    # Step 2: Create the pm-skill rollback wrapper
+    cat > "$repo_dir/skills/$slug/rollback.sh" << 'WRAPPER_EOF'
+#!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+bash "$REPO_ROOT/scripts/skill_rollback.sh" pm-skill "$@"
+WRAPPER_EOF
+    chmod +x "$repo_dir/skills/$slug/rollback.sh"
+
+    # Step 3: Deploy v1
+    HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
+        bash "$repo_dir/scripts/skill_deploy.sh" "$slug" > /dev/null 2>&1
+
+    assert_file_exists "$home_mock/.openclaw/skills/$slug/SKILL.md"
+    assert_file_exists "$home_mock/.openclaw/skills/$slug/v1_pm_marker.txt"
+    assert_file_content_equals "$home_mock/.openclaw/skills/$slug/SKILL.md" "# pm-skill v1"
+
+    # Step 4: Change source to v2
+    echo "# pm-skill v2" > "$repo_dir/skills/$slug/SKILL.md"
+    echo "v2-pm-marker" > "$repo_dir/skills/$slug/v2_pm_marker.txt"
+    rm -f "$repo_dir/skills/$slug/v1_pm_marker.txt"
+
+    # Step 5: Deploy v2 — creates backup of v1
+    HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
+        bash "$repo_dir/scripts/skill_deploy.sh" "$slug" > /dev/null 2>&1
+
+    # Verify v2 is in place
+    assert_file_content_equals "$home_mock/.openclaw/skills/$slug/SKILL.md" "# pm-skill v2"
+    assert_file_exists "$home_mock/.openclaw/skills/$slug/v2_pm_marker.txt"
+    assert_file_not_exists "$home_mock/.openclaw/skills/$slug/v1_pm_marker.txt"
+
+    # Verify a backup was created
+    local releases_dir="$home_mock/.openclaw/.releases/$slug"
+    assert_file_exists "$releases_dir"
+    local backup_count
+    backup_count=$(ls -1 "$releases_dir"/backup_*.tar.gz 2>/dev/null | wc -l)
+    if [ "$backup_count" -lt 1 ]; then
+        fail "Expected at least 1 backup, found $backup_count"
+    fi
+
+    # Step 6: Invoke pm-skill rollback wrapper with HOME_MOCK
+    HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
+        bash "$repo_dir/skills/$slug/rollback.sh" > /dev/null 2>&1
+
+    # Assert v1 content restored
+    assert_file_content_equals "$home_mock/.openclaw/skills/$slug/SKILL.md" "# pm-skill v1"
+    assert_file_exists "$home_mock/.openclaw/skills/$slug/v1_pm_marker.txt"
+    assert_file_not_exists "$home_mock/.openclaw/skills/$slug/v2_pm_marker.txt"
+
+    echo "✅ Passed"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
+test_pm_skill_rollback_wrapper_functional_correctness
 test_pm_skill_rollback_wrapper_delegation_only
 test_generic_rollback_restores_latest_backup
 test_rollback_rejects_empty_slug
