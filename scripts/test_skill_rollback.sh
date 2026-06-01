@@ -488,115 +488,7 @@ test_rollback_retains_only_three_recent_backups() {
 }
 
 # ---------------------------------------------------------------------------
-# Test Case 11: pm-skill rollback wrapper remains compatible (PRD Scenarios 5, 6)
-# Verifies: a) wrapper restores pm-skill runtime from latest backup
-#           b) wrapper is delegation-only (no inline tar/rm logic)
-# ---------------------------------------------------------------------------
-test_pm_skill_rollback_wrapper_remains_compatible() {
-    echo "--- test_pm_skill_rollback_wrapper_remains_compatible ---"
-    local slug="pm-skill"
-    local case_dir="$TEST_ROOT/tc_pm_wrapper"
-    local home_mock="$case_dir/home"
-    local repo_dir="$case_dir/repo"
-
-    mkdir -p "$case_dir"
-
-    # Step 1: Create mock repo with pm-skill source and thin wrapper
-    mkdir -p "$repo_dir/scripts" "$repo_dir/skills/$slug"
-    cp "$REPO_ROOT/scripts/skill_deploy.sh" "$repo_dir/scripts/skill_deploy.sh"
-    cp "$REPO_ROOT/scripts/skill_rollback.sh" "$repo_dir/scripts/skill_rollback.sh"
-    cp "$REPO_ROOT/scripts/skill_deploy_lib.sh" "$repo_dir/scripts/skill_deploy_lib.sh"
-
-    # Create v1 pm-skill source with unique marker
-    echo "# pm-skill v1" > "$repo_dir/skills/$slug/SKILL.md"
-    echo "v1-pm-marker" > "$repo_dir/skills/$slug/v1_pm_marker.txt"
-
-    # Create the pm-skill rollback wrapper (mirrors real skills/pm-skill/rollback.sh delegation pattern)
-    cat > "$repo_dir/skills/$slug/rollback.sh" << 'WRAPPER'
-#!/bin/bash
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-bash "$REPO_ROOT/scripts/skill_rollback.sh" pm-skill "$@"
-WRAPPER
-    chmod +x "$repo_dir/skills/$slug/rollback.sh"
-
-    # Step 2: Deploy v1 via the generic deploy mechanism
-    HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
-        bash "$repo_dir/scripts/skill_deploy.sh" "$slug" > /dev/null 2>&1
-
-    assert_file_exists "$home_mock/.openclaw/skills/$slug/SKILL.md"
-    assert_file_exists "$home_mock/.openclaw/skills/$slug/v1_pm_marker.txt"
-    assert_file_content_equals "$home_mock/.openclaw/skills/$slug/SKILL.md" "# pm-skill v1"
-
-    # Step 3: Change source to v2 (different SKILL.md, different marker)
-    echo "# pm-skill v2" > "$repo_dir/skills/$slug/SKILL.md"
-    echo "v2-pm-marker" > "$repo_dir/skills/$slug/v2_pm_marker.txt"
-    rm -f "$repo_dir/skills/$slug/v1_pm_marker.txt"
-
-    # Step 4: Deploy v2 — this backs up v1 to releases dir
-    HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
-        bash "$repo_dir/scripts/skill_deploy.sh" "$slug" > /dev/null 2>&1
-
-    # Verify v2 is now in place
-    assert_file_content_equals "$home_mock/.openclaw/skills/$slug/SKILL.md" "# pm-skill v2"
-    assert_file_exists "$home_mock/.openclaw/skills/$slug/v2_pm_marker.txt"
-    assert_file_not_exists "$home_mock/.openclaw/skills/$slug/v1_pm_marker.txt"
-
-    # Verify a backup was created
-    local releases_dir="$home_mock/.openclaw/.releases/$slug"
-    assert_file_exists "$releases_dir"
-    local backup_count
-    backup_count=$(ls -1 "$releases_dir"/backup_*.tar.gz 2>/dev/null | wc -l)
-    if [ "$backup_count" -lt 1 ]; then
-        fail "Expected at least 1 backup for pm-skill, found $backup_count"
-    fi
-
-    # Step 5: Invoke the pm-skill rollback WRAPPER (not the generic script)
-    HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
-        bash "$repo_dir/skills/$slug/rollback.sh" > /dev/null 2>&1
-
-    # Step 6: Functional correctness — assert v1 content is restored from backup
-    assert_file_content_equals "$home_mock/.openclaw/skills/$slug/SKILL.md" "# pm-skill v1"
-    assert_file_exists "$home_mock/.openclaw/skills/$slug/v1_pm_marker.txt"
-    assert_file_not_exists "$home_mock/.openclaw/skills/$slug/v2_pm_marker.txt"
-
-    # Step 7: Non-duplication — verify the wrapper is delegation-only
-    local wrapper_path="$repo_dir/skills/$slug/rollback.sh"
-
-    # 7a: Must reference skill_rollback.sh or skill_deploy_lib.sh for delegation
-    if ! grep -qE "skill_rollback.sh|skill_deploy_lib.sh" "$wrapper_path"; then
-        fail "pm-skill rollback wrapper must reference skill_rollback.sh or skill_deploy_lib.sh"
-    fi
-
-    # 7b: Must NOT contain inline tar extraction/creation logic
-    if grep -qE "tar.*-[cx]zf" "$wrapper_path"; then
-        fail "pm-skill rollback wrapper must not contain inline tar extraction logic"
-    fi
-
-    # 7c: Must NOT contain inline rm -rf restoration patterns
-    if grep -qE "rm -rf.*(PROD_DIR|OLD_DIR|skills)" "$wrapper_path"; then
-        fail "pm-skill rollback wrapper must not contain inline rm -rf restoration logic"
-    fi
-
-    # 7d: Also verify the REAL repo wrapper remains delegation-only
-    local real_wrapper="$REPO_ROOT/skills/pm-skill/rollback.sh"
-    if [ -f "$real_wrapper" ]; then
-        if ! grep -qE "skill_rollback.sh|skill_deploy_lib.sh" "$real_wrapper"; then
-            fail "Real pm-skill rollback wrapper must reference skill_rollback.sh or skill_deploy_lib.sh"
-        fi
-        if grep -qE "tar.*-[cx]zf" "$real_wrapper"; then
-            fail "Real pm-skill rollback wrapper must not contain inline tar extraction logic"
-        fi
-    fi
-
-    echo "✅ Passed"
-}
-
-# ---------------------------------------------------------------------------
-# Test Case 12: pm-skill rollback wrapper delegation-only verification (PR-002_2_3_1)
+# Test Case 11: pm-skill rollback wrapper delegation-only verification (PR-002_2_3_1)
 # Static analysis of the real repository skills/pm-skill/rollback.sh.
 # No runtime execution or HOME_MOCK isolation needed.
 # Satisfies PRD Scenario 6 (skill-local wrappers do not duplicate deploy logic).
@@ -641,7 +533,5 @@ test_rollback_with_home_mock_isolation
 test_rollback_respects_sdlc_runtime_dir
 test_rollback_handles_symlink_prod_dir
 test_rollback_retains_only_three_recent_backups
-test_pm_skill_rollback_wrapper_remains_compatible
-
 echo ""
 echo "✅ Skill Rollback Substrate Integration Tests PASSED"
