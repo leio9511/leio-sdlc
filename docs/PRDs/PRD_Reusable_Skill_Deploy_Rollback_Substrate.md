@@ -12,10 +12,12 @@ The `leio-sdlc` repository contains repository-native skills under `skills/`.
 Current repository reality:
 - `skills/pm-skill/` already has working hard-copy deploy and rollback scripts.
 - Additional skills under `skills/<slug>/` should not require bespoke deploy/rollback logic.
+- Static dependency analysis shows that `skills/pm-skill/deploy.sh` currently copies `scripts/agent_driver.py` and `scripts/utils_notification.py`, but `pm-skill` itself does not directly consume those files as part of its own runtime logic.
+- Static dependency analysis also shows that staged runtime provisioning / smoke-before-swap is part of the root `leio-sdlc` deploy contract in `deploy.sh`, not part of the current `skills/pm-skill/deploy.sh` behavior.
 
 The problem is that deploy and rollback behavior should not be redesigned, re-audited, and re-discussed for every repository skill.
 
-The existing `pm-skill` deploy/rollback behavior should be generalized into a reusable substrate for repository skills. Each skill should be able to reuse the same hard-copy deployment, backup, rollback, mock-home, runtime-dir, and compatibility behavior without owning duplicated deployment logic.
+The existing `pm-skill` deploy/rollback behavior should be generalized into a reusable substrate for repository skills, but only for the behavior that is actually part of the `pm-skill` skill-level deploy contract. Historical baggage that is not a proven `pm-skill` runtime dependency should not be promoted into the shared substrate by default.
 
 ## 2. Requirements & User Stories (需求定义)
 
@@ -42,6 +44,7 @@ scripts/skill_rollback.sh <slug> [--no-restart]
 - The rollback entrypoint must restore the latest backup for that runtime skill.
 - Preserve existing `pm-skill` deploy behavior unless explicitly changed by this PRD.
 - Preserve existing `pm-skill` rollback behavior unless explicitly changed by this PRD.
+- Remove `pm-skill` deploy behaviors that are not proven runtime dependencies of `pm-skill` itself, specifically the repository-root helper-file copy, unless later evidence demonstrates they are required.
 - Convert `skills/pm-skill/deploy.sh` and `skills/pm-skill/rollback.sh` into thin compatibility wrappers around the generic mechanism, or otherwise make them delegate to the generic mechanism while keeping their existing command interface.
 - Support `HOME_MOCK` so deploy/rollback tests can run without touching the real user runtime home.
 - Support `SDLC_RUNTIME_DIR` for non-mock runtime skill directory override, matching existing behavior.
@@ -65,6 +68,7 @@ or `${SDLC_RUNTIME_DIR}/<slug>` when `SDLC_RUNTIME_DIR` is set outside mock mode
 - Preserve rollback from the latest backup tarball.
 - Preserve cleanup of older backups using the existing retention policy unless a safer equivalent is needed.
 - Preserve Gemini CLI link behavior for deployed skills when `gemini` is available, if this remains part of the current `pm-skill` deploy contract.
+- Treat Gemini best-effort link as a deploy-time post-step only; rollback is not required to re-run Gemini link behavior.
 
 ### 2.3 Non-goals
 
@@ -139,22 +143,34 @@ Any repository skill intended to participate in `kit-deploy.sh` must provide a s
 
 Skill-local `rollback.sh` wrappers are optional but recommended when operators need a familiar per-skill rollback command. They must delegate to `scripts/skill_rollback.sh <slug>` and must not duplicate rollback logic.
 
-### 3.4 Preserve current pm-skill special behavior deliberately
+### 3.4 Scope boundary: shared skill substrate vs non-skill root deploy contract
 
-The existing `pm-skill` deploy script copies repository root helper files into the deployed `pm-skill` runtime directory:
+The generic skill deploy/rollback substrate should cover behavior that is genuinely part of skill-local deployment for repository skills under `skills/<slug>/`.
 
-```text
-scripts/agent_driver.py
-scripts/utils_notification.py
-```
+Static analysis performed before this PRD revision establishes:
+- `skills/pm-skill/deploy.sh` currently performs slug-local hard-copy deployment, backup, atomic promotion, and Gemini best-effort linking.
+- `skills/pm-skill/deploy.sh` currently copies `scripts/agent_driver.py` and `scripts/utils_notification.py`, but the `pm-skill` source tree itself does not directly consume those files in its own runtime logic.
+- staged runtime provisioning / smoke-before-swap is part of the root `deploy.sh` contract for the `leio-sdlc` runtime package, not part of the current `skills/pm-skill/deploy.sh` path.
 
-This behavior must not be accidentally lost.
+Therefore this PRD must treat the following as in scope for the shared skill substrate:
+- slug validation
+- source directory validation
+- resolved runtime skill directory placement
+- temp staging
+- backup creation
+- atomic swap / promotion
+- rollback from latest backup
+- backup retention
+- common default excludes
+- optional skill-local `.release_ignore`
+- thin wrapper delegation and `kit-deploy.sh` participation semantics
+- Gemini best-effort link behavior if preserved as a shared post-deploy step
 
-The implementation must either:
-- preserve this behavior through a generic per-skill include mechanism, or
-- preserve it as a narrowly scoped `pm-skill` compatibility case inside the generic deploy implementation.
-
-The PRD does not require inventing a broad plugin packaging system. The goal is to avoid behavior regression while removing duplicated deploy/rollback logic.
+This PRD must treat the following as out of scope for the shared skill substrate unless later evidence proves they are true skill-level dependencies:
+- repository-root helper-file bundling for `pm-skill`
+- root `leio-sdlc` staged runtime provisioning / smoke-before-swap
+- root-runtime `.venv` provisioning logic
+- root-runtime smoke contract
 
 ### 3.5 Packaging ignore policy
 
@@ -169,7 +185,7 @@ dist
 .ruff_cache
 ```
 
-Skill-local `.release_ignore` files are optional. A skill-specific `.release_ignore` may extend or override packaging excludes only when that skill has additional local artifacts to omit.
+Skill-local `.release_ignore` files are optional. A skill-specific `.release_ignore` may extend the common packaging excludes with additional skill-local exclusions only; it does not re-include artifacts already excluded by the shared default policy.
 
 This PRD does not require every skill to define its own `.gitignore` or `.release_ignore`.
 
@@ -246,10 +262,11 @@ It is not acceptable to add tests asserting skill prose semantics.
 ### Core quality risks
 
 - Breaking existing `pm-skill` deploy/rollback behavior while extracting shared logic
+- Accidentally retaining historical `pm-skill` deploy baggage that is not a real skill runtime dependency
+- Incorrectly pulling root `leio-sdlc` runtime provisioning/smoke behavior into the shared skill substrate
 - Touching the real runtime home during tests
 - Failing to restore from backup during rollback
 - Accidentally creating one-off per-skill deployment logic instead of a reusable substrate
-- Losing `pm-skill` special packaging behavior for root helper scripts
 
 ### Verification approach
 
@@ -277,6 +294,7 @@ Authorized modifications:
 - `skills/pm-skill/rollback.sh`
 - optional skill-local deploy/rollback wrappers under `skills/<slug>/`
 - tests covering generic deploy/rollback behavior and wrapper compatibility
+- cleanup or removal of `pm-skill` helper-file bundling if implementation evidence confirms it is not a true runtime dependency
 
 Not authorized:
 - changes to skill prose unrelated to deploy/rollback mechanics
@@ -292,6 +310,7 @@ Not authorized:
 > IGNORING THIS SECTION IS MANDATORY. This section is strictly for historical tracking of the PM-Auditor-Boss discussion loop. Do NOT read, reference, or implement any logic from this appendix into the SDLC pipeline.
 
 - **v1.0**: Initial PRD focused on generalizing the existing `pm-skill` hard-copy deploy/rollback behavior for all repository skills under `skills/<slug>/`.
+- **v1.1**: Static dependency analysis established that repository-root helper-file copy is not currently proven to be a true `pm-skill` runtime dependency, and that staged runtime provisioning / smoke-before-swap belongs to the root `leio-sdlc` deploy contract rather than the `pm-skill` skill-local deploy path. The PRD scope was narrowed accordingly.
 
 ---
 
