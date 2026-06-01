@@ -549,6 +549,41 @@ test_kit_deploy_invokes_skill_deploy_wrapper() {
 }
 
 # ---------------------------------------------------------------------------
+# Test Case 17: backup retention keeps only latest 3 backups
+# ---------------------------------------------------------------------------
+test_backup_retention_keeps_only_latest_three() {
+    echo "--- test_backup_retention_keeps_only_latest_three ---"
+    local slug="test-skill-17"
+    local case_dir="$TEST_ROOT/tc17"
+    local home_mock="$case_dir/home"
+    local repo_dir="$case_dir/repo"
+
+    mkdir -p "$case_dir"
+    create_skill_test_repo "$repo_dir" "$slug"
+
+    # Perform 5 consecutive deploys to generate 5 backups
+    for i in $(seq 1 5); do
+        # Update the skill content so each deploy creates a distinct backup
+        echo "# Deploy $i" > "$repo_dir/skills/$slug/SKILL.md"
+        HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
+            bash "$repo_dir/scripts/skill_deploy.sh" "$slug" > /dev/null 2>&1
+    done
+
+    local releases_dir="$home_mock/.openclaw/.releases/$slug"
+    local backup_count
+    backup_count=$(ls -1 "$releases_dir"/backup_*.tar.gz 2>/dev/null | wc -l)
+
+    if [ "$backup_count" -gt 3 ]; then
+        fail "Backup retention failed: expected at most 3 backups, found $backup_count"
+    fi
+    if [ "$backup_count" -lt 1 ]; then
+        fail "Expected at least 1 backup, found $backup_count"
+    fi
+    assert_file_exists "$home_mock/.openclaw/skills/$slug/SKILL.md"
+    echo "✅ Passed"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 test_generic_deploy_installs_skill
@@ -567,6 +602,7 @@ test_home_mock_overrides_sdlc_runtime_dir
 test_gemini_link_when_available
 test_gemini_link_skipped_when_absent
 test_kit_deploy_invokes_skill_deploy_wrapper
+test_backup_retention_keeps_only_latest_three
 
 echo ""
 echo "✅ Skill Deploy Substrate Integration Tests PASSED"

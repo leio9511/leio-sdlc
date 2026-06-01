@@ -10,6 +10,15 @@ skill_deploy_run() {
     local slug="${1:-}"
     shift || true
 
+    # -- Parse optional flags --
+    local NO_RESTART=false
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --no-restart) NO_RESTART=true ; shift ;;
+            *) shift ;;
+        esac
+    done
+
     # -- 3.1.1 Slug validation (fail-fast) --
     if [ -z "$slug" ]; then
         echo "Error: slug must not be empty" >&2
@@ -100,7 +109,7 @@ skill_deploy_run() {
     mv -T "$TMP_DIR" "$PROD_DIR"
     rm -rf "$OLD_DIR"
 
-    # Backup retention: keep at most 3 latest backups (shopt -s nullglob to avoid ls glob error)
+    # -- Backup retention: keep at most 3 latest backups --
     local _found_backups
     _found_backups=$(ls -dt "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null || true)
     if [ -n "$_found_backups" ]; then
@@ -114,6 +123,9 @@ skill_deploy_run() {
 
     # -- 3.1.9 Cleanup --
     rm -rf "$TMP_DIR" "$OLD_DIR"
+
+    # --no-restart is accepted as a compatibility no-op for deploy.
+    # Gateway restart is not part of the skill deploy contract (it belongs to root deploy).
 }
 
 # ---------------------------------------------------------------------------
@@ -123,7 +135,16 @@ skill_rollback_run() {
     local slug="${1:-}"
     shift || true
 
-    # Slug validation (same as deploy)
+    # -- Parse optional flags --
+    local NO_RESTART=false
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --no-restart) NO_RESTART=true ; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    # -- Slug validation --
     if [ -z "$slug" ]; then
         echo "Error: slug must not be empty" >&2
         return 1
@@ -137,6 +158,7 @@ skill_rollback_run() {
         return 1
     fi
 
+    # -- Path resolution --
     local HOME_ROOT="${HOME_MOCK:-$HOME}"
     local OPENCLAW_HOME="$HOME_ROOT/.openclaw"
     local SKILLS_DIR
@@ -148,6 +170,7 @@ skill_rollback_run() {
     local RELEASES_DIR="$OPENCLAW_HOME/.releases/$slug"
     local PROD_DIR="$SKILLS_DIR/$slug"
 
+    # -- Locate latest backup --
     local LATEST_BACKUP
     LATEST_BACKUP=$(ls -t "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | head -1 || true)
 
@@ -156,12 +179,19 @@ skill_rollback_run() {
         return 1
     fi
 
-    # Remove current runtime
+    # -- Remove current runtime --
     if [ -e "$PROD_DIR" ] || [ -L "$PROD_DIR" ]; then
         rm -rf "$PROD_DIR"
     fi
 
-    # Restore from backup
+    # -- Restore from backup --
     mkdir -p "$SKILLS_DIR"
     tar -xzf "$LATEST_BACKUP" -C "$SKILLS_DIR"
+
+    # -- Gateway restart (rollback): --no-restart suppresses, HOME_MOCK skips --
+    if [ "$NO_RESTART" != "true" ] && [ -z "${HOME_MOCK:-}" ]; then
+        if command -v openclaw >/dev/null 2>&1; then
+            openclaw gateway restart || echo "Warning: Gateway restart failed." >&2
+        fi
+    fi
 }
