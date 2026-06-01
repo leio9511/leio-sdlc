@@ -593,6 +593,64 @@ WRAPPER_EOF
 }
 
 # ---------------------------------------------------------------------------
+# Test Case 11: rollback must never invoke openclaw gateway restart (PR-002_2_4)
+# Regression guard: mock openclaw binary on PATH, no HOME_MOCK, no --no-restart.
+# Assert the substrate never calls 'openclaw gateway restart'.
+# ---------------------------------------------------------------------------
+test_rollback_does_not_restart_gateway() {
+    echo "--- test_rollback_does_not_restart_gateway ---"
+    local slug="test-no-restart-gw"
+    local case_dir="$TEST_ROOT/tc_no_gw_restart"
+    local home_dir="$case_dir/home"
+    local repo_dir="$case_dir/repo"
+    local mock_bin_dir="$case_dir/mock_bin"
+    local mock_log_file="$case_dir/mock_openclaw.log"
+
+    mkdir -p "$case_dir" "$home_dir/.openclaw" "$mock_bin_dir"
+
+    create_skill_test_repo "$repo_dir" "$slug"
+
+    # Create mock openclaw binary that logs all invocations
+    cat > "$mock_bin_dir/openclaw" << 'MOCK_EOF'
+#!/bin/bash
+echo "$@" >> "$MOCK_LOG_FILE"
+exit 0
+MOCK_EOF
+    chmod +x "$mock_bin_dir/openclaw"
+
+    # Create backup tarball manually under the temp HOME
+    local releases_dir="$home_dir/.openclaw/.releases/$slug"
+    mkdir -p "$releases_dir"
+    local staging="$case_dir/staging/$slug"
+    mkdir -p "$staging"
+    echo "no-restart-marker" > "$staging/marker.txt"
+    echo "# No Gateway Restart Test" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20240101_000000.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # Invoke rollback: HOME = temp dir (simulates real-home, no HOME_MOCK)
+    # --no-restart is NOT passed
+    # Mock openclaw is first on PATH
+    if ! MOCK_LOG_FILE="$mock_log_file" HOME="$home_dir" PATH="$mock_bin_dir:$BASE_PATH" \
+        bash "$repo_dir/scripts/skill_rollback.sh" "$slug" > /dev/null 2>&1; then
+        fail "Rollback exited with non-zero status"
+    fi
+
+    # Assert no gateway restart was invoked
+    if [ -f "$mock_log_file" ]; then
+        if grep -q "gateway restart" "$mock_log_file"; then
+            fail "Mock openclaw log contains 'gateway restart' — skill rollback must not restart gateway"
+        fi
+    fi
+
+    # Assert backup content was restored
+    assert_file_exists "$home_dir/.openclaw/skills/$slug/SKILL.md"
+    assert_file_exists "$home_dir/.openclaw/skills/$slug/marker.txt"
+    assert_file_content_equals "$home_dir/.openclaw/skills/$slug/marker.txt" "no-restart-marker"
+
+    echo "✅ Passed"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 test_pm_skill_rollback_wrapper_functional_correctness
@@ -607,5 +665,6 @@ test_rollback_with_home_mock_isolation
 test_rollback_respects_sdlc_runtime_dir
 test_rollback_handles_symlink_prod_dir
 test_rollback_retains_only_three_recent_backups
+test_rollback_does_not_restart_gateway
 echo ""
 echo "✅ Skill Rollback Substrate Integration Tests PASSED"
