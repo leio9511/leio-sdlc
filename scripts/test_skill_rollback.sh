@@ -399,6 +399,95 @@ test_rollback_handles_symlink_prod_dir() {
 }
 
 # ---------------------------------------------------------------------------
+# Test Case 10: rollback retains only 3 most recent backups
+# Create 4 backups with sequential timestamps, run rollback, assert only 3
+# remain and the oldest is pruned.
+# ---------------------------------------------------------------------------
+test_rollback_retains_only_three_recent_backups() {
+    echo "--- test_rollback_retains_only_three_recent_backups ---"
+    local slug="test-rollback-retain"
+    local case_dir="$TEST_ROOT/tc-retain"
+    local home_mock="$case_dir/home"
+    local repo_dir="$case_dir/repo"
+
+    mkdir -p "$case_dir"
+
+    # Create a minimal repo so rollback can resolve REPO_ROOT
+    create_skill_test_repo "$repo_dir" "$slug" "# Skill v1"
+
+    # Create 4 backup tarballs manually with sequential timestamps
+    local releases_dir="$home_mock/.openclaw/.releases/$slug"
+    mkdir -p "$releases_dir"
+
+    local staging="$case_dir/staging/$slug"
+
+    # backup_20260101 — oldest, should be pruned
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    echo "backup-01-content" > "$staging/marker.txt"
+    echo "# Skill backup-01" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20260101_000001.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # backup_20260102
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    echo "backup-02-content" > "$staging/marker.txt"
+    echo "# Skill backup-02" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20260102_000002.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # backup_20260103
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    echo "backup-03-content" > "$staging/marker.txt"
+    echo "# Skill backup-03" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20260103_000003.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # backup_20260104 — latest, should be restored and kept
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    echo "backup-04-content" > "$staging/marker.txt"
+    echo "# Skill backup-04" > "$staging/SKILL.md"
+    tar -czf "$releases_dir/backup_20260104_000004.tar.gz" -C "$case_dir/staging" "$slug"
+
+    # Set up current prod directory with distinct content
+    local prod_dir="$home_mock/.openclaw/skills/$slug"
+    mkdir -p "$prod_dir"
+    echo "current-prod-content" > "$prod_dir/marker.txt"
+    echo "# Skill current" > "$prod_dir/SKILL.md"
+
+    # Verify we have exactly 4 backups before rollback
+    local backup_count_before
+    backup_count_before=$(ls -1 "$releases_dir"/backup_*.tar.gz 2>/dev/null | wc -l)
+    if [ "$backup_count_before" -ne 4 ]; then
+        fail "Expected 4 backups before rollback, found $backup_count_before"
+    fi
+
+    # Invoke rollback
+    if ! HOME="$home_mock" HOME_MOCK="$home_mock" PATH="$BASE_PATH" \
+        bash "$repo_dir/scripts/skill_rollback.sh" "$slug" > /dev/null 2>&1; then
+        fail "Rollback exited with non-zero status"
+    fi
+
+    # Assert exactly 3 backup tarballs remain
+    local backup_count_after
+    backup_count_after=$(ls -1 "$releases_dir"/backup_*.tar.gz 2>/dev/null | wc -l)
+    if [ "$backup_count_after" -ne 3 ]; then
+        fail "Expected 3 backups after rollback, found $backup_count_after"
+    fi
+
+    # Assert oldest backup is removed
+    assert_file_not_exists "$releases_dir/backup_20260101_000001.tar.gz"
+
+    # Assert latest backup still exists
+    assert_file_exists "$releases_dir/backup_20260104_000004.tar.gz"
+
+    # Assert rollback restored content from latest backup
+    assert_file_content_equals "$prod_dir/marker.txt" "backup-04-content"
+
+    echo "✅ Passed"
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 test_generic_rollback_restores_latest_backup
@@ -410,6 +499,7 @@ test_rollback_fails_when_no_backups
 test_rollback_with_home_mock_isolation
 test_rollback_respects_sdlc_runtime_dir
 test_rollback_handles_symlink_prod_dir
+test_rollback_retains_only_three_recent_backups
 
 echo ""
 echo "✅ Skill Rollback Substrate Integration Tests PASSED"

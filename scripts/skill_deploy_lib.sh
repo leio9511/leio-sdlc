@@ -197,6 +197,13 @@ skill_rollback_run() {
     mkdir -p "$SKILLS_DIR"
     tar -xzf "$LATEST_BACKUP" -C "$SKILLS_DIR"
 
+    # -- Backup retention: keep at most 3 latest backups (filename-based sort) --
+    local _found_backups
+    _found_backups=$(ls -1 "$RELEASES_DIR"/backup_*.tar.gz 2>/dev/null | sort -r || true)
+    if [ -n "$_found_backups" ]; then
+        echo "$_found_backups" | tail -n +4 | xargs -r rm -f
+    fi
+
     # --no-restart is accepted as a compatibility no-op for rollback.
     # Gateway restart is NOT part of the skill rollback substrate (PRD §3.1.6).
 }
