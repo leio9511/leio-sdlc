@@ -127,19 +127,10 @@ Once the PRD / execution brief is written and saved, the PRD-authoring task is c
 
 Then:
 
-1. Trigger the Auditor using the current installed Auditor entrypoint:
+1. Trigger the Auditor by spawning an isolated sub-agent to execute the `prd_auditor` skill. Pass the absolute PRD file path and the project repository path as context.
 
-```bash
-python3 "${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}"/leio-sdlc/scripts/spawn_auditor.py \
-  --prd-file <Absolute_Path_To_PRD> \
-  --workdir <Project_Root> \
-  --channel <Channel_String>
-```
-
-This is the current installed Auditor entrypoint for the workflow today. If Auditor is later consolidated into `pm-skill`, this invocation path may change.
-
-2. If the Auditor returns `APPROVED`, notify the user and stop
-3. If the Auditor returns `REJECTED`, do not auto-correct the PRD
+2. If the Auditor returns `APPROVED`, notify the user and stop.
+3. If the Auditor returns `REJECTED`, do not auto-correct the PRD.
 
 On `REJECTED`, the agent must:
 - summarize the rejection clearly
@@ -152,7 +143,7 @@ Do not enter a loop where the PM mechanically edits one line per Auditor complai
 Do not let the Auditor become the de facto designer.
 Do not continue revising without explicit human approval.
 
-The agent should show understanding of the Auditor’s reasoning, but the human remains the decision-maker for the next revision.
+The agent should show understanding of the Auditor's reasoning, but the human remains the decision-maker for the next revision.
 
 ## Baseline rule
 
