@@ -13,7 +13,7 @@ NONCRITICAL_PYTHON3_BUCKETS = {
     "archived PRDs": [REPO_ROOT / "docs" / "PRs" / ".archive" / "PR_037_Micro_Slicing_Act.md"],
     "generated `.dist`": [REPO_ROOT / ".dist" / "TEMPLATES" / "organization_governance.md"],
     "templates/reference materials": [REPO_ROOT / "TEMPLATES" / "organization_governance.md"],
-    "non-default mocked/e2e examples": [REPO_ROOT / "scripts" / "e2e" / "mocked" / "e2e_test_preflight_guardrails.sh"],
+    "non-default mocked/e2e examples": [REPO_ROOT / "scripts" / "e2e" / "mocked" / "e2e_test_anti_reward_hacking.sh"],
 }
 CONTRACT_CRITICAL_ACTIVE_PATHS = [
     DEV_PYTHON,
@@ -58,7 +58,7 @@ def test_dev_python_wrapper_targets_repo_root_venv_without_activation():
     assert 'PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"' in wrapper
     assert 'REQUIREMENTS_FILE="${REPO_ROOT}/requirements.txt"' in wrapper
     assert 'python3 -m venv "${VENV_DIR}"' in wrapper
-    assert '"${PYTHON_BIN}" -m pip install -r "${REQUIREMENTS_FILE}"' in wrapper
+    assert 'safe_pip install -r "${REQUIREMENTS_FILE}"' in wrapper
     assert 'exec "${PYTHON_BIN}" "$@"' in wrapper
     assert "source .venv/bin/activate" not in wrapper
 

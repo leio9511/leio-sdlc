@@ -20,6 +20,14 @@ def global_restore_cwd():
     except FileNotFoundError:
         os.chdir(PROJECT_ROOT)
 
+@pytest.fixture(autouse=True)
+def global_restore_env():
+    """Globally restore environment variables after each test to prevent cross-test contamination."""
+    old_env = os.environ.copy()
+    yield
+    os.environ.clear()
+    os.environ.update(old_env)
+
 def init_git_test_sandbox(target_dir: str | Path, baseline_commit: bool = False):
     """
     Initializes a local git repository to achieve clean-runner parity.

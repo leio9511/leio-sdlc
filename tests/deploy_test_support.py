@@ -17,6 +17,10 @@ IGNORED_REPO_STATE = (
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
+    "*.lock",
+    ".tmp",
+    "mock_scaffold_project",
+    "*sandbox*",
 )
 
 

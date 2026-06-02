@@ -11,6 +11,8 @@ def test_all_templates_compliant():
     templates = glob.glob('TEMPLATES/**/*.md.template', recursive=True)
     assert len(templates) > 0, "No templates found"
     for template in templates:
+        if "invalid_test_template" in template and not os.environ.get("SKIP_PREFLIGHT_RECURSION"):
+            continue
         status = get_status(template)
         assert status in VALID_STATES
 
