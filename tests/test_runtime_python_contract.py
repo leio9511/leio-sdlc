@@ -110,9 +110,28 @@ def _make_runtime_venv(skill_root):
     venv_dir = skill_root / ".venv"
     bin_dir = venv_dir / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Symlink python to the active python running tests
     python = bin_dir / "python"
     if not python.exists():
         python.symlink_to(sys.executable)
+        
+    # Write pyvenv.cfg to activate virtual environment path resolution
+    pyvenv_cfg = venv_dir / "pyvenv.cfg"
+    pyvenv_cfg.write_text(
+        f"home = {os.path.dirname(sys.executable)}\n"
+        "include-system-site-packages = false\n"
+        f"version = {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}\n",
+        encoding="utf-8"
+    )
+    
+    # Symlink lib to parent venv's lib folder so we inherit all installed dependencies
+    parent_venv = REPO_ROOT / ".venv"
+    parent_lib = parent_venv / "lib"
+    mock_lib = venv_dir / "lib"
+    if parent_lib.exists() and not mock_lib.exists():
+        mock_lib.symlink_to(parent_lib)
+        
     return python
 
 
