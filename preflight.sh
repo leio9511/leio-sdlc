@@ -319,7 +319,7 @@ if [ -d "tests" ]; then
     if [[ "$MODE" == "$REPORT_ALL_MODE_NAME" && $TEMPLATE_COMPLIANCE_FAILED -eq 1 ]]; then
         mark_test_blocked "Pytest functional & unittest suite" "Template Compliance Gate failed earlier; broader pytest suite would only duplicate non-actionable structural failures"
     else
-        run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest tests/ "${PYTEST_IGNORE_ARGS[@]}"
+        run_test_argv "Pytest functional & unittest suite" "${PYTHON_CMD[@]}" -m pytest -n auto tests/ "${PYTEST_IGNORE_ARGS[@]}"
     fi
 fi
 

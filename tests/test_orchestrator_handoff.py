@@ -26,8 +26,12 @@ def _init_git_repo(workdir: Path) -> None:
         check=True,
         capture_output=True,
     )
+    # Ignore logger temp directory to prevent false dirty-workspace triggers
+    gitignore = workdir / ".gitignore"
+    gitignore.write_text(".tmp/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(workdir), "add", ".gitignore"], check=True, capture_output=True)
     subprocess.run(
-        ["git", "-C", str(workdir), "commit", "--allow-empty", "-m", "init"],
+        ["git", "-C", str(workdir), "commit", "-m", "init"],
         check=True,
         capture_output=True,
     )

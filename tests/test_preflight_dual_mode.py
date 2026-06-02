@@ -40,8 +40,8 @@ def _create_fixture_repo(tmp_path: Path, *, bash_scripts: list[tuple[str, str]],
         "from pathlib import Path\n\n"
         "def test_template_compliance_placeholder():\n"
         "    log_path = Path('order.log')\n"
-        "    existing = log_path.read_text(encoding='utf-8') if log_path.exists() else ''\n"
-        "    log_path.write_text(existing + 'template\\n', encoding='utf-8')\n"
+        "    with open(log_path, 'a', encoding='utf-8') as f:\n"
+        "        f.write('template\\n')\n"
         "    assert True\n",
     )
 
@@ -98,7 +98,8 @@ def test_default_preflight_command_is_fail_fast(tmp_path: Path):
                 "tests/test_late_pytest_probe.py",
                 "from pathlib import Path\n\n"
                 "def test_late_pytest_probe():\n"
-                "    Path('order.log').write_text(Path('order.log').read_text(encoding='utf-8') + 'late-pytest\\n', encoding='utf-8')\n"
+                "    with open('order.log', 'a', encoding='utf-8') as f:\n"
+                "        f.write('late-pytest\\n')\n"
                 "    assert True\n",
             )
         ],
@@ -144,7 +145,8 @@ def test_report_all_preflight_command_accumulates_multiple_failures(tmp_path: Pa
                 "from pathlib import Path\n\n"
                 "def test_pytest_failure_probe():\n"
                 "    log_path = Path('order.log')\n"
-                "    log_path.write_text(log_path.read_text(encoding='utf-8') + 'pytest-failure\\n', encoding='utf-8')\n"
+                "    with open(log_path, 'a', encoding='utf-8') as f:\n"
+                "        f.write('pytest-failure\\n')\n"
                 "    assert False, 'pytest failure probe'\n",
             )
         ],
@@ -185,7 +187,8 @@ def test_fail_fast_and_report_all_share_the_same_gate_surface(tmp_path: Path):
             "from pathlib import Path\n\n"
             "def test_gate_surface_probe():\n"
             "    log_path = Path('order.log')\n"
-            "    log_path.write_text(log_path.read_text(encoding='utf-8') + 'pytest-suite\\n', encoding='utf-8')\n"
+            "    with open(log_path, 'a', encoding='utf-8') as f:\n"
+            "        f.write('pytest-suite\\n')\n"
             "    assert True\n",
         )
     ]
@@ -206,9 +209,14 @@ def test_fail_fast_and_report_all_share_the_same_gate_surface(tmp_path: Path):
 
     assert fail_fast.returncode == 0
     assert report_all.returncode == 0
-    expected_gate_order = "template\nbash-alpha\nbash-beta\npytest-suite\ntemplate\n"
-    assert (fail_fast_repo / "order.log").read_text(encoding="utf-8") == expected_gate_order
-    assert (report_all_repo / "order.log").read_text(encoding="utf-8") == expected_gate_order
+    
+    def verify_gate_order(repo_path: Path):
+        lines = (repo_path / "order.log").read_text(encoding="utf-8").splitlines()
+        assert lines[:3] == ["template", "bash-alpha", "bash-beta"]
+        assert sorted(lines[3:]) == ["pytest-suite", "template"]
+
+    verify_gate_order(fail_fast_repo)
+    verify_gate_order(report_all_repo)
     assert "Starting Smart Preflight Checks (fail-fast mode)" in fail_fast.stdout
     assert "Starting Smart Preflight Checks (report-all mode)" in report_all.stdout
     assert "FINAL FAILURE SUMMARY" not in fail_fast.stdout
