@@ -37,22 +37,23 @@ rm -rf "${RUNTIME_VENV}"
 python3 -m venv "${RUNTIME_VENV}"
 ALLOW_FALLBACK=$(STAGING_ROOT="${STAGING_ROOT}" python3 -c '
 import json, os
-sdlc_root = os.environ.get("STAGING_ROOT", ".")
-default_path = os.path.join(sdlc_root, "config", "engines.default.json")
-local_path = os.path.join(sdlc_root, "config", "engines.local.json")
-val = False
-if os.path.exists(default_path):
-    try:
-        with open(default_path) as f:
-            val = json.load(f).get("allow_public_fallback", False)
-    except Exception: pass
-if os.path.exists(local_path):
-    try:
-        with open(local_path) as f:
-            local_config = json.load(f)
-            if "allow_public_fallback" in local_config:
-                val = local_config["allow_public_fallback"]
-    except Exception: pass
+val = os.environ.get("ALLOW_PUBLIC_FALLBACK_LOCAL_OVERRIDE") == "true"
+if not val:
+    sdlc_root = os.environ.get("STAGING_ROOT", ".")
+    default_path = os.path.join(sdlc_root, "config", "engines.default.json")
+    local_path = os.path.join(sdlc_root, "config", "engines.local.json")
+    if os.path.exists(default_path):
+        try:
+            with open(default_path) as f:
+                val = json.load(f).get("allow_public_fallback", False)
+        except Exception: pass
+    if os.path.exists(local_path):
+        try:
+            with open(local_path) as f:
+                local_config = json.load(f)
+                if "allow_public_fallback" in local_config:
+                    val = local_config["allow_public_fallback"]
+        except Exception: pass
 print("true" if val else "false")
 ')
 

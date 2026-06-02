@@ -45,7 +45,7 @@ def _create_runtime_venv(skill_root):
     subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
     runtime_python = venv_dir / "bin" / "python"
     subprocess.run(
-        [str(runtime_python), "-m", "pip", "install", "-r", str(REQUIREMENTS)],
+        [str(runtime_python), "-m", "pip", "install", "--index-url", "https://pypi.org/simple", "-r", str(REQUIREMENTS)],
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

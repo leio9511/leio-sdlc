@@ -9,6 +9,7 @@ from deploy_test_support import (
     canonical_releases_dir,
     canonical_skill_dir,
     isolated_repo_env,
+    install_fake_python_toolchain,
 )
 
 
@@ -29,6 +30,7 @@ def test_independent_symmetrical_rollbacks():
         mock_home = isolated["mock_home"]
         env = isolated["env"]
 
+        install_fake_python_toolchain(isolated_root, env)
         assert_isolated_checkout(isolated_root)
         assert env["HOME_MOCK"] == mock_home
 
@@ -78,6 +80,7 @@ def test_rollback_no_restart_with_mock():
         mock_home = isolated["mock_home"]
         env = isolated["env"]
 
+        install_fake_python_toolchain(isolated_root, env)
         assert_isolated_checkout(isolated_root)
 
         deploy_script = os.path.join(isolated_root, "kit-deploy.sh")
@@ -113,6 +116,7 @@ def test_rollback_lock_guardrails():
         mock_home = isolated["mock_home"]
         env = isolated["env"]
 
+        install_fake_python_toolchain(isolated_root, env)
         assert_isolated_checkout(isolated_root)
 
         deploy_script = os.path.join(isolated_root, "deploy.sh")

@@ -110,7 +110,7 @@ def _make_runtime_venv(skill_root):
     venv.EnvBuilder(with_pip=True).create(skill_root / ".venv")
     python = _venv_python(skill_root)
     subprocess.run(
-        [str(python), "-m", "pip", "install", "PyYAML"],
+        [str(python), "-m", "pip", "install", "PyYAML", "--index-url", "https://pypi.org/simple"],
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
