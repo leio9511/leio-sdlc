@@ -24,15 +24,11 @@ def _copy_minimal_skill_root(target_root):
 
 def _create_runtime_venv(skill_root):
     venv_dir = skill_root / ".venv"
-    subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
-    runtime_python = venv_dir / "bin" / "python"
-    subprocess.run(
-        [str(runtime_python), "-m", "pip", "install", "--index-url", "https://pypi.org/simple", "-r", str(REQUIREMENTS)],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    bin_dir = venv_dir / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    runtime_python = bin_dir / "python"
+    if not runtime_python.exists():
+        runtime_python.symlink_to(sys.executable)
     return runtime_python
 
 

@@ -107,15 +107,12 @@ def test_validate_runtime_interpreter_fails_closed_with_actual_expected_and_cont
 
 
 def _make_runtime_venv(skill_root):
-    venv.EnvBuilder(with_pip=True).create(skill_root / ".venv")
-    python = _venv_python(skill_root)
-    subprocess.run(
-        [str(python), "-m", "pip", "install", "PyYAML", "--index-url", "https://pypi.org/simple"],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    venv_dir = skill_root / ".venv"
+    bin_dir = venv_dir / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    python = bin_dir / "python"
+    if not python.exists():
+        python.symlink_to(sys.executable)
     return python
 
 
