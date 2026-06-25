@@ -49,26 +49,6 @@ Before using this skill, all of the following should already be true:
 
 If these conditions are not met, do not launch SDLC yet.
 
-## Python execution contract (Issue #57)
-
-Define a controlled, repeatable Python execution contract for local development, testing, deployed skill runtime, and GitHub CI without depending on unmanaged system Python state.
-
-The single Python dependency entry is requirements.txt at the repository root, currently serving runtime, development, and test dependencies together.
-
-Local development and testing use the repository-root .venv through explicit project entrypoints such as `scripts/dev_python.sh` and `preflight.sh`; the formal contract is not ambient shell state or manual activation memory.
-
-Deployed runtime commands use the deployed leio-sdlc skill root .venv, rebuilt per release in staging before atomic swap. Runtime launch examples in this skill bind to `${SDLC_SKILLS_ROOT:-$HOME/.openclaw/skills}/leio-sdlc/.venv/bin/python` or an equivalent documented runtime wrapper rather than ambient system Python.
-
-`scripts/runtime_smoke.py` is the official minimal no-side-effect smoke path shared by deploy/runtime and CI.
-
-Issue #57 is limited to leio-sdlc local development, testing, deployed runtime execution, and GitHub CI only. It does not solve ClawHub installation, public packaging/distribution contract, and cross-skill global runtime unification.
-
-Historical docs, archived PRDs, generated `.dist`, non-default mocked/e2e examples, templates, and reference material are tracked as Issue #59 follow-up cleanup debt when they contain legacy interpreter wording. Issue #59 does not exempt formal development/test entrypoints, deploy/runtime launch paths, GitHub CI default paths, or execution-contract-related smoke/tests from the controlled Issue #57 contract.
-
-The deployed `leio-sdlc` runtime `.venv` is isolated to `leio-sdlc`; it does not force `pm-skill` or other skills to inherit, share, or switch to the `leio-sdlc` runtime `.venv`.
-
-Use a minimal, no-side-effect official smoke path that proves interpreter binding, key imports, and startup-path initialization. Do not use full auditor/orchestrator/long-running business execution as default smoke validation.
-
 ## Relationship to the upstream lifecycle
 
 This skill is part of a larger human-agent software delivery protocol.
